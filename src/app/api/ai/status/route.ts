@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   return NextResponse.json({
-    provider: getActiveProvider(),
+    provider: await getActiveProvider(),
     timestamp: new Date().toISOString(),
   });
 }

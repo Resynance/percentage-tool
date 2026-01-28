@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const provider = getActiveProvider();
+    const provider = await getActiveProvider();
 
     if (provider !== 'openrouter') {
       return NextResponse.json({
