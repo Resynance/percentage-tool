@@ -7,10 +7,10 @@ export async function createClient() {
 
     // Unified environment variable extraction
     const supabaseUrl = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL)?.trim()?.replace(/['"]/g, '')
-    const supabaseKey = (process.env.SUPABASE_PUBLISHABLE_KEY || 
-                        process.env.SUPABASE_ANON_KEY || 
-                        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || 
-                        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)?.trim()?.replace(/['"]/g, '')
+    const supabaseKey = (process.env.SUPABASE_PUBLISHABLE_KEY ||
+        process.env.SUPABASE_ANON_KEY ||
+        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)?.trim()?.replace(/['"]/g, '')
 
     if (!supabaseUrl || !supabaseKey) {
         const errorMsg = `Supabase configuration missing (URL: ${supabaseUrl ? 'Set' : 'MISSING'}, Key: ${supabaseKey ? 'Set' : 'MISSING'}).`
@@ -48,8 +48,8 @@ export async function createClient() {
 export async function createAdminClient() {
     const supabaseUrl = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL)?.trim()?.replace(/['"]/g, '')
     const supabaseServiceKey = (
-        process.env.SUPABASE_SERVICE_ROLE_KEY || 
-        process.env.SERVICE_ROLE_KEY || 
+        process.env.SUPABASE_SERVICE_ROLE_KEY ||
+        process.env.SERVICE_ROLE_KEY ||
         process.env.SUPABASE_SERVICE_KEY
     )?.trim()?.replace(/['"]/g, '')
 
