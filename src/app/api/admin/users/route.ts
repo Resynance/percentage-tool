@@ -125,6 +125,10 @@ export async function POST(req: Request) {
         return NextResponse.json(updatedProfile)
     } catch (error: any) {
         console.error('[Admin API] Create user error:', error)
-        return NextResponse.json({ error: error.message }, { status: 500 })
+        let message = error.message
+        if (message.includes('already been registered')) {
+            message = 'A user with this email already exists in Supabase Auth (auth.users), but is missing from the profiles table. Please delete them from the Supabase Auth dashboard before trying again.'
+        }
+        return NextResponse.json({ error: message }, { status: 500 })
     }
 }

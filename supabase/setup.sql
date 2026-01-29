@@ -11,7 +11,7 @@ END $$;
 -- Note: In Supabase SQL editor, you can run multiple statements.
 ALTER TYPE "UserRole" ADD VALUE IF NOT EXISTS 'PENDING' BEFORE 'USER';
 
--- 2. Create the profiles table
+-- 2. Create or Update the profiles table
 CREATE TABLE IF NOT EXISTS public.profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   email TEXT UNIQUE NOT NULL,
@@ -20,6 +20,13 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Ensure existing tables have the new column
+ALTER TABLE public.profiles
+ADD COLUMN IF NOT EXISTS "mustResetPassword" BOOLEAN DEFAULT FALSE;
+
+-- Force a reload of the PostgREST schema cache
+NOTIFY pgrst, 'reload schema';
 
 -- 3. Enable RLS
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;

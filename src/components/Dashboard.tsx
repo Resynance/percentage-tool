@@ -147,7 +147,7 @@ export default function Dashboard() {
                     </Link>
 
 
-                    {aiStatus?.provider === 'openrouter' && aiStatus.balance && (
+                    {aiStatus?.provider === 'openrouter' && aiStatus.balance && typeof aiStatus.balance.credits === 'number' && (
                         <div className="glass-card" style={{
                             padding: '8px 16px',
                             display: 'flex',

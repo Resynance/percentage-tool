@@ -14,9 +14,9 @@ export function createClient() {
     }
 
     if (!supabaseUrl || !supabaseKey) {
-        const errorMsg = 'NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY is missing.'
+        const errorMsg = 'SUPABASE_URL or ANAL_KEY/PUBLISHABLE_KEY is missing. Check your NEXT_PUBLIC_ variables.'
         console.error('[Supabase Client]', errorMsg)
-        throw new Error(errorMsg)
+        return null;
     }
 
     return createBrowserClient(

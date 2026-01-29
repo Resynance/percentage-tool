@@ -33,6 +33,10 @@ export default function ResetPasswordPage() {
         }
 
         try {
+            if (!supabase) {
+                throw new Error('Supabase client failed to initialize. Please check your NEXT_PUBLIC_SUPABASE_URL environment variable.');
+            }
+
             // 1. Update Supabase Auth password
             const { error: authError } = await supabase.auth.updateUser({
                 password: password
