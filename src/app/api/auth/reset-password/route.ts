@@ -1,5 +1,4 @@
-
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 
@@ -12,8 +11,9 @@ export async function POST() {
     }
 
     try {
+        const adminSupabase = await createAdminClient()
         // Update the profile to clear the reset flag
-        const { error: updateError } = await supabase
+        const { error: updateError } = await adminSupabase
             .from('profiles')
             .update({ mustResetPassword: false })
             .eq('id', user.id)
