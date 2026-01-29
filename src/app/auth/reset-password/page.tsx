@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Lock, Loader2, CheckCircle2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { clearResetFlagAction } from './actions';
 
 export default function ResetPasswordPage() {
     const [password, setPassword] = useState('');
@@ -37,45 +38,31 @@ export default function ResetPasswordPage() {
                 throw new Error('Supabase client failed to initialize. Please check your NEXT_PUBLIC_SUPABASE_URL environment variable.');
             }
 
+            console.log('[ResetPassword] Attempting Auth password update...');
             // 1. Update Supabase Auth password
             const { error: authError } = await supabase.auth.updateUser({
                 password: password
             });
 
             if (authError) throw authError;
+            console.log('[ResetPassword] Auth password updated successfully');
 
-            // 2. Update profile in Prisma via an API call (to be created or use exist logic)
-            // For now, let's assume we have a simple PATCH endpoint or we do it here if RLS allows
-            // Better to use an API route to handle the side effect cleanly
-            const res = await fetch('/api/auth/reset-password', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ password })
-            });
-
-            if (!res.ok) {
-                const data = await res.json();
-                console.error('[Reset Password] API Error:', data);
-                throw new Error(data.error || 'Failed to update profile');
+            // 2. Clear reset flag via Server Action
+            console.log('[ResetPassword] Calling clearResetFlagAction...');
+            const result = await clearResetFlagAction();
+            
+            if (!result.success) {
+                throw new Error(result.error || 'Failed to clear password reset flag');
             }
 
-            const data = await res.json();
-            console.log('[Reset Password] API Response Detail:', data);
-
-            if (data.updated === 0 || data.currentState === true) {
-                const diag = data.diagnostics || {};
-                const msg = data.updated === 0 
-                    ? `Update failed (0 rows affected). ID: ${diag.id}, Email: ${diag.email}.`
-                    : `Update ran, but the flag remained TRUE. State: ${data.currentState}, Found: ${data.found}.`;
-                
-                throw new Error(`${msg} Please check if you have duplicate records in your profiles table.`);
-            }
+            console.log('[ResetPassword] Flag cleared successfully. Affected rows:', result.count);
 
             setSuccess(true);
             setTimeout(() => {
                 router.push('/');
             }, 2000);
         } catch (err: any) {
+            console.error('[ResetPassword] Critical flow error:', err);
             setError(err.message);
         } finally {
             setLoading(false);

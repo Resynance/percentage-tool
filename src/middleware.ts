@@ -59,7 +59,7 @@ export async function middleware(request: NextRequest) {
         const url = request.nextUrl.clone()
         url.pathname = '/login'
         const response = NextResponse.redirect(url)
-        response.headers.set('Cache-Control', 'no-store, max-age=0')
+        response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0')
         return response
     }
 
@@ -82,7 +82,7 @@ export async function middleware(request: NextRequest) {
             const url = request.nextUrl.clone()
             url.pathname = '/waiting-approval'
             const response = NextResponse.redirect(url)
-            response.headers.set('Cache-Control', 'no-store, max-age=0')
+            response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0')
             return response
         }
 
@@ -91,7 +91,7 @@ export async function middleware(request: NextRequest) {
             const url = request.nextUrl.clone()
             url.pathname = '/auth/reset-password'
             const response = NextResponse.redirect(url)
-            response.headers.set('Cache-Control', 'no-store, max-age=0')
+            response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0')
             return response
         }
     }
