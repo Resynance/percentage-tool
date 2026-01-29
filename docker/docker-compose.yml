@@ -4,19 +4,19 @@ services:
   # The Next.js Application
   app:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: docker/Dockerfile
       target: deps
     container_name: percentage-tool-app
     restart: always
     ports:
       - "3000:3000"
     volumes:
-      - .:/app
+      - ..:/app
       - /app/node_modules
       - /app/.next
     env_file:
-      - .env
+      - ../.env
     environment:
       - HOSTNAME=0.0.0.0
       # Use the internal docker service name 'db' as the host
