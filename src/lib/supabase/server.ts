@@ -47,10 +47,19 @@ export async function createClient() {
  */
 export async function createAdminClient() {
     const supabaseUrl = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL)?.trim()?.replace(/['"]/g, '')
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()?.replace(/['"]/g, '')
+    const supabaseServiceKey = (
+        process.env.SUPABASE_SERVICE_ROLE_KEY || 
+        process.env.SERVICE_ROLE_KEY || 
+        process.env.SUPABASE_SERVICE_KEY
+    )?.trim()?.replace(/['"]/g, '')
 
     if (!supabaseUrl || !supabaseServiceKey) {
         throw new Error('Supabase Admin config missing (SUPABASE_SERVICE_ROLE_KEY)')
+    }
+
+    // Diagnostic check: if the key is an anon key, it will fail admin operations
+    if (supabaseServiceKey.includes('anon')) {
+        console.warn('[Supabase Admin] The provided key appears to be an ANON key, not a SERVICE ROLE key. Admin operations will likely fail.')
     }
 
     return createServerClient(
