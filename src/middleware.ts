@@ -65,13 +65,20 @@ export async function middleware(request: NextRequest) {
 
     if (user) {
         // Check for PENDING role
-        const { data: profile } = await supabase
+        const { data: profile, error: profileError } = await supabase
             .from('profiles')
             .select('role, mustResetPassword')
             .eq('id', user.id)
             .single() as any
 
+        if (profileError) {
+            console.error(`[Middleware] Profile fetch error for ${user.id}:`, profileError.message)
+        } else {
+            console.log(`[Middleware] User: ${user.email}, Role: ${profile?.role}, ResetReq: ${profile?.mustResetPassword}`)
+        }
+
         if (profile?.role === 'PENDING' && !request.nextUrl.pathname.startsWith('/waiting-approval') && !request.nextUrl.pathname.startsWith('/auth')) {
+            console.log(`[Middleware] Redirecting ${user.email} to /waiting-approval (Role: PENDING)`)
             const url = request.nextUrl.clone()
             url.pathname = '/waiting-approval'
             const response = NextResponse.redirect(url)
@@ -80,6 +87,7 @@ export async function middleware(request: NextRequest) {
         }
 
         if (profile?.mustResetPassword && !request.nextUrl.pathname.startsWith('/auth/reset-password') && !request.nextUrl.pathname.startsWith('/auth/callback')) {
+            console.log(`[Middleware] Redirecting ${user.email} to /auth/reset-password (mustResetPassword: true)`)
             const url = request.nextUrl.clone()
             url.pathname = '/auth/reset-password'
             const response = NextResponse.redirect(url)

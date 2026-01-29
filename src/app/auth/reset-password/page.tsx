@@ -55,7 +55,15 @@ export default function ResetPasswordPage() {
 
             if (!res.ok) {
                 const data = await res.json();
+                console.error('[Reset Password] API Error:', data);
                 throw new Error(data.error || 'Failed to update profile');
+            }
+
+            const data = await res.json();
+            console.log('[Reset Password] API Success:', data);
+
+            if (data.updated === 0) {
+                throw new Error('Your password was updated, but we could not find your profile to clear the "Reset Password" flag. Please contact an administrator.');
             }
 
             setSuccess(true);
