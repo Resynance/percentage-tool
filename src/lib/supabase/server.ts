@@ -40,3 +40,27 @@ export async function createClient() {
         }
     )
 }
+
+/**
+ * ADMIN CLIENT: Uses Service Role Key to bypass RLS and perform admin actions.
+ * NEVER use this on the client side.
+ */
+export async function createAdminClient() {
+    const supabaseUrl = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL)?.trim()?.replace(/['"]/g, '')
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()?.replace(/['"]/g, '')
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+        throw new Error('Supabase Admin config missing (SUPABASE_SERVICE_ROLE_KEY)')
+    }
+
+    return createServerClient(
+        supabaseUrl,
+        supabaseServiceKey,
+        {
+            cookies: {
+                getAll() { return [] },
+                setAll() { },
+            },
+        }
+    )
+}

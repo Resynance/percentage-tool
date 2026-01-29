@@ -74,6 +74,12 @@ export async function middleware(request: NextRequest) {
             url.pathname = '/waiting-approval'
             return NextResponse.redirect(url)
         }
+
+        if (profile?.mustResetPassword && !request.nextUrl.pathname.startsWith('/auth/reset-password') && !request.nextUrl.pathname.startsWith('/auth/callback')) {
+            const url = request.nextUrl.clone()
+            url.pathname = '/auth/reset-password'
+            return NextResponse.redirect(url)
+        }
     }
 
     return supabaseResponse

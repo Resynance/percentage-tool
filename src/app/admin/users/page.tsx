@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { UserCheck, UserX, Shield, User as UserIcon, Loader2, ArrowLeft } from 'lucide-react';
+import { UserCheck, UserX, Shield, User as UserIcon, Loader2, ArrowLeft, UserPlus } from 'lucide-react';
 import Link from 'next/link';
 
 interface Profile {
@@ -16,6 +16,13 @@ export default function UserManagementPage() {
     const [users, setUsers] = useState<Profile[]>([]);
     const [loading, setLoading] = useState(true);
     const [actioningId, setActioningId] = useState<string | null>(null);
+    
+    // Create User Form State
+    const [showCreateForm, setShowCreateForm] = useState(false);
+    const [newEmail, setNewEmail] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [newRole, setNewRole] = useState('USER');
+    const [isCreating, setIsCreating] = useState(false);
 
     useEffect(() => {
         fetchUsers();
@@ -32,6 +39,33 @@ export default function UserManagementPage() {
             console.error('Failed to fetch users', err);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleCreateUser = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsCreating(true);
+        try {
+            const res = await fetch('/api/admin/users', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: newEmail, password: newPassword, role: newRole })
+            });
+
+            if (res.ok) {
+                const newUser = await res.json();
+                setUsers([newUser, ...users]);
+                setShowCreateForm(false);
+                setNewEmail('');
+                setNewPassword('');
+            } else {
+                const data = await res.json();
+                alert(data.error || 'Failed to create user');
+            }
+        } catch (err) {
+            console.error('Create user error:', err);
+        } finally {
+            setIsCreating(false);
         }
     };
 
@@ -78,11 +112,70 @@ export default function UserManagementPage() {
                 }}>
                     <ArrowLeft size={16} /> Back to Dashboard
                 </Link>
-                <h1 className="premium-gradient" style={{ fontSize: '2.5rem', marginBottom: '8px' }}>User Management</h1>
-                <p style={{ color: 'rgba(255,255,255,0.6)' }}>Approve new sign-ups and manage permissions.</p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                    <div>
+                        <h1 className="premium-gradient" style={{ fontSize: '2.5rem', marginBottom: '8px' }}>User Management</h1>
+                        <p style={{ color: 'rgba(255,255,255,0.6)' }}>Approve new sign-ups and manage permissions.</p>
+                    </div>
+                    <button 
+                        onClick={() => setShowCreateForm(!showCreateForm)}
+                        className="btn-primary" 
+                        style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 24px' }}
+                    >
+                        <UserPlus size={18} /> {showCreateForm ? 'Cancel' : 'Add New User'}
+                    </button>
+                </div>
             </header>
 
             <main style={{ display: 'flex', flexDirection: 'column', gap: '48px' }}>
+                {/* Create User Form */}
+                {showCreateForm && (
+                    <section className="glass-card" style={{ padding: '32px', border: '1px solid var(--accent)' }}>
+                        <h2 style={{ fontSize: '1.25rem', marginBottom: '24px' }}>Create New User</h2>
+                        <form onSubmit={handleCreateUser} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '20px', alignItems: 'flex-end' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <label style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.6)' }}>Email Address</label>
+                                <input 
+                                    type="email" 
+                                    required 
+                                    className="input-field" 
+                                    value={newEmail}
+                                    onChange={(e) => setNewEmail(e.target.value)}
+                                    placeholder="user@example.com"
+                                />
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <label style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.6)' }}>Initial Password</label>
+                                <input 
+                                    type="password" 
+                                    required 
+                                    className="input-field" 
+                                    value={newPassword}
+                                    onChange={(e) => setNewPassword(e.target.value)}
+                                    placeholder="••••••••"
+                                />
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <label style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.6)' }}>Role</label>
+                                <select 
+                                    className="input-field"
+                                    value={newRole}
+                                    onChange={(e) => setNewRole(e.target.value)}
+                                    style={{ padding: '10px' }}
+                                >
+                                    <option value="USER">User</option>
+                                    <option value="MANAGER">Manager</option>
+                                    <option value="ADMIN">Admin</option>
+                                </select>
+                            </div>
+                            <div style={{ gridColumn: 'span 3', display: 'flex', justifyContent: 'flex-end' }}>
+                                <button type="submit" className="btn-primary" disabled={isCreating} style={{ padding: '12px 32px' }}>
+                                    {isCreating ? <Loader2 className="animate-spin" size={20} /> : 'Create User & Require Password Reset'}
+                                </button>
+                            </div>
+                        </form>
+                    </section>
+                )}
                 {/* Pending Approvals Section */}
                 <section>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>

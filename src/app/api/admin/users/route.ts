@@ -63,3 +63,55 @@ export async function PATCH(req: Request) {
         return NextResponse.json({ error: error.message }, { status: 500 })
     }
 }
+
+export async function POST(req: Request) {
+    const supabase = await createClient()
+    const { data: { user: adminUser } } = await supabase.auth.getUser()
+
+    if (!adminUser) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const adminProfile = await prisma.profile.findUnique({
+        where: { id: adminUser.id }
+    })
+
+    if (adminProfile?.role !== 'ADMIN') {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    try {
+        const { email, password, role } = await req.json()
+
+        if (!email || !password || !role) {
+            return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+        }
+
+        const { createAdminClient } = await import('@/lib/supabase/server')
+        const adminClient = await createAdminClient()
+
+        // 1. Create user in Supabase Auth (bypassing confirmation)
+        const { data: authData, error: authError } = await adminClient.auth.admin.createUser({
+            email,
+            password,
+            email_confirm: true,
+            user_metadata: { role }
+        })
+
+        if (authError) throw authError
+
+        // 2. Update the profile created by the trigger to set role and forced reset
+        const updatedProfile = await prisma.profile.update({
+            where: { id: authData.user.id },
+            data: { 
+                role: role as any,
+                mustResetPassword: true 
+            }
+        })
+
+        return NextResponse.json(updatedProfile)
+    } catch (error: any) {
+        console.error('[Admin API] Create user error:', error)
+        return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+}

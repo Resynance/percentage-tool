@@ -48,6 +48,7 @@ model Profile {
   id        String   @id
   email     String   @unique
   role      UserRole @default(PENDING)
+  mustResetPassword Boolean @default(false)
   projects  Project[]
   
   createdAt DateTime @default(now())
