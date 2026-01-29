@@ -2,9 +2,14 @@
 DO $$ 
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'UserRole') THEN
-        CREATE TYPE "UserRole" AS ENUM ('PENDING', 'USER', 'MANAGER', 'ADMIN');
+        CREATE TYPE "UserRole" AS ENUM ('USER', 'MANAGER', 'ADMIN');
     END IF;
 END $$;
+
+-- Ensure 'PENDING' value exists in the enum (must be run outside DO block)
+-- We wrap this in a separate execution or just provide the command
+-- Note: In Supabase SQL editor, you can run multiple statements.
+ALTER TYPE "UserRole" ADD VALUE IF NOT EXISTS 'PENDING' BEFORE 'USER';
 
 -- 2. Create the profiles table
 CREATE TABLE IF NOT EXISTS public.profiles (
@@ -20,10 +25,14 @@ ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
 -- 4. Create Policies
 -- Users can view their own profile
+DROP POLICY IF EXISTS "Users can view own profile" ON public.profiles;
+
 CREATE POLICY "Users can view own profile" ON public.profiles FOR
 SELECT USING (auth.uid () = id);
 
 -- Admins can view and manage all profiles
+DROP POLICY IF EXISTS "Admins can manage all profiles" ON public.profiles;
+
 CREATE POLICY "Admins can manage all profiles" ON public.profiles FOR ALL USING (
     EXISTS (
         SELECT 1

@@ -22,7 +22,7 @@ export default async function LoginPage({
                     Sign in to manage your bonus windows.
                 </p>
 
-                <form style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <form action={login} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         <label htmlFor="email" style={{ fontSize: '0.9rem', fontWeight: '500' }}>Email Address</label>
                         <input
@@ -72,7 +72,7 @@ export default async function LoginPage({
                     )}
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
-                        <button formAction={login} className="btn-primary">
+                        <button type="submit" className="btn-primary">
                             Sign In
                         </button>
                         <button formAction={signup} style={{ 
