@@ -18,27 +18,28 @@ model Project {
   records      DataRecord[]
   ingestJobs   IngestJob[]
   analyticsJobs AnalyticsJob[]
-  
+
   // AI-generated summary reports (cached for dashboard display)
   lastTaskAnalysis String?       @map("lastTaskAnalysis") @db.Text
   lastFeedbackAnalysis String?   @map("lastFeedbackAnalysis") @db.Text
-  
+
   // Grounding Data: Guidelines PDF stored as a base64 string for RAG analysis
   guidelines   String?       @db.Text
   guidelinesFileName String? @map("guidelinesFileName")
-  
+
   createdAt    DateTime      @default(now()) @map("createdAt")
   updatedAt    DateTime      @updatedAt @map("updatedAt")
 
   @@map("projects")
-}
+  }
 
 enum UserRole {
   PENDING
   USER
   MANAGER
   ADMIN
-}
+
+  }
 
 /**
  * PROFILE: Application-specific user data.
@@ -50,20 +51,18 @@ model Profile {
   role      UserRole @default(PENDING)
   mustResetPassword Boolean @default(false) @map("mustResetPassword")
   projects  Project[]
-  
+
   createdAt DateTime @default(now()) @map("createdAt")
   updatedAt DateTime @updatedAt @map("updatedAt")
 
   @@map("profiles")
-}
-
-// ... (existing RecordType/RecordCategory)
+  }
 
 model AnalyticsJob {
   id            String      @id @default(cuid())
   projectId     String      @map("projectId")
   project       Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  status        String      @default("PENDING") 
+  status        String      @default("PENDING")
   totalRecords  Int         @default(0) @map("totalRecords")
   processedCount Int         @default(0) @map("processedCount")
   error         String?     @db.Text
@@ -71,17 +70,19 @@ model AnalyticsJob {
   updatedAt     DateTime    @updatedAt @map("updatedAt")
 
   @@map("analytics_jobs")
-}
+  }
 
 enum RecordType {
   TASK        // Individual prompt/request
   FEEDBACK    // Human or AI evaluation of a task
-}
+
+  }
 
 enum RecordCategory {
   TOP_10      // High quality/aligned
   BOTTOM_10   // Low quality/unaligned
-}
+
+  }
 
 /**
  * DATA RECORD: The core data unit.
@@ -100,21 +101,21 @@ model DataRecord {
   hasBeenReviewed Boolean      @default(false) // Whether a human rater has reviewed this record
   isCategoryCorrect Boolean?    // Rater's agreement: true if they agree with TOP_10/BOTTOM_10 classification
   reviewedBy    String?        // TODO: Update to authenticated user once auth is implemented
-  
+
   // AI-generated comparison against the project guidelines
   alignmentAnalysis String?    @map("alignmentAnalysis") @db.Text
-  
+
   ingestJobId   String?        @map("ingestJobId")
 
   createdAt     DateTime       @default(now()) @map("createdAt")
   updatedAt     DateTime       @updatedAt @map("updatedAt")
 
   @@map("data_records")
-}
+  }
 
 /**
  * INGEST JOB: Background process tracker.
- * Used to manage long-running CSV uploads and API syncs. 
+ * Used to manage long-running CSV uploads and API syncs.
  * Allows the UI to poll for real-time progress bars.
  */
 model IngestJob {
@@ -132,7 +133,7 @@ model IngestJob {
   updatedAt     DateTime    @updatedAt @map("updatedAt")
 
   @@map("ingest_jobs")
-}
+  }
 
 model SystemSetting {
   key         String   @id
@@ -141,4 +142,4 @@ model SystemSetting {
   updatedAt   DateTime @updatedAt @map("updatedAt")
 
   @@map("system_settings")
-}
+  }

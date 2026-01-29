@@ -1,4 +1,4 @@
-
+import { defineConfig } from '@prisma/config';
 import fs from 'fs';
 import path from 'path';
 
@@ -7,7 +7,8 @@ function loadEnv() {
   const envPath = path.resolve(process.cwd(), '.env');
   if (fs.existsSync(envPath)) {
     const envFile = fs.readFileSync(envPath, 'utf8');
-    envFile.split('\n').forEach(line => {
+    // Handle both Unix (\n) and Windows (\r\n) line endings
+    envFile.split(/\r?\n/).forEach(line => {
       const match = line.match(/^([^#=]+)=(.*)$/);
       if (match) {
         const key = match[1].trim();
@@ -24,12 +25,14 @@ function loadEnv() {
 
 loadEnv();
 
-export default {
+export default defineConfig({
   schema: "prisma/schema.prisma",
   migrations: {
     path: "prisma/migrations",
   },
   datasource: {
-    url: process.env.DATABASE_URL,
+    // Use DIRECT_URL for CLI operations (migrations/db push) - bypasses pgbouncer
+    // Runtime queries use DATABASE_URL configured in Prisma Client
+    url: process.env.DIRECT_URL || process.env.DATABASE_URL,
   },
-};
+});
