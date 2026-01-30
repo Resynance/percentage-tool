@@ -1,9 +1,16 @@
+// NOTE: multiSchema is only needed because the database has a foreign key
+// constraint from public.profiles to auth.users (Supabase's auth schema).
+// Once you fully integrate Supabase auth into this schema OR remove that constraint,
+// you can remove the multiSchema preview feature and all @@schema("public") annotations.
+
 generator client {
   provider = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
 }
 
 datasource db {
   provider = "postgresql"
+  schemas  = ["public", "auth"]
 }
 
 /**
@@ -31,7 +38,8 @@ model Project {
   updatedAt    DateTime      @updatedAt @map("updatedAt")
 
   @@map("projects")
-  }
+  @@schema("public")
+}
 
 enum UserRole {
   PENDING
@@ -39,7 +47,7 @@ enum UserRole {
   MANAGER
   ADMIN
 
-  
+  @@schema("public")
 }
 
 /**
@@ -57,7 +65,8 @@ model Profile {
   updatedAt DateTime @updatedAt @map("updatedAt")
 
   @@map("profiles")
-  }
+  @@schema("public")
+}
 
 model AnalyticsJob {
   id            String      @id @default(cuid())
@@ -71,20 +80,21 @@ model AnalyticsJob {
   updatedAt     DateTime    @updatedAt @map("updatedAt")
 
   @@map("analytics_jobs")
-  }
+  @@schema("public")
+}
 
 enum RecordType {
   TASK        // Individual prompt/request
   FEEDBACK    // Human or AI evaluation of a task
 
-  
+  @@schema("public")
 }
 
 enum RecordCategory {
   TOP_10      // High quality/aligned
   BOTTOM_10   // Low quality/unaligned
 
-  
+  @@schema("public")
 }
 
 /**
@@ -108,13 +118,19 @@ model DataRecord {
   // AI-generated comparison against the project guidelines
   alignmentAnalysis String?    @map("alignmentAnalysis") @db.Text
 
+  // User tracking fields from ingestion
+  createdById     String?        @map("createdById")
+  createdByName   String?        @map("createdByName")
+  createdByEmail  String?        @map("createdByEmail")
+
   ingestJobId   String?        @map("ingestJobId")
 
   createdAt     DateTime       @default(now()) @map("createdAt")
   updatedAt     DateTime       @updatedAt @map("updatedAt")
 
   @@map("data_records")
-  }
+  @@schema("public")
+}
 
 /**
  * INGEST JOB: Background process tracker.
@@ -136,7 +152,8 @@ model IngestJob {
   updatedAt     DateTime    @updatedAt @map("updatedAt")
 
   @@map("ingest_jobs")
-  }
+  @@schema("public")
+}
 
 model SystemSetting {
   key         String   @id
@@ -145,4 +162,6 @@ model SystemSetting {
   updatedAt   DateTime @updatedAt @map("updatedAt")
 
   @@map("system_settings")
-  }
+  @@schema("public")
+}
+

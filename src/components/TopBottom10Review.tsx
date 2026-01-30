@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { ChevronLeft, ChevronRight, Check, X } from "lucide-react";
 
 interface ReviewRecord {
@@ -17,7 +17,6 @@ interface ReviewRecord {
 
 export default function TopBottom10Review() {
   const searchParams = useSearchParams();
-  const router = useRouter();
   const projectId = searchParams.get("projectId");
 
   const [category, setCategory] = useState<"TOP_10" | "BOTTOM_10">("TOP_10");
@@ -144,39 +143,16 @@ export default function TopBottom10Review() {
 
   return (
     <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "0 20px" }}>
-      <div style={{
+      <h1
+        style={{
+          fontSize: "28px",
+          fontWeight: "bold",
+          color: "white",
           marginBottom: "20px",
-          display: "flex",
-          alignItems: "center",
-          gap: "12px",
         }}
       >
-        <button
-          onClick={() => router.push("/")}
-          style={{
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-            color: "white",
-            padding: 0,
-            display: "flex",
-            alignItems: "center",
-            opacity: 0.7,
-          }}
-        >
-          <ChevronLeft size={20} />
-        </button>
-        <h1
-          style={{
-            fontSize: "28px",
-            fontWeight: "bold",
-            color: "white",
-            marginBottom: "0",
-          }}
-        >
-          Review Top/Bottom 10% Prompts
-        </h1>
-      </div>
+        Review Top/Bottom 10% Prompts
+      </h1>
 
       {loading ? (
         <div

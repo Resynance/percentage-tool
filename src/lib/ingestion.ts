@@ -304,7 +304,10 @@ export async function processAndStore(records: any[], options: IngestOptions, jo
                     source,
                     content: v.content,
                     metadata: typeof v.record === 'object' ? v.record : { value: v.record },
-                    embedding: []
+                    embedding: [],
+                    createdById: v.record?.created_by_id ? String(v.record.created_by_id) : null,
+                    createdByName: v.record?.created_by_name ? String(v.record.created_by_name) : null,
+                    createdByEmail: v.record?.created_by_email ? String(v.record.created_by_email) : null,
                 }
             })
         ));

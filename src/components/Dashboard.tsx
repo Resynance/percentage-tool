@@ -128,6 +128,10 @@ export default function Dashboard() {
                         <BarChart3 size={18} /> Analytics
                     </Link>
 
+                    <Link href={`/similarity?projectId=${selectedProject?.id}`} className="glass-card" style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', color: 'rgba(255,255,255,0.7)' }}>
+                        <Sparkles size={18} /> Similarity
+                    </Link>
+
                     <Link href="/ingest" className="glass-card" style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', color: 'rgba(255,255,255,0.7)' }}>
                         <Database size={18} /> Ingest
                     </Link>
