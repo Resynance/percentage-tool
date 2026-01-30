@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 /**
- * Authentication Middleware
+ * Authentication Proxy
  *
  * Handles authentication and authorization for all routes:
  * - Redirects unauthenticated users to /login
@@ -15,7 +15,7 @@ import { NextResponse, type NextRequest } from 'next/server'
  * - Production: Uses Vercel environment variables with Supabase Cloud
  * - Tests: Uses .env.test with local Supabase
  */
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
     let supabaseResponse = NextResponse.next({
         request,
     })
@@ -31,7 +31,7 @@ export async function middleware(request: NextRequest) {
 
     if (!supabaseUrl || !supabaseKey) {
         if (request.nextUrl.pathname !== '/favicon.ico' && !request.nextUrl.pathname.startsWith('/_next')) {
-            console.warn('[Middleware] Supabase config missing or invalid. URL:', supabaseUrl ? 'Set' : 'MISSING', 'Key:', supabaseKey ? 'Set' : 'MISSING')
+            console.warn('[Proxy] Supabase config missing or invalid. URL:', supabaseUrl ? 'Set' : 'MISSING', 'Key:', supabaseKey ? 'Set' : 'MISSING')
         }
         return supabaseResponse
     }
@@ -59,11 +59,15 @@ export async function middleware(request: NextRequest) {
 
     // IMPORTANT: Avoid writing any logic between createServerClient and
     // getUser(). A simple mistake could make it very hard to debug issues
-    // related to the middleware refreshing the user's session.
+    // related to the proxy refreshing the user's session.
 
     const {
         data: { user },
     } = await supabase.auth.getUser()
+
+    if (process.env.NODE_ENV === 'development') {
+        console.log('[Proxy]', request.nextUrl.pathname, '- User:', user ? user.email : 'none')
+    }
 
     if (
         !user &&
@@ -71,6 +75,7 @@ export async function middleware(request: NextRequest) {
         !request.nextUrl.pathname.startsWith('/auth')
     ) {
         // no user, redirect to login page
+        console.log('[Proxy] No user found, redirecting to /login from', request.nextUrl.pathname)
         const url = request.nextUrl.clone()
         url.pathname = '/login'
         const response = NextResponse.redirect(url)
@@ -87,7 +92,7 @@ export async function middleware(request: NextRequest) {
             .single() as any
 
         if (profileError) {
-            console.error(`[Middleware] Profile fetch error for ${user.id}:`, profileError.message)
+            console.error(`[Proxy] Profile fetch error for ${user.id}:`, profileError.message)
         }
 
         if (profile?.role === 'PENDING' && !request.nextUrl.pathname.startsWith('/waiting-approval') && !request.nextUrl.pathname.startsWith('/auth')) {
@@ -117,8 +122,9 @@ export const config = {
          * - _next/static (static files)
          * - _next/image (image optimization files)
          * - favicon.ico (favicon file)
+         * - api (API routes - they handle their own auth)
          * Feel free to modify this pattern to include more paths.
          */
-        '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+        '/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
     ],
 }
