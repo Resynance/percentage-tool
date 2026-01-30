@@ -1,6 +1,4 @@
-
 import { type NextRequest, NextResponse } from 'next/server'
-// The client you created in Step 1
 import { createClient } from '@/lib/supabase/server'
 
 export async function GET(request: NextRequest) {
@@ -12,17 +10,23 @@ export async function GET(request: NextRequest) {
   if (code) {
     const supabase = await createClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
+
     if (!error) {
-      const forwardedHost = request.headers.get('x-forwarded-host') // i.e. local.vercely.com
+      const forwardedHost = request.headers.get('x-forwarded-host')
       const isLocalEnv = process.env.NODE_ENV === 'development'
+
+      let redirectUrl: string
       if (isLocalEnv) {
-        // we can be sure that origin is localhost
-        return NextResponse.redirect(`${origin}${next}`)
+        redirectUrl = `${origin}${next}`
       } else if (forwardedHost) {
-        return NextResponse.redirect(`https://${forwardedHost}${next}`)
+        redirectUrl = `https://${forwardedHost}${next}`
       } else {
-        return NextResponse.redirect(`${origin}${next}`)
+        redirectUrl = `${origin}${next}`
       }
+
+      return NextResponse.redirect(redirectUrl)
+    } else {
+      console.error('[Auth Callback] Session exchange failed:', error.message)
     }
   }
 

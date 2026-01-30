@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
 export async function login(formData: FormData) {
@@ -18,6 +19,8 @@ export async function login(formData: FormData) {
         redirect('/login?error=' + encodeURIComponent(error.message))
     }
 
+    // Revalidate to ensure cookies are committed before redirect
+    revalidatePath('/', 'layout')
     redirect('/')
 }
 
