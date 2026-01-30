@@ -5,33 +5,6 @@ import { findSimilarRecords } from '@/lib/similarity';
 
 export const dynamic = 'force-dynamic';
 
-type SortField = 'createdAt' | 'alignmentScore' | 'environment';
-type SortOrder = 'asc' | 'desc';
-
-interface DataRecordRow {
-    id: string;
-    projectId: string;
-    type: string;
-    category: string | null;
-    source: string;
-    content: string;
-    metadata: Record<string, unknown> | null;
-    embedding: number[];
-    hasBeenReviewed: boolean;
-    isCategoryCorrect: boolean | null;
-    reviewedBy: string | null;
-    alignmentAnalysis: string | null;
-    ingestJobId: string | null;
-    createdAt: Date;
-    updatedAt: Date;
-}
-
-// Validation constants
-const VALID_TYPES = ['TASK', 'FEEDBACK'] as const;
-const VALID_CATEGORIES = ['TOP_10', 'BOTTOM_10'] as const;
-const VALID_SORT_FIELDS = ['createdAt', 'alignmentScore', 'environment'] as const;
-const VALID_SORT_ORDERS = ['asc', 'desc'] as const;
-
 export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const projectId = searchParams.get('projectId');
@@ -128,10 +101,8 @@ export async function GET(req: NextRequest) {
         });
 
         return NextResponse.json({ records, total });
-
-    } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        return NextResponse.json({ error: message }, { status: 500 });
+    } catch (error: any) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }
 
