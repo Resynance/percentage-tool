@@ -56,6 +56,7 @@ export default function PromptSimilarityPage() {
 
         setAllPrompts(data.prompts);
         setUsers(data.users);
+        setError(null);
       } catch (err: any) {
         setError(err.message);
       }
