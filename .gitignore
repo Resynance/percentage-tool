@@ -48,6 +48,10 @@ next-env.d.ts
 
 /src/generated/prisma
 
+# Prisma migrations - DO NOT USE
+# This project uses Supabase migrations, not Prisma migrations
+# Prisma is only for type-safe database access
+/prisma/migrations/
 
 .claude
 CLAUDE.md
