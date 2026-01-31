@@ -14,20 +14,27 @@ export async function GET() {
         let dbHost = 'Unknown';
         let dbPort = 'Unknown';
 
-        try {
-            // regex to capture host and port: postgres://user:pass@HOST:PORT/db
-            const match = dbUrl.match(/@([^:]+):(\d+)\//);
-            if (match) {
-                dbHost = match[1];
-                dbPort = match[2];
-            } else if (dbUrl.includes('@')) {
-                // Fallback simpler parse
-                const parts = dbUrl.split('@')[1].split('/')[0].split(':');
-                dbHost = parts[0];
-                dbPort = parts[1] || '5432';
+        // If we have a connection URL, parse it
+        if (dbUrl) {
+            try {
+                // regex to capture host and port: postgres://user:pass@HOST:PORT/db
+                const match = dbUrl.match(/@([^:]+):(\d+)\//);
+                if (match) {
+                    dbHost = match[1];
+                    dbPort = match[2];
+                } else if (dbUrl.includes('@')) {
+                    // Fallback simpler parse
+                    const parts = dbUrl.split('@')[1].split('/')[0].split(':');
+                    dbHost = parts[0];
+                    dbPort = parts[1] || '5432';
+                }
+            } catch (e) {
+                console.error('Failed to parse DB URL', e);
             }
-        } catch (e) {
-            console.error('Failed to parse DB URL', e);
+        } else {
+            // If no URL available, check for individual components
+            dbHost = process.env.POSTGRES_HOST || 'Unknown';
+            dbPort = '5432'; // Default PostgreSQL port
         }
 
         // Determine AI Provider info
