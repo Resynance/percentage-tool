@@ -129,39 +129,43 @@ async function processJobs(projectId: string) {
 /**
  * Phase 2: Vectorization
  * Iterates through records in the project that lack embeddings and generates them using the active AI provider.
- * 
+ *
  * Note: Scoped to the Project ID. This serves as a self-healing mechanism: any record in the project
  * missing an embedding (from this job or previous failed jobs) will be processed.
  */
 async function vectorizeJob(jobId: string, projectId: string) {
     const RECORDS_BATCH_SIZE = 50;
-
-    // Fetch records that need embeddings (empty arrays)
-    // We prioritize records with empty embeddings to ensure 100% coverage.
-    // Using cursor-based pagination for stability during updates.
-    let cursor: string | undefined;
+    const MAX_CONSECUTIVE_FAILURES = 3;
+    let consecutiveFailures = 0;
+    let totalEmbedded = 0;
 
     while (true) {
         // Check for cancellation
         const job = await prisma.ingestJob.findUnique({ where: { id: jobId }, select: { status: true } });
         if (job?.status === 'CANCELLED') break;
 
+        // Fetch records that need embeddings (empty arrays)
+        // No cursor - we always fetch records that still need embeddings
+        // Successfully embedded records won't appear in subsequent queries
         const batch = await prisma.dataRecord.findMany({
             where: {
                 projectId,
                 embedding: { equals: [] }
             },
             take: RECORDS_BATCH_SIZE,
-            cursor: cursor ? { id: cursor } : undefined,
-            skip: cursor ? 1 : 0,
-            orderBy: { id: 'asc' } // Stable ordering
+            orderBy: { id: 'asc' }
         });
 
         if (batch.length === 0) break;
 
         // Generate embeddings
         const contents = batch.map(r => r.content);
+        console.log(`[Vectorize] Generating embeddings for ${contents.length} records...`);
+
         const embeddings = await getEmbeddings(contents);
+
+        // Count successful embeddings in this batch
+        let batchSuccess = 0;
 
         // Save back to DB
         for (let i = 0; i < batch.length; i++) {
@@ -171,11 +175,39 @@ async function vectorizeJob(jobId: string, projectId: string) {
                     where: { id: batch[i].id },
                     data: { embedding: vector }
                 });
+                batchSuccess++;
+                totalEmbedded++;
             }
         }
 
-        cursor = batch[batch.length - 1].id;
+        console.log(`[Vectorize] Batch result: ${batchSuccess}/${batch.length} successful (total: ${totalEmbedded})`);
+
+        // Track consecutive failures to detect persistent API issues
+        if (batchSuccess === 0) {
+            consecutiveFailures++;
+            console.error(`[Vectorize] Batch failed completely (${consecutiveFailures}/${MAX_CONSECUTIVE_FAILURES} consecutive failures)`);
+
+            if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+                // Mark job as failed due to embedding API issues
+                await prisma.ingestJob.update({
+                    where: { id: jobId },
+                    data: {
+                        status: 'FAILED',
+                        error: `Embedding generation failed after ${MAX_CONSECUTIVE_FAILURES} consecutive batch failures. Check AI provider configuration and API key.`
+                    }
+                });
+                console.error(`[Vectorize] Job ${jobId} failed: embedding API not responding`);
+                return;
+            }
+
+            // Wait before retry to avoid hammering a failing API
+            await new Promise(resolve => setTimeout(resolve, 2000));
+        } else {
+            consecutiveFailures = 0; // Reset on any success
+        }
     }
+
+    console.log(`[Vectorize] Job ${jobId} completed. Total embedded: ${totalEmbedded}`);
 }
 
 /**

@@ -138,16 +138,24 @@ export async function getEmbedding(text: string): Promise<number[]> {
  */
 export async function getEmbeddings(texts: string[]): Promise<number[][]> {
   const config = await getProviderConfig();
+  const TIMEOUT_MS = 60000; // 60 second timeout for embedding requests
 
   // SANITIZE: Remove empty strings and handle malformed inputs to reduce tokenizer warnings.
   // This prevents the "last token is not SEP" warning from common embedding models (like Qwen).
   const sanitizedInput = texts.map(t => (typeof t === 'string' ? t.trim() : ''));
 
   if (sanitizedInput.every(t => t.length === 0)) {
+    console.warn('[Embeddings] All inputs are empty, returning empty embeddings');
     return texts.map(() => []);
   }
 
   try {
+    // Create abort controller for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+    console.log(`[Embeddings] Requesting ${texts.length} embeddings from ${config.provider} (model: ${config.embeddingModel})`);
+
     const response = await fetch(`${config.baseUrl}/embeddings`, {
       method: 'POST',
       headers: getHeaders(config),
@@ -155,18 +163,44 @@ export async function getEmbeddings(texts: string[]): Promise<number[][]> {
         model: config.embeddingModel,
         input: sanitizedInput,
       }),
+      signal: controller.signal,
     });
+
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(`${config.provider} error: ${response.statusText} ${JSON.stringify(errorData)}`);
+      const errorMsg = `${config.provider} embedding error (${response.status}): ${response.statusText} ${JSON.stringify(errorData)}`;
+      console.error(`[Embeddings] ${errorMsg}`);
+      throw new Error(errorMsg);
     }
 
     const data = await response.json();
-    return data.data.map((item: any) => item.embedding);
-  } catch (error) {
-    console.error(`Error getting embeddings batch (${config.provider}):`, error);
-    // Return empty embeddings for the batch if one fails
+
+    // Validate response structure
+    if (!data.data || !Array.isArray(data.data)) {
+      console.error(`[Embeddings] Invalid response structure from ${config.provider}:`, JSON.stringify(data).slice(0, 500));
+      throw new Error(`Invalid embedding response: missing 'data' array`);
+    }
+
+    const embeddings = data.data.map((item: any) => item.embedding);
+
+    // Validate that we got actual embeddings
+    const validCount = embeddings.filter((e: any) => Array.isArray(e) && e.length > 0).length;
+    if (validCount === 0) {
+      console.error(`[Embeddings] No valid embeddings in response from ${config.provider}`);
+      throw new Error(`No valid embeddings returned`);
+    }
+
+    console.log(`[Embeddings] Received ${validCount}/${texts.length} valid embeddings`);
+    return embeddings;
+  } catch (error: any) {
+    if (error.name === 'AbortError') {
+      console.error(`[Embeddings] Request timed out after ${TIMEOUT_MS}ms`);
+    } else {
+      console.error(`[Embeddings] Error from ${config.provider}:`, error.message);
+    }
+    // Return empty embeddings for the batch on failure
     return texts.map(() => []);
   }
 }
