@@ -129,53 +129,110 @@ async function processJobs(projectId: string) {
 /**
  * Phase 2: Vectorization
  * Iterates through records in the project that lack embeddings and generates them using the active AI provider.
- * 
+ *
  * Note: Scoped to the Project ID. This serves as a self-healing mechanism: any record in the project
  * missing an embedding (from this job or previous failed jobs) will be processed.
+ * 
+ * Retry Strategy:
+ * - Tracks failed record IDs to avoid infinite retries on the same batch
+ * - After MAX_RETRIES_PER_RECORD attempts, marks records with embedding error status
+ * - Continues processing other batches instead of failing the entire job on intermittent API failures
  */
 async function vectorizeJob(jobId: string, projectId: string) {
     const RECORDS_BATCH_SIZE = 50;
-
-    // Fetch records that need embeddings (empty arrays)
-    // We prioritize records with empty embeddings to ensure 100% coverage.
-    // Using cursor-based pagination for stability during updates.
-    let cursor: string | undefined;
+    const MAX_RETRIES_PER_RECORD = 3;
+    const failedRecordAttempts = new Map<string, number>(); // Track retry attempts per record
+    let totalEmbedded = 0;
+    let totalSkipped = 0;
 
     while (true) {
         // Check for cancellation
         const job = await prisma.ingestJob.findUnique({ where: { id: jobId }, select: { status: true } });
         if (job?.status === 'CANCELLED') break;
 
+        // Fetch records that need embeddings (empty arrays) and are not permanently failed
         const batch = await prisma.dataRecord.findMany({
             where: {
                 projectId,
                 embedding: { equals: [] }
             },
             take: RECORDS_BATCH_SIZE,
-            cursor: cursor ? { id: cursor } : undefined,
-            skip: cursor ? 1 : 0,
-            orderBy: { id: 'asc' } // Stable ordering
+            orderBy: { id: 'asc' }
         });
 
         if (batch.length === 0) break;
 
-        // Generate embeddings
-        const contents = batch.map(r => r.content);
-        const embeddings = await getEmbeddings(contents);
+        // Separate records by retry status
+        const recordsToProcess: typeof batch = [];
+        const recordsToSkip: typeof batch = [];
 
-        // Save back to DB
-        for (let i = 0; i < batch.length; i++) {
-            const vector = embeddings[i];
-            if (vector && vector.length > 0) {
-                await prisma.dataRecord.update({
-                    where: { id: batch[i].id },
-                    data: { embedding: vector }
-                });
+        for (const record of batch) {
+            const attempts = failedRecordAttempts.get(record.id) || 0;
+            if (attempts >= MAX_RETRIES_PER_RECORD) {
+                recordsToSkip.push(record);
+            } else {
+                recordsToProcess.push(record);
             }
         }
 
-        cursor = batch[batch.length - 1].id;
+        // Skip records that have exceeded max retry attempts
+        for (const record of recordsToSkip) {
+            await prisma.dataRecord.update({
+                where: { id: record.id },
+                data: {
+                    embedding: [], // Keep as empty to mark as failed
+                    metadata: {
+                        ...(typeof record.metadata === 'object' ? record.metadata : {}),
+                        embeddingError: `Failed to generate embedding after ${MAX_RETRIES_PER_RECORD} attempts`
+                    }
+                }
+            });
+            totalSkipped++;
+            failedRecordAttempts.delete(record.id);
+        }
+
+        if (recordsToProcess.length === 0) continue;
+
+        // Generate embeddings
+        const contents = recordsToProcess.map(r => r.content);
+        console.log(`[Vectorize] Generating embeddings for ${contents.length} records...`);
+
+        const embeddings = await getEmbeddings(contents);
+
+        // Count successful embeddings in this batch
+        let batchSuccess = 0;
+
+        // Save back to DB
+        for (let i = 0; i < recordsToProcess.length; i++) {
+            const vector = embeddings[i];
+            const record = recordsToProcess[i];
+
+            if (vector && vector.length > 0) {
+                await prisma.dataRecord.update({
+                    where: { id: record.id },
+                    data: { embedding: vector }
+                });
+                batchSuccess++;
+                totalEmbedded++;
+                // Clear from failed attempts on success
+                failedRecordAttempts.delete(record.id);
+            } else {
+                // Track failed attempt
+                const attempts = failedRecordAttempts.get(record.id) || 0;
+                failedRecordAttempts.set(record.id, attempts + 1);
+            }
+        }
+
+        console.log(`[Vectorize] Batch result: ${batchSuccess}/${recordsToProcess.length} successful (total: ${totalEmbedded}, skipped: ${totalSkipped})`);
+
+        // Wait briefly to avoid hammering API if experiencing issues
+        if (batchSuccess === 0 && recordsToProcess.length > 0) {
+            console.warn(`[Vectorize] Batch failed, waiting before retry...`);
+            await new Promise(resolve => setTimeout(resolve, 2000));
+        }
     }
+
+    console.log(`[Vectorize] Job ${jobId} completed. Total embedded: ${totalEmbedded}, skipped due to persistent failures: ${totalSkipped}`);
 }
 
 /**
