@@ -25,6 +25,10 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 ALTER TABLE public.profiles
 ADD COLUMN IF NOT EXISTS "mustResetPassword" BOOLEAN DEFAULT FALSE;
 
+-- Ensure updatedAt has default for existing tables
+ALTER TABLE public.profiles
+ALTER COLUMN "updatedAt" SET DEFAULT NOW();
+
 -- Force a reload of the PostgREST schema cache
 NOTIFY pgrst, 'reload schema';
 
@@ -58,8 +62,8 @@ CREATE POLICY "Admins can manage all profiles" ON public.profiles FOR ALL USING 
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO public.profiles (id, email, role)
-  VALUES (new.id, new.email, 'PENDING');
+  INSERT INTO public.profiles (id, email, role, "createdAt", "updatedAt")
+  VALUES (new.id, new.email, 'PENDING', NOW(), NOW());
   RETURN new;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
