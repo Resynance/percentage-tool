@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Folder, Settings, Database, BarChart3, ShieldAlert, FileCheck, Sparkles, Wallet } from 'lucide-react';
+import { Folder, Settings, Database, BarChart3, ShieldAlert, FileCheck, Sparkles, Wallet, Star, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 
 interface Project {
@@ -42,6 +42,7 @@ export default function Dashboard() {
     const [selectedProject, setSelectedProject] = useState<Project | null>(null);
     const [records, setRecords] = useState<Record[]>([]);
     const [aiStatus, setAiStatus] = useState<AIStatus | null>(null);
+    const [promptsDropdownOpen, setPromptsDropdownOpen] = useState(false);
 
     // UI State
     const [loading, setLoading] = useState(true);
@@ -128,26 +129,42 @@ export default function Dashboard() {
                         <BarChart3 size={18} /> Analytics
                     </Link>
 
-                    <Link href={`/similarity?projectId=${selectedProject?.id}`} className="glass-card" style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', color: 'rgba(255,255,255,0.7)' }}>
-                        <Sparkles size={18} /> Similarity
-                    </Link>
 
                     <Link href="/ingest" className="glass-card" style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', color: 'rgba(255,255,255,0.7)' }}>
                         <Database size={18} /> Ingest
-                    </Link>
-                    
-                    <Link href={`/topbottom10?projectId=${selectedProject?.id}`} className="glass-card" style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', color: 'rgba(255,255,255,0.7)' }}>
-                        <FileCheck size={18} /> Top/Bottom 10
-                    </Link>
-
-                    <Link href={`/top-prompts?projectId=${selectedProject?.id}`} className="glass-card" style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', color: 'rgba(255,255,255,0.7)' }}>
-                        <ShieldAlert size={18} /> Top Prompts
                     </Link>
 
                     <Link href="/manage" className="glass-card" style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', color: 'rgba(255,255,255,0.7)' }}>
                         <Settings size={18} /> Manage
                     </Link>
 
+                    {/* Prompts Dropdown */}
+                    <div style={{ position: 'relative' }}>
+                        <button
+                            onClick={() => setPromptsDropdownOpen(!promptsDropdownOpen)}
+                            className="glass-card"
+                            style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', color: 'rgba(255,255,255,0.7)', border: 'none', cursor: 'pointer', background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(10px)', borderRadius: '8px' }}
+                        >
+                            <Sparkles size={18} /> Prompt Review <ChevronDown size={16} style={{ transition: 'transform 0.2s', transform: promptsDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)' }} />
+                        </button>
+
+                        {promptsDropdownOpen && (
+                            <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: '8px', minWidth: '180px', zIndex: 1000, background: 'rgba(20, 20, 30, 0.95)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', overflow: 'hidden' }}>
+                                <Link href={`/similarity?projectId=${selectedProject?.id}`} className="prompt-dropdown-item" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 16px', color: 'rgba(255,255,255,0.7)', textDecoration: 'none', fontSize: '0.9rem' }} onClick={() => setPromptsDropdownOpen(false)}>
+                                    <Sparkles size={16} /> Similarity
+                                </Link>
+                                <Link href={`/topbottom10?projectId=${selectedProject?.id}`} className="prompt-dropdown-item" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 16px', color: 'rgba(255,255,255,0.7)', textDecoration: 'none', fontSize: '0.9rem' }} onClick={() => setPromptsDropdownOpen(false)}>
+                                    <FileCheck size={16} /> Top/Bottom 10
+                                </Link>
+                                <Link href={`/likert-scoring?projectId=${selectedProject?.id}`} className="prompt-dropdown-item" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 16px', color: 'rgba(255,255,255,0.7)', textDecoration: 'none', fontSize: '0.9rem' }} onClick={() => setPromptsDropdownOpen(false)}>
+                                    <Star size={16} /> Likert Scoring
+                                </Link>
+                                <Link href={`/top-prompts?projectId=${selectedProject?.id}`} className="prompt-dropdown-item" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 16px', color: 'rgba(255,255,255,0.7)', textDecoration: 'none', fontSize: '0.9rem' }} onClick={() => setPromptsDropdownOpen(false)}>
+                                    <ShieldAlert size={16} /> Top Prompts
+                                </Link>
+                            </div>
+                        )}
+                    </div>
 
                     {aiStatus?.provider === 'openrouter' && aiStatus.balance && typeof aiStatus.balance.credits === 'number' && (
                         <div className="glass-card" style={{
