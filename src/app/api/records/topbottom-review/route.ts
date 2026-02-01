@@ -1,6 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { RecordCategory } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
+
+type RecordCategory = 'TOP_10' | 'BOTTOM_10';
+
+type RecordWithoutScores = {
+    id: string;
+    content: string;
+    category: RecordCategory | null;
+    source: string;
+    metadata: Record<string, any> | null;
+    alignmentAnalysis: string | null;
+    isCategoryCorrect: boolean | null;
+    hasBeenReviewed: boolean;
+    reviewedBy: string | null;
+};
 
 export async function GET(req: NextRequest) {
     try {
@@ -50,7 +63,37 @@ export async function GET(req: NextRequest) {
             },
         });
 
-        return NextResponse.json({ records, total: records.length });
+        // Fetch Likert scores for each record and calculate averages
+        const recordsWithScores = await Promise.all(
+            records.map(async (record: RecordWithoutScores) => {
+                const likertScores = await prisma.likertScore.findMany({
+                    where: { recordId: record.id },
+                    select: {
+                        realismScore: true,
+                        qualityScore: true,
+                    },
+                });
+
+                const avgRealism = likertScores.length > 0
+                    ? likertScores.reduce((sum: number, s: { realismScore: number; qualityScore: number }) => sum + s.realismScore, 0) / likertScores.length
+                    : null;
+
+                const avgQuality = likertScores.length > 0
+                    ? likertScores.reduce((sum: number, s: { realismScore: number; qualityScore: number }) => sum + s.qualityScore, 0) / likertScores.length
+                    : null;
+
+                return {
+                    ...record,
+                    likertScores: {
+                        count: likertScores.length,
+                        avgRealism: avgRealism ? parseFloat(avgRealism.toFixed(1)) : null,
+                        avgQuality: avgQuality ? parseFloat(avgQuality.toFixed(1)) : null,
+                    },
+                };
+            })
+        );
+
+        return NextResponse.json({ records: recordsWithScores, total: recordsWithScores.length });
     } catch (error) {
         console.error('Error fetching records:', error);
         return NextResponse.json(
