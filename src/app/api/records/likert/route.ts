@@ -6,10 +6,14 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const projectId = searchParams.get('projectId');
-    const userId = searchParams.get('userId') || 'test-user-id'; // TODO: Replace with actual auth
+    const userId = searchParams.get('userId');
 
     if (!projectId) {
       return NextResponse.json({ error: 'Project ID is required' }, { status: 400 });
+    }
+
+    if (!userId) {
+      return NextResponse.json({ error: 'User ID is required' }, { status: 401 });
     }
 
     // Get all record IDs that this user has already rated
@@ -56,12 +60,12 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { recordId, userId = 'test-user-id', realismScore, qualityScore } = body;
+    const { recordId, userId, realismScore, qualityScore } = body;
 
     // Validate input
-    if (!recordId || !realismScore || !qualityScore) {
+    if (!recordId || !userId || !realismScore || !qualityScore) {
       return NextResponse.json(
-        { error: 'Missing required fields: recordId, realismScore, qualityScore' },
+        { error: 'Missing required fields: recordId, userId, realismScore, qualityScore' },
         { status: 400 }
       );
     }
