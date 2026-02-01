@@ -15,22 +15,37 @@ async function callLLMProvider(
     model: string
 ): Promise<{ realism: number; quality: number } | null> {
     try {
-        const provider = process.env.LLM_PROVIDER || 'openrouter'; // Default to openrouter
-        const apiHost = process.env.AI_HOST || process.env.OPENROUTER_API_URL || 'https://openrouter.io/api/v1';
-        const apiKey = process.env.AI_API_KEY || process.env.OPENROUTER_API_KEY;
+        // Determine provider based on OpenRouter API key availability (matches lib/ai.ts logic)
+        const openRouterKey = process.env.OPENROUTER_API_KEY;
+        const isOpenRouter = !!openRouterKey;
+        
+        let apiHost: string;
+        let apiKey: string | undefined;
+        
+        if (isOpenRouter) {
+            apiHost = process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1';
+            apiKey = openRouterKey;
+        } else {
+            apiHost = process.env.AI_HOST || 'http://localhost:1234/v1';
+            apiKey = process.env.AI_API_KEY;
+        }
 
-        if (!apiKey) {
-            console.error(`Missing API key for LLM provider: ${provider}`);
+        if (!apiKey && isOpenRouter) {
+            console.error('Missing API key for OpenRouter');
             return null;
+        }
+
+        const headers: Record<string, string> = {
+            "Content-Type": "application/json",
+        };
+        
+        if (isOpenRouter && apiKey) {
+            headers["Authorization"] = `Bearer ${apiKey}`;
         }
 
         const response = await fetch(`${apiHost}/chat/completions`, {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                ...(provider === 'openrouter' && { "Authorization": `Bearer ${apiKey}` }),
-                ...(provider === 'lmstudio' && {}), // LMStudio typically doesn't require auth
-            },
+            headers,
             body: JSON.stringify({
                 model,
                 // The content is subject to change, this is just an example prompt. We will likely pass in instructions in the future.
@@ -54,7 +69,7 @@ Respond in JSON format only: {"realism": <1-7>, "quality": <1-7>}`,
         });
 
         if (!response.ok) {
-            console.error(`LLM provider (${provider}) error for model ${model}:`, response.statusText);
+            console.error(`LLM provider error for model ${model}:`, response.statusText);
             return null;
         }
 
@@ -62,7 +77,7 @@ Respond in JSON format only: {"realism": <1-7>, "quality": <1-7>}`,
         const content = data.choices?.[0]?.message?.content;
 
         if (!content) {
-            console.error(`No content from LLM provider (${provider}) for model ${model}`);
+            console.error(`No content from LLM provider for model ${model}`);
             return null;
         }
 
