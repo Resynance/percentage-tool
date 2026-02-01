@@ -187,3 +187,26 @@ model BonusWindow {
   @@schema("public")
 }
 
+/**
+ * LIKERT SCORE: User or LLM ratings for prompts on Realism and Quality scales (1-7).
+ * Each user can rate a prompt only once.
+ * For LLM evaluations, userId is the reserved LLM UUID (00000000-0000-0000-0000-000000000000)
+ * and llmModel contains the model name (e.g., "gpt-4", "claude-3").
+ */
+model LikertScore {
+  id              String      @id @default(cuid())
+  recordId        String      @map("recordId")
+  userId          String      @map("userId")
+  realismScore    Int         @map("realismScore") // 1-7 scale
+  qualityScore    Int         @map("qualityScore") // 1-7 scale
+  llmModel        String?     @map("llmModel") // Name of LLM if this is an LLM evaluation
+  createdAt       DateTime    @default(now()) @map("createdAt")
+  updatedAt       DateTime    @updatedAt @map("updatedAt")
+
+  @@index([recordId])
+  @@index([userId])
+  @@index([llmModel])
+  @@map("likert_scores")
+  @@schema("public")
+}
+
