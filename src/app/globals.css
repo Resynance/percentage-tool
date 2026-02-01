@@ -147,3 +147,12 @@ h3 {
   opacity: 1;
   transform: translateX(-50%) scale(1);
 }
+/* Dropdown Item Styles */
+.prompt-dropdown-item {
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.prompt-dropdown-item:hover {
+  background-color: rgba(0, 112, 243, 0.15) !important;
+  color: rgba(255, 255, 255, 0.9) !important;
+}
