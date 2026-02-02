@@ -379,9 +379,10 @@ export async function getOpenRouterBalance(): Promise<BalanceInfo | null> {
     const data = await response.json();
     const usage = data.data?.usage || 0;
     const limit = data.data?.limit;
+    const limitRemaining = data.data?.limit_remaining;
 
     return {
-      credits: limit ? limit - usage : 0,
+      credits: limitRemaining ?? (limit ? limit - usage : 0),
       usage,
       limit,
     };
