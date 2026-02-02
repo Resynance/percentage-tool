@@ -35,7 +35,6 @@ export default function BugReportsPage() {
       }
 
       const data = await response.json()
-      console.log('Fetched bug reports:', data.bugReports)
       setReports(data.bugReports)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
@@ -47,7 +46,6 @@ export default function BugReportsPage() {
   const updateStatus = async (id: string, status: string, assignedTo?: string) => {
     try {
       setUpdatingId(id)
-      console.log('Sending PATCH request:', { id, status, assignedTo })
       const response = await fetch('/api/bug-reports', {
         method: 'PATCH',
         headers: {

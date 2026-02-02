@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,6 +27,28 @@ export async function POST(request: NextRequest) {
     if (!pageUrl || !description) {
       return NextResponse.json(
         { error: 'Missing required fields: pageUrl, description' },
+        { status: 400 }
+      )
+    }
+
+    // Validate input types and lengths
+    if (typeof description !== 'string' || description.length > 10000) {
+      return NextResponse.json(
+        { error: 'Description must be a string under 10000 characters' },
+        { status: 400 }
+      )
+    }
+
+    if (typeof pageUrl !== 'string' || pageUrl.length > 2000) {
+      return NextResponse.json(
+        { error: 'Page URL must be a string under 2000 characters' },
+        { status: 400 }
+      )
+    }
+
+    if (userAgent && typeof userAgent !== 'string') {
+      return NextResponse.json(
+        { error: 'User agent must be a string' },
         { status: 400 }
       )
     }
@@ -117,11 +140,9 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json()
-    console.log('Received PATCH body:', body)
     const { id, status, assignedTo } = body
 
     if (!id || !status) {
-      console.log('Missing fields - id:', id, 'status:', status)
       return NextResponse.json(
         { error: 'Missing required fields: id, status' },
         { status: 400 }
@@ -137,10 +158,10 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Update the bug report
-    const updateData: any = {
+    const updateData: Prisma.BugReportUpdateInput = {
       status,
       assignedTo: assignedTo === 'self' ? user.id : null,
-      assignedToEmail: assignedTo === 'self' ? profile.email : null,
+      assignedToEmail: assignedTo === 'self' ? (profile?.email ?? null) : null,
     }
 
     const bugReport = await prisma.bugReport.update({
