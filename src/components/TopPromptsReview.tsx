@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { Check } from "lucide-react";
+import { useProjects } from "@/hooks/useProjects";
 
 interface TopPromptRecord {
     id: string;
@@ -13,11 +14,25 @@ interface TopPromptRecord {
     isCategoryCorrect: boolean | null;
     hasBeenReviewed: boolean;
     reviewedBy: string | null;
+    likertScores: {
+        count: number;
+        avgRealism: number | null;
+        avgQuality: number | null;
+    };
 }
 
 export default function TopPromptsReview() {
     const searchParams = useSearchParams();
-    const projectId = searchParams.get("projectId");
+    const {
+        projects,
+        selectedProjectId,
+        setSelectedProjectId,
+        loading: projectsLoading,
+        error: projectsError
+    } = useProjects({
+        autoSelectFirst: true,
+        initialProjectId: searchParams.get("projectId") || ""
+    });
 
     const [allRecords, setAllRecords] = useState<TopPromptRecord[]>([]);
     const [environments, setEnvironments] = useState<string[]>([]);
@@ -38,11 +53,13 @@ export default function TopPromptsReview() {
     });
 
     useEffect(() => {
-        fetchRecords();
-    }, [projectId]);
+        if (selectedProjectId) {
+            fetchRecords();
+        }
+    }, [selectedProjectId]);
 
     const fetchRecords = async () => {
-        if (!projectId || projectId.trim() === "" || projectId === "undefined") {
+        if (!selectedProjectId || selectedProjectId.trim() === "" || selectedProjectId === "undefined") {
             setError("No project selected");
             setLoading(false);
             return;
@@ -53,7 +70,7 @@ export default function TopPromptsReview() {
             setError(null);
 
             const response = await fetch(
-                `/api/records/topbottom-review?projectId=${projectId}&category=TOP_10&includeReviewed=true`,
+                `/api/records/topbottom-review?projectId=${selectedProjectId}&category=TOP_10&includeReviewed=true`,
             );
 
             if (!response.ok) {
@@ -86,21 +103,10 @@ export default function TopPromptsReview() {
     };
 
     return (
-        <div style={{ maxWidth: "1600px", margin: "0 auto", padding: "0 20px 20px 20px" }}>
-            <div style={{ marginBottom: "16px" }}>
-                <h1
-                    className="premium-gradient"
-                    style={{
-                        fontSize: "1.75rem",
-                        fontWeight: "bold",
-                        marginBottom: "4px",
-                    }}
-                >
-                    Top Prompts
-                </h1>
-                <p style={{ color: "rgba(255,255,255,0.5)", fontSize: "13px", margin: 0 }}>
-                    Browse and filter top-performing prompts
-                </p>
+        <div style={{ width: "100%", maxWidth: "1600px", margin: "0 auto" }}>
+            <div style={{ marginBottom: "24px" }}>
+                <h1 className="premium-gradient" style={{ fontSize: "2.5rem", marginBottom: "8px" }}>Top Prompts</h1>
+                <p style={{ color: "rgba(255,255,255,0.6)" }}>Browse and filter top-performing prompts</p>
             </div>
 
             {loading ? (
@@ -260,26 +266,67 @@ export default function TopPromptsReview() {
                                             style={{
                                                 display: "flex",
                                                 justifyContent: "space-between",
-                                                alignItems: "flex-start",
+                                                alignItems: "center",
                                                 marginBottom: "16px",
                                                 gap: "12px",
                                             }}
                                         >
-                                            <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
-                                                <span
-                                                    style={{
-                                                        padding: "5px 12px",
-                                                        background: "linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(37, 99, 235, 0.3))",
-                                                        color: "#93c5fd",
-                                                        borderRadius: "16px",
-                                                        fontSize: "12px",
-                                                        fontWeight: "600",
-                                                        border: "1px solid rgba(59, 130, 246, 0.3)",
-                                                    }}
-                                                >
-                                                    {envKey}
-                                                </span>
-                                            </div>
+                                            <span
+                                                style={{
+                                                    padding: "5px 12px",
+                                                    background: "linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(37, 99, 235, 0.3))",
+                                                    color: "#93c5fd",
+                                                    borderRadius: "16px",
+                                                    fontSize: "12px",
+                                                    fontWeight: "600",
+                                                    border: "1px solid rgba(59, 130, 246, 0.3)",
+                                                }}
+                                            >
+                                                {envKey}
+                                            </span>
+
+                                            {record.likertScores.count > 0 && (
+                                                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                                    <span
+                                                        data-tooltip="Average Realism Score"
+                                                        style={{
+                                                            padding: "5px 10px",
+                                                            background: "rgba(0, 112, 243, 0.15)",
+                                                            borderRadius: "12px",
+                                                            fontSize: "11px",
+                                                            fontWeight: "600",
+                                                            border: "1px solid rgba(0, 112, 243, 0.3)",
+                                                            display: "flex",
+                                                            alignItems: "center",
+                                                            gap: "4px",
+                                                            cursor: "pointer",
+                                                            position: "relative",
+                                                        }}
+                                                    >
+                                                        <span style={{ color: "rgba(255,255,255,0.5)" }}>R:</span>
+                                                        <span style={{ color: "#0070f3" }}>{record.likertScores.avgRealism}/7</span>
+                                                    </span>
+                                                    <span
+                                                        data-tooltip="Average Quality Score"
+                                                        style={{
+                                                            padding: "5px 10px",
+                                                            background: "rgba(34, 197, 94, 0.15)",
+                                                            borderRadius: "12px",
+                                                            fontSize: "11px",
+                                                            fontWeight: "600",
+                                                            border: "1px solid rgba(34, 197, 94, 0.3)",
+                                                            display: "flex",
+                                                            alignItems: "center",
+                                                            gap: "4px",
+                                                            cursor: "pointer",
+                                                            position: "relative",
+                                                        }}
+                                                    >
+                                                        <span style={{ color: "rgba(255,255,255,0.5)" }}>Q:</span>
+                                                        <span style={{ color: "#22c55e" }}>{record.likertScores.avgQuality}/7</span>
+                                                    </span>
+                                                </div>
+                                            )}
 
                                             {isVerified && (
                                                 <div

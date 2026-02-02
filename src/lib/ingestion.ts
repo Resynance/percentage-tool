@@ -1,6 +1,6 @@
 /**
  * Ingestion Hub - Flexible data ingestion system for CSV/API sources
- * 
+ *
  * Key Features:
  * - Multi-column content detection (feedback, prompt, text, etc.)
  * - Flexible rating detection (top_10, Top 10%, numerical scores, etc.)
@@ -156,12 +156,14 @@ async function vectorizeJob(jobId: string, projectId: string) {
 
         // Fetch records that need embeddings (NULL embedding) using raw SQL
         // Exclude permanently failed records to avoid infinite loops
+        // Also exclude records that already have embeddingError in metadata
         const failedIdsArray = Array.from(permanentlyFailedIds);
         const batch: { id: string; content: string; metadata: unknown }[] = failedIdsArray.length > 0
             ? await prisma.$queryRaw`
                 SELECT id, content, metadata FROM public.data_records
                 WHERE "projectId" = ${projectId}
                 AND embedding IS NULL
+                AND (metadata->>'embeddingError' IS NULL)
                 AND id NOT IN (${Prisma.join(failedIdsArray)})
                 ORDER BY id ASC
                 LIMIT ${RECORDS_BATCH_SIZE}
@@ -170,6 +172,7 @@ async function vectorizeJob(jobId: string, projectId: string) {
                 SELECT id, content, metadata FROM public.data_records
                 WHERE "projectId" = ${projectId}
                 AND embedding IS NULL
+                AND (metadata->>'embeddingError' IS NULL)
                 ORDER BY id ASC
                 LIMIT ${RECORDS_BATCH_SIZE}
             `;
@@ -254,7 +257,7 @@ async function vectorizeJob(jobId: string, projectId: string) {
 /**
  * Phase 1: Data Loading
  * Parses records, filters by content/keywords, detects categories, and prevents duplicates.
- * 
+ *
  * New Feature: Detailed Skip Tracking
  * - Tracks 'Keyword Mismatch' (filtered out by user keywords)
  * - Tracks 'Duplicate ID' (existing Task ID or Feedback ID in project)
@@ -296,7 +299,7 @@ export async function processAndStore(records: any[], options: IngestOptions, jo
 
                 if (!content || content.length < 10) {
                     const textFields = Object.entries(record)
-                        .filter(([key, val]) => typeof val === 'string' && String(val).length > 10)
+                        .filter(([, val]) => typeof val === 'string' && String(val).length > 10)
                         .sort((a, b) => String(b[1]).length - String(a[1]).length);
                     if (textFields.length > 0) content = String(textFields[0][1]);
                 }
@@ -341,23 +344,24 @@ export async function processAndStore(records: any[], options: IngestOptions, jo
             const taskId = v.record.task_id || v.record.id || v.record.uuid || v.record.record_id;
             if (!taskId) return true;
 
-            const existing = await prisma.dataRecord.findFirst({
-                where: {
-                    projectId,
-                    type,
-                    OR: [
-                        { metadata: { path: ['task_id'], equals: String(taskId) } },
-                        { metadata: { path: ['id'], equals: String(taskId) } },
-                        { metadata: { path: ['uuid'], equals: String(taskId) } },
-                        { metadata: { path: ['record_id'], equals: String(taskId) } }
-                    ]
-                }
-            });
+            // Use raw SQL for reliable JSON querying in PostgreSQL
+            const existing = await prisma.$queryRaw<any[]>`
+                SELECT id FROM public.data_records
+                WHERE "projectId" = ${projectId}
+                AND type = ${type}::"RecordType"
+                AND (
+                    metadata->>'task_id' = ${String(taskId)}
+                    OR metadata->>'id' = ${String(taskId)}
+                    OR metadata->>'uuid' = ${String(taskId)}
+                    OR metadata->>'record_id' = ${String(taskId)}
+                )
+                LIMIT 1
+            `;
 
-            if (existing) {
+            if (existing && existing.length > 0) {
                 chunkSkipDetails['Duplicate ID'] = (chunkSkipDetails['Duplicate ID'] || 0) + 1;
             }
-            return !existing;
+            return !(existing && existing.length > 0);
         }));
 
         const finalChunk = validChunk.filter((_, idx) => uniqueness[idx]);
@@ -368,8 +372,22 @@ export async function processAndStore(records: any[], options: IngestOptions, jo
             currentDetails[reason] = (currentDetails[reason] || 0) + count;
         });
 
-        await Promise.all(finalChunk.map(v =>
-            prisma.dataRecord.create({
+        await Promise.all(finalChunk.map(v => {
+            // Extract timestamps from CSV data
+            const createdAtValue = v.record?.created_at || v.record?.createdAt ||
+                                  v.record?.timestamp || v.record?.date_created;
+            const updatedAtValue = v.record?.updated_at || v.record?.updatedAt ||
+                                  v.record?.date_updated || v.record?.modified_at;
+
+            // Parse timestamps if they exist
+            const createdAt = createdAtValue ? new Date(createdAtValue) : undefined;
+            const updatedAt = updatedAtValue ? new Date(updatedAtValue) : undefined;
+
+            // Validate parsed dates
+            const validCreatedAt = createdAt && !isNaN(createdAt.getTime()) ? createdAt : undefined;
+            const validUpdatedAt = updatedAt && !isNaN(updatedAt.getTime()) ? updatedAt : undefined;
+
+            return prisma.dataRecord.create({
                 data: {
                     projectId,
                     type,
@@ -381,9 +399,11 @@ export async function processAndStore(records: any[], options: IngestOptions, jo
                     createdById: v.record?.created_by_id ? String(v.record.created_by_id) : null,
                     createdByName: v.record?.created_by_name ? String(v.record.created_by_name) : null,
                     createdByEmail: v.record?.created_by_email ? String(v.record.created_by_email) : null,
+                    ...(validCreatedAt && { createdAt: validCreatedAt }),
+                    ...(validUpdatedAt && { updatedAt: validUpdatedAt }),
                 }
-            })
-        ));
+            });
+        }));
 
         savedCount += finalChunk.length;
         await prisma.ingestJob.update({

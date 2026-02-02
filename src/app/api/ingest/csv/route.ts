@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { startBackgroundIngest } from '@/lib/ingestion';
 import { RecordType } from '@prisma/client';
+import { createClient } from '@/lib/supabase/server';
 import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
@@ -13,6 +14,21 @@ const VALID_TYPES: RecordType[] = ['TASK', 'FEEDBACK'];
 
 export async function POST(req: NextRequest) {
     try {
+        const supabase = await createClient();
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+        if (authError || !user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        // Get user's role
+        const profile = await prisma.profile.findUnique({
+            where: { id: user.id },
+            select: { role: true }
+        });
+
+        const role = profile?.role || 'USER';
+
         const formData = await req.formData();
         const file = formData.get('file') as File | null;
         const projectId = formData.get('projectId') as string | null;
@@ -50,13 +66,18 @@ export async function POST(req: NextRequest) {
             }, { status: 400 });
         }
 
-        // Validation: Project exists
+        // Validation: Project exists and user has access
         const project = await prisma.project.findUnique({
             where: { id: projectId },
-            select: { id: true }
+            select: { id: true, ownerId: true }
         });
+
         if (!project) {
             return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+        }
+
+        if (role !== 'ADMIN' && project.ownerId !== user.id) {
+            return NextResponse.json({ error: 'Forbidden: You do not own this project' }, { status: 403 });
         }
 
         // Read file content

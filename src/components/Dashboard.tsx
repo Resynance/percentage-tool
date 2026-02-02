@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Folder, Settings, Database, BarChart3, ShieldAlert, FileCheck, Sparkles, Wallet } from 'lucide-react';
+import { Folder, Sparkles, FileCheck } from 'lucide-react';
 import Link from 'next/link';
+import { useProjects } from '@/hooks/useProjects';
 
 interface Project {
     id: string;
@@ -20,15 +21,6 @@ interface Record {
     createdAt: string;
 }
 
-interface AIStatus {
-    provider: string;
-    balance?: {
-        credits: number;
-        usage: number;
-        limit?: number;
-    } | null;
-}
-
 const extractAlignmentScore = (analysis: string | null | undefined): string | null => {
     if (!analysis) return null;
     // Look for patterns like "Alignment Score (0-100): 85" or "Score (0-100)\n85"
@@ -38,57 +30,20 @@ const extractAlignmentScore = (analysis: string | null | undefined): string | nu
 };
 
 export default function Dashboard() {
-    const [projects, setProjects] = useState<Project[]>([]);
-    const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+    const { projects, selectedProjectId, loading: projectsLoading } = useProjects();
     const [records, setRecords] = useState<Record[]>([]);
-    const [aiStatus, setAiStatus] = useState<AIStatus | null>(null);
+    const [promptsDropdownOpen, setPromptsDropdownOpen] = useState(false);
+    const [loading, setLoading] = useState(false);
 
-    // UI State
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        fetchProjects();
-        fetchAiStatus();
-    }, []);
-
-    const fetchAiStatus = async () => {
-        try {
-            const res = await fetch('/api/ai/balance');
-            const data = await res.json();
-            setAiStatus(data);
-        } catch (err) {
-            console.error('Failed to fetch AI status', err);
-        }
-    };
+    const selectedProject = projects.find(p => p.id === selectedProjectId) || null;
 
     useEffect(() => {
-        if (selectedProject) {
-            fetchRecords(selectedProject.id);
+        if (selectedProjectId) {
+            fetchRecords(selectedProjectId);
         } else {
             setRecords([]);
         }
-    }, [selectedProject]);
-
-    const fetchProjects = async () => {
-        try {
-            const res = await fetch('/api/projects');
-            const data = await res.json();
-            if (Array.isArray(data)) {
-                setProjects(data);
-                if (data.length > 0 && !selectedProject) {
-                    setSelectedProject(data[0]);
-                }
-            } else {
-                console.error('Failed to fetch projects:', data.error || 'Unknown error');
-                setProjects([]);
-            }
-        } catch (err) {
-            console.error('Failed to fetch projects', err);
-            setProjects([]);
-        } finally {
-            setLoading(false);
-        }
-    };
+    }, [selectedProjectId]);
 
     const fetchRecords = async (projectId: string) => {
         setLoading(true);
@@ -115,83 +70,27 @@ export default function Dashboard() {
     const filteredRecords = (type: string, category: string) =>
         records.filter(r => r.type === type && r.category === category);
 
+
     return (
-        <div className="container" style={{ maxWidth: '1400px' }}>
+        <div style={{ width: '100%' }}>
             <header style={{ marginBottom: '40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                    <h1 className="premium-gradient" style={{ fontSize: '2.5rem', marginBottom: '8px' }}>Task Data</h1>
-                    <p style={{ color: 'rgba(255,255,255,0.6)' }}>Analyze Top and Bottom Percentages</p>
-                </div>
-
-                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                    <Link href="/analytics" className="glass-card" style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', color: 'rgba(255,255,255,0.7)' }}>
-                        <BarChart3 size={18} /> Analytics
-                    </Link>
-
-                    <Link href={`/similarity?projectId=${selectedProject?.id}`} className="glass-card" style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', color: 'rgba(255,255,255,0.7)' }}>
-                        <Sparkles size={18} /> Similarity
-                    </Link>
-
-                    <Link href="/ingest" className="glass-card" style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', color: 'rgba(255,255,255,0.7)' }}>
-                        <Database size={18} /> Ingest
-                    </Link>
-                    
-                    <Link href={`/topbottom10?projectId=${selectedProject?.id}`} className="glass-card" style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', color: 'rgba(255,255,255,0.7)' }}>
-                        <FileCheck size={18} /> Top/Bottom 10
-                    </Link>
-
-                    <Link href={`/top-prompts?projectId=${selectedProject?.id}`} className="glass-card" style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', color: 'rgba(255,255,255,0.7)' }}>
-                        <ShieldAlert size={18} /> Top Prompts
-                    </Link>
-
-                    <Link href="/manage" className="glass-card" style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', color: 'rgba(255,255,255,0.7)' }}>
-                        <Settings size={18} /> Manage
-                    </Link>
-
-
-                    {aiStatus?.provider === 'openrouter' && aiStatus.balance && typeof aiStatus.balance.credits === 'number' && (
-                        <div className="glass-card" style={{
-                            padding: '8px 16px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            fontSize: '0.85rem',
-                            background: 'rgba(0, 255, 136, 0.05)',
-                            border: '1px solid rgba(0, 255, 136, 0.1)'
-                        }}>
-                            <Wallet size={16} color="#00ff88" />
-                            <span style={{ color: 'rgba(255,255,255,0.7)' }}>
-                                Balance: <span style={{ color: '#00ff88', fontWeight: 600 }}>
-                                    ${aiStatus.balance.credits.toFixed(4)}
-                                </span>
-                            </span>
-                        </div>
-                    )}
-
-                    <div className="glass-card" style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <Folder size={18} color="#0070f3" />
-                        <select
-                            value={selectedProject?.id || ''}
-                            onChange={(e) => {
-                                const p = projects.find(p => p.id === e.target.value);
-                                setSelectedProject(p || null);
-                            }}
-                            style={{ background: 'none', color: 'white', border: 'none', outline: 'none', fontSize: '0.9rem', cursor: 'pointer' }}
-                        >
-                            {projects.length === 0 && <option value="">No Projects</option>}
-                            {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                        </select>
-                    </div>
+                    <h1 className="premium-gradient" style={{ fontSize: '2.5rem', marginBottom: '8px' }}>Dashboard</h1>
+                    <p style={{ color: 'rgba(255,255,255,0.6)' }}>Data Overview & Analysis</p>
                 </div>
             </header>
 
             <main style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
 
-                {!selectedProject ? (
+                {projectsLoading ? (
+                    <div className="glass-card" style={{ textAlign: 'center', padding: '100px', opacity: 0.5 }}>
+                        <h2>Loading projects...</h2>
+                    </div>
+                ) : !selectedProject ? (
                     <div className="glass-card" style={{ textAlign: 'center', padding: '100px', opacity: 0.5 }}>
                         <h2>No project selected</h2>
-                        <p>Create a project in <b>Manage</b> to start.</p>
-                        <Link href="/manage" className="btn-primary" style={{ display: 'inline-flex', marginTop: '20px', padding: '10px 24px' }}>Go to Management</Link>
+                        <p>Create a project in <b>Project Management</b> to start.</p>
+                        <Link href="/manage" className="btn-primary" style={{ display: 'inline-flex', marginTop: '20px', padding: '10px 24px' }}>Go to Project Management</Link>
                     </div>
                 ) : (
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }}>

@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import RedZoneModal from "./RedZoneModal";
+import { useProjects } from "@/hooks/useProjects";
 
 interface Prompt {
   id: string;
@@ -29,7 +30,9 @@ interface User {
 
 export default function PromptSimilarityPage() {
   const searchParams = useSearchParams();
-  const projectId = searchParams?.get("projectId");
+  const { projects, selectedProjectId, setSelectedProjectId } = useProjects({
+    initialProjectId: searchParams?.get("projectId") || undefined,
+  });
 
   const [allPrompts, setAllPrompts] = useState<Prompt[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -41,12 +44,12 @@ export default function PromptSimilarityPage() {
   const [showRedZoneModal, setShowRedZoneModal] = useState(false);
 
   useEffect(() => {
-    if (!projectId) return;
+    if (!selectedProjectId) return;
 
     const fetchPrompts = async () => {
       try {
-        const url = new URL("/api/analytics/prompts", window.location.origin);
-        url.searchParams.set("projectId", projectId);
+        const url = new URL("/api/analysis/prompts", window.location.origin);
+        url.searchParams.set("projectId", selectedProjectId);
 
         const response = await fetch(url.toString());
         const data = await response.json();
@@ -65,7 +68,7 @@ export default function PromptSimilarityPage() {
     };
 
     fetchPrompts();
-  }, [projectId]);
+  }, [selectedProjectId]);
 
   const filteredPrompts = useMemo(() => {
     if (selectedUserId) {
@@ -75,7 +78,7 @@ export default function PromptSimilarityPage() {
   }, [selectedUserId, allPrompts]);
 
   useEffect(() => {
-    if (!selectedPrompt || !projectId) {
+    if (!selectedPrompt || !selectedProjectId) {
       setSimilarPrompts([]);
       return;
     }
@@ -87,7 +90,7 @@ export default function PromptSimilarityPage() {
 
       try {
         const response = await fetch(
-          `/api/analytics/prompt-similarity?projectId=${projectId}&recordId=${selectedPrompt.id}`,
+          `/api/analysis/prompt-similarity?projectId=${selectedProjectId}&recordId=${selectedPrompt.id}`,
         );
         const data = await response.json();
 
@@ -105,7 +108,7 @@ export default function PromptSimilarityPage() {
     };
 
     fetchSimilarity();
-  }, [selectedPrompt, projectId]);
+  }, [selectedPrompt, selectedProjectId]);
 
   const getSimilarityColor = (similarity: number): string => {
     if (similarity >= 70) {
@@ -117,7 +120,7 @@ export default function PromptSimilarityPage() {
     return "#22c55e";
   };
 
-  if (!projectId) {
+  if (!selectedProjectId && projects.length === 0) {
     return (
       <div style={{ padding: "40px", textAlign: "center" }}>
         <p>Please select a project to view prompt similarity.</p>
@@ -130,9 +133,9 @@ export default function PromptSimilarityPage() {
       style={{
         display: "flex",
         flexDirection: "column",
-        height: "calc(100vh - 60px)",
-        overflow: "hidden",
-        background: "var(--background)",
+        width: "100%",
+        maxWidth: "1600px",
+        margin: "0 auto",
       }}
     >
       <div
@@ -216,6 +219,43 @@ export default function PromptSimilarityPage() {
           <div
             style={{ padding: "16px", borderBottom: "1px solid var(--border)" }}
           >
+            <label
+              style={{
+                display: "block",
+                marginBottom: "8px",
+                fontWeight: 600,
+                fontSize: "14px",
+                color: "rgba(255,255,255,0.8)",
+              }}
+            >
+              Project:
+            </label>
+            <select
+              value={selectedProjectId}
+              onChange={(e) => {
+                setSelectedProjectId(e.target.value);
+                setSelectedPrompt(null);
+                setSimilarPrompts([]);
+              }}
+              style={{
+                width: "100%",
+                padding: "10px 12px",
+                borderRadius: "8px",
+                border: "1px solid var(--border)",
+                fontSize: "14px",
+                background: "rgba(0, 0, 0, 0.3)",
+                color: "rgba(255,255,255,0.95)",
+                cursor: "pointer",
+                fontWeight: 500,
+                marginBottom: "16px",
+              }}
+            >
+              <option value="" disabled>Select a project</option>
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+
             <label
               style={{
                 display: "block",
@@ -561,7 +601,7 @@ export default function PromptSimilarityPage() {
       <RedZoneModal
         isOpen={showRedZoneModal}
         onClose={() => setShowRedZoneModal(false)}
-        projectId={projectId}
+        projectId={selectedProjectId}
       />
     </div>
   );

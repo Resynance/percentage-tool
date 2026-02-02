@@ -1,9 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { RecordCategory } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
+import { createClient } from '@/lib/supabase/server';
 
 export async function GET(req: NextRequest) {
     try {
+        const supabase = await createClient();
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+        if (authError || !user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        // Get user's role
+        const profile = await prisma.profile.findUnique({
+            where: { id: user.id },
+            select: { role: true }
+        });
+
+        const role = profile?.role || 'USER';
+
         const { searchParams } = new URL(req.url);
         const projectId = searchParams.get('projectId');
         const category = searchParams.get('category') as RecordCategory | null;
@@ -14,6 +30,16 @@ export async function GET(req: NextRequest) {
                 { error: 'projectId is required' },
                 { status: 400 }
             );
+        }
+
+        // Verify project exists (read access allowed for all users)
+        const project = await prisma.project.findUnique({
+            where: { id: projectId },
+            select: { id: true }
+        });
+
+        if (!project) {
+            return NextResponse.json({ error: 'Project not found' }, { status: 404 });
         }
 
         const whereClause: any = {
@@ -44,13 +70,49 @@ export async function GET(req: NextRequest) {
                 isCategoryCorrect: true,
                 hasBeenReviewed: true,
                 reviewedBy: true,
+                likertScores: {
+                    select: {
+                        realismScore: true,
+                        qualityScore: true,
+                    },
+                },
             },
             orderBy: {
                 createdAt: 'desc',
             },
         });
 
-        return NextResponse.json({ records, total: records.length });
+        // Calculate averages from the included likertScores
+        const recordsWithScores = records.map((record) => {
+            const likertScores = record.likertScores;
+
+            const avgRealism = likertScores.length > 0
+                ? likertScores.reduce((sum: number, s: { realismScore: number; qualityScore: number }) => sum + s.realismScore, 0) / likertScores.length
+                : null;
+
+            const avgQuality = likertScores.length > 0
+                ? likertScores.reduce((sum: number, s: { realismScore: number; qualityScore: number }) => sum + s.qualityScore, 0) / likertScores.length
+                : null;
+
+            return {
+                id: record.id,
+                content: record.content,
+                category: record.category,
+                source: record.source,
+                metadata: record.metadata,
+                alignmentAnalysis: record.alignmentAnalysis,
+                isCategoryCorrect: record.isCategoryCorrect,
+                hasBeenReviewed: record.hasBeenReviewed,
+                reviewedBy: record.reviewedBy,
+                likertScores: {
+                    count: likertScores.length,
+                    avgRealism: avgRealism ? parseFloat(avgRealism.toFixed(1)) : null,
+                    avgQuality: avgQuality ? parseFloat(avgQuality.toFixed(1)) : null,
+                },
+            };
+        });
+
+        return NextResponse.json({ records: recordsWithScores, total: recordsWithScores.length });
     } catch (error) {
         console.error('Error fetching records:', error);
         return NextResponse.json(

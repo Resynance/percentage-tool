@@ -25,8 +25,8 @@ Access is governed by the `role` field in the `profiles` table:
 | Role | Description |
 | :--- | :--- |
 | **USER** | Can view data and run analyses. |
-| **MANAGER** | Can manage projects and ingestion jobs. |
-| **ADMIN** | Full system control, including user creation, role management, and system configuration. |
+| **MANAGER** | Can manage projects and ingestion jobs. Has access to Time Tracking and Bonus Windows to monitor team performance. |
+| **ADMIN** | Full system control, including user creation, role management, system configuration, and all MANAGER capabilities. |
 
 ## 3. User Management (Admins)
 
@@ -36,16 +36,16 @@ Administrators can manage users via the **Admin → User Management** page:
 - **Change Roles**: Promote or demote users between USER, MANAGER, and ADMIN
 - **Reset Passwords**: Set new temporary passwords for users (forces password change on next login)
 
-## 4. Security: First-Time Login (Password Reset)
+## 5. Self-Service Password Change
 
-When an admin manually creates a user, or when a reset is required for security:
+Users can change their own passwords at any time without administrator intervention:
 
-1. The `mustResetPassword` flag is set to `true` in the user's profile.
-2. **Force Redirect**: Middleware detects this flag and redirects the user to `/auth/reset-password`.
-3. **Action**: The user MUST set a new password.
-4. **Completion**: Once the password is saved, a **Server Action** clears the flag, and the user is granted access to the dashboard.
+1. Click on your **Email/Username** in the top-right header to open the profile dropdown.
+2. Select **Change Password**.
+3. Enter and confirm your new password in the modal dialog.
+4. Click **Update Password**.
 
-## 5. Implementation Summary
+## 6. Implementation Summary
 
 - Database: `profiles` table in the `public` schema.
 - Middleware: Intercepts requests to check for `PENDING` or `mustResetPassword` states.
