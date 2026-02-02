@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
+import { useProjects } from "@/hooks/useProjects";
 
 interface Prompt {
   id: string;
@@ -26,15 +27,11 @@ interface User {
   name: string;
 }
 
-interface Project {
-  id: string;
-  name: string;
-}
-
 export default function PromptSimilarityPage() {
   const searchParams = useSearchParams();
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedProjectId, setSelectedProjectId] = useState<string>(searchParams?.get("projectId") || "");
+  const { projects, selectedProjectId, setSelectedProjectId } = useProjects({
+    initialProjectId: searchParams?.get("projectId") || undefined,
+  });
 
   const [allPrompts, setAllPrompts] = useState<Prompt[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -43,25 +40,6 @@ export default function PromptSimilarityPage() {
   const [similarPrompts, setSimilarPrompts] = useState<SimilarPrompt[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetchProjects();
-  }, []);
-
-  const fetchProjects = async () => {
-    try {
-      const res = await fetch("/api/projects");
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        setProjects(data);
-        if (!selectedProjectId && data.length > 0) {
-          setSelectedProjectId(data[0].id);
-        }
-      }
-    } catch (err) {
-      console.error("Failed to fetch projects", err);
-    }
-  };
 
   useEffect(() => {
     if (!selectedProjectId) return;
