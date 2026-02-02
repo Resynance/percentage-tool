@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { Check } from "lucide-react";
 import { useProjects } from "@/hooks/useProjects";
@@ -52,13 +52,7 @@ export default function TopPromptsReview() {
         return matchesEnv && matchesVerification;
     });
 
-    useEffect(() => {
-        if (selectedProjectId) {
-            fetchRecords();
-        }
-    }, [selectedProjectId]);
-
-    const fetchRecords = async () => {
+    const fetchRecords = useCallback(async () => {
         if (!selectedProjectId || selectedProjectId.trim() === "" || selectedProjectId === "undefined") {
             setError("No project selected");
             setLoading(false);
@@ -96,7 +90,13 @@ export default function TopPromptsReview() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [selectedProjectId]);
+
+    useEffect(() => {
+        if (selectedProjectId) {
+            fetchRecords();
+        }
+    }, [selectedProjectId, fetchRecords]);
 
     const getVerificationStatus = (record: TopPromptRecord) => {
         return record.hasBeenReviewed && record.isCategoryCorrect === true;
@@ -104,12 +104,12 @@ export default function TopPromptsReview() {
 
     return (
         <div style={{ width: "100%", maxWidth: "1600px", margin: "0 auto" }}>
-            <div style={{ marginBottom: "24px" }}>
-                <h1 className="premium-gradient" style={{ fontSize: "2.5rem", marginBottom: "8px" }}>Top Prompts</h1>
+            <div style={{ marginBottom: "12px" }}>
+                <h1 className="premium-gradient" style={{ fontSize: "1.5rem", marginBottom: "8px" }}>Top Prompts</h1>
                 <p style={{ color: "rgba(255,255,255,0.6)" }}>Browse and filter top-performing prompts</p>
             </div>
 
-            {loading ? (
+                {loading ? (
                 <div
                     style={{
                         textAlign: "center",
@@ -134,17 +134,17 @@ export default function TopPromptsReview() {
                     </button>
                 </div>
             ) : (
-                <>
+                <div>
                     <div
                         className="glass-card"
                         style={{
                             display: "flex",
-                            gap: "20px",
-                            marginBottom: "20px",
+                            gap: "16px",
+                            marginBottom: "12px",
                             alignItems: "center",
                             justifyContent: "space-between",
                             flexWrap: "wrap",
-                            padding: "14px 20px",
+                            padding: "10px 14px",
                         }}
                     >
                         <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
@@ -233,7 +233,18 @@ export default function TopPromptsReview() {
                         }}>
                             {filteredRecords.length} prompt{filteredRecords.length !== 1 ? 's' : ''}
                         </div>
-                    </div>
+
+                        </div>
+
+                    <div
+                        className="glass-card"
+                        style={{
+                            maxHeight: "calc(100vh - 300px)",
+                            overflowY: "auto",
+                            padding: '12px 14px',
+                            paddingBottom: 16
+                        }}
+                    >
 
                     {filteredRecords.length === 0 ? (
                         <div className="glass-card" style={{ textAlign: "center", padding: "80px 20px" }}>
@@ -247,7 +258,7 @@ export default function TopPromptsReview() {
                         </div>
                     ) : (
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(500px, 1fr))", gap: "16px" }}>
-                            {filteredRecords.map((record, index) => {
+                            {filteredRecords.map((record) => {
                                 const isVerified = getVerificationStatus(record);
                                 const envKey = record.metadata?.environment_name || record.metadata?.env_key || "unknown";
 
@@ -400,8 +411,10 @@ export default function TopPromptsReview() {
                                 );
                             })}
                         </div>
+
                     )}
-                </>
+                    </div>
+                </div>
             )}
         </div>
     );

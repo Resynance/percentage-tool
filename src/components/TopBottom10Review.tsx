@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useProjects } from '@/hooks/useProjects';
 import { useSearchParams } from "next/navigation";
 import { ChevronLeft, ChevronRight, Check, X } from "lucide-react";
 
@@ -15,15 +16,9 @@ interface ReviewRecord {
   reviewedBy: string | null;
 }
 
-interface Project {
-  id: string;
-  name: string;
-}
-
 export default function TopBottom10Review() {
   const searchParams = useSearchParams();
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedProjectId, setSelectedProjectId] = useState<string>(searchParams.get("projectId") || "");
+  const { selectedProjectId, setSelectedProjectId } = useProjects({ initialProjectId: searchParams.get("projectId") || undefined });
 
   const [category, setCategory] = useState<"TOP_10" | "BOTTOM_10">("TOP_10");
   const [allRecords, setAllRecords] = useState<ReviewRecord[]>([]);
@@ -44,24 +39,7 @@ export default function TopBottom10Review() {
     return hovered === btnCategory ? "#374151" : "transparent";
   };
 
-  useEffect(() => {
-    fetchProjects();
-  }, []);
-
-  const fetchProjects = async () => {
-    try {
-      const res = await fetch("/api/projects");
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        setProjects(data);
-        if (!selectedProjectId && data.length > 0) {
-          setSelectedProjectId(data[0].id);
-        }
-      }
-    } catch (err) {
-      console.error("Failed to fetch projects", err);
-    }
-  };
+  // Projects and selectedProjectId are provided by ProjectContext via useProjects
 
   useEffect(() => {
     if (selectedProjectId) {
@@ -170,23 +148,12 @@ export default function TopBottom10Review() {
 
   return (
     <div style={{ width: "100%", maxWidth: "1200px", margin: "0 auto" }}>
-      <div style={{ marginBottom: "24px" }}>
-        <h1 className="premium-gradient" style={{ fontSize: "2.5rem", marginBottom: "8px" }}>Review Top/Bottom 10%</h1>
+      <div style={{ marginBottom: "12px" }}>
+        <h1 className="premium-gradient" style={{ fontSize: "1.5rem", paddingBottom: "8px" }}>Review Top/Bottom 10%</h1>
         <p style={{ color: "rgba(255,255,255,0.6)" }}>Verify and correct automated percentage classifications</p>
       </div>
 
-      <div className="glass-card" style={{ padding: '24px', marginBottom: '24px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        <label style={{ display: 'block', fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Project</label>
-        <select
-          value={selectedProjectId}
-          onChange={(e) => setSelectedProjectId(e.target.value)}
-          className="input-field"
-          style={{ width: '100%', maxWidth: '400px', height: '42px', padding: '0 12px' }}
-        >
-          <option value="" disabled>Select a project</option>
-          {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-        </select>
-      </div>
+      {/* Project selection is handled in the header; no inline project dropdown here. */}
 
       {loading ? (
         <div
@@ -283,7 +250,7 @@ export default function TopBottom10Review() {
 
           <div
             style={{
-              padding: "16px",
+              padding: "12px",
               marginBottom: "16px",
               border: "1px solid #374151",
               borderRadius: "8px",
@@ -291,8 +258,8 @@ export default function TopBottom10Review() {
               display: "flex",
               flexDirection: "column",
               gap: "12px",
-              height: "calc(100vh - 280px)",
-              minHeight: "500px",
+              maxHeight: "calc(100vh - 180px)",
+              minHeight: "320px",
             }}
           >
             <div
@@ -308,14 +275,7 @@ export default function TopBottom10Review() {
               </span>
             </div>
 
-            <div
-              style={{
-                flex: 1,
-                minHeight: 0,
-                display: "flex",
-                flexDirection: "column",
-              }}
-            >
+            <div>
               <h2
                 style={{
                   fontSize: "14px",
@@ -332,7 +292,7 @@ export default function TopBottom10Review() {
                   padding: "12px",
                   borderRadius: "4px",
                   border: "1px solid #4b5563",
-                  flex: 1,
+                  height: "400px",
                   overflowY: "auto",
                 }}
               >

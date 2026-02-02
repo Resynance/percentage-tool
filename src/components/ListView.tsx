@@ -87,14 +87,13 @@ function ListContent() {
 
     return (
         <div style={{ width: '100%', maxWidth: '1000px', margin: '0 auto' }}>
-            <div style={{ marginBottom: '40px' }}>
-                <h1 className="premium-gradient" style={{ fontSize: '2.5rem', marginBottom: '8px', textTransform: 'capitalize' }}>
+            <div style={{ marginBottom: '24px' }}>
+                <h1 className="premium-gradient" style={{ fontSize: '1.5rem', marginBottom: '8px', textTransform: 'capitalize' }}>
                     {selectedCategory?.replace('_', ' ').toLowerCase()} {selectedType === 'TASK' ? 'Tasks' : 'Feedback'}
                 </h1>
                 <p style={{ color: 'rgba(255,255,255,0.6)' }}>Exploration View • {total} Total Records</p>
             </div>
 
-            {/* Projects Error Display */}
             {projectsError && (
                 <div className="glass-card" style={{
                     padding: '16px 20px',
@@ -113,16 +112,16 @@ function ListContent() {
                 </div>
             )}
 
-            <div className="glass-card" style={{ padding: '24px', marginBottom: '24px', display: 'flex', flexWrap: 'wrap', gap: '20px', alignItems: 'flex-end' }}>
+            <div className="glass-card" style={{ padding: '12px 16px', marginBottom: '16px', display: 'flex', gap: '16px', alignItems: 'center', justifyContent: 'space-between' }}>
                 {/* Project selection is handled globally via ProjectContext in the header */}
 
-                <div style={{ flex: '0 0 auto' }}>
-                    <label style={{ display: 'block', fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)', marginBottom: '8px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Record Type</label>
-                    <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', padding: '4px', border: '1px solid var(--border)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <label style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.7)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Record Type</label>
+                    <div style={{ display: 'flex', background: 'rgba(255,255,255,0.04)', borderRadius: '8px', padding: '4px', border: '1px solid var(--border)' }}>
                         <button
                             onClick={() => setSelectedType('TASK')}
                             style={{
-                                padding: '6px 16px',
+                                padding: '6px 12px',
                                 borderRadius: '6px',
                                 border: 'none',
                                 background: selectedType === 'TASK' ? 'var(--accent)' : 'transparent',
@@ -136,7 +135,7 @@ function ListContent() {
                         <button
                             onClick={() => setSelectedType('FEEDBACK')}
                             style={{
-                                padding: '6px 16px',
+                                padding: '6px 12px',
                                 borderRadius: '6px',
                                 border: 'none',
                                 background: selectedType === 'FEEDBACK' ? 'var(--accent)' : 'transparent',
@@ -150,13 +149,13 @@ function ListContent() {
                     </div>
                 </div>
 
-                <div style={{ flex: '0 0 auto' }}>
-                    <label style={{ display: 'block', fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)', marginBottom: '8px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Category</label>
-                    <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', padding: '4px', border: '1px solid var(--border)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <label style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.7)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Category</label>
+                    <div style={{ display: 'flex', background: 'rgba(255,255,255,0.04)', borderRadius: '8px', padding: '4px', border: '1px solid var(--border)' }}>
                         <button
                             onClick={() => setSelectedCategory('TOP_10')}
                             style={{
-                                padding: '6px 16px',
+                                padding: '6px 12px',
                                 borderRadius: '6px',
                                 border: 'none',
                                 background: selectedCategory === 'TOP_10' ? 'var(--accent)' : 'transparent',
@@ -170,7 +169,7 @@ function ListContent() {
                         <button
                             onClick={() => setSelectedCategory('BOTTOM_10')}
                             style={{
-                                padding: '6px 16px',
+                                padding: '6px 12px',
                                 borderRadius: '6px',
                                 border: 'none',
                                 background: selectedCategory === 'BOTTOM_10' ? 'var(--accent)' : 'transparent',
@@ -186,10 +185,9 @@ function ListContent() {
             </div>
 
             <main>
-
                 <div className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
-                    <div style={{ padding: '24px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.9rem', opacity: 0.6 }}>Showing {total > 0 ? ((page - 1) * pageSize) + 1 : 0} - {Math.min(page * pageSize, total)} of {total}</span>
+                    <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.85rem', opacity: 0.6 }}>Showing {total > 0 ? ((page - 1) * pageSize) + 1 : 0} - {Math.min(page * pageSize, total)} of {total}</span>
                         <div style={{ display: 'flex', gap: '8px' }}>
                             <button
                                 className="btn-outline"
@@ -210,8 +208,9 @@ function ListContent() {
                         </div>
                     </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        {records.map((record, i) => (
+                    <div style={{ maxHeight: 'calc(100vh - 440px)', overflowY: 'auto', padding: '8px 12px', boxSizing: 'border-box' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            {records.map((record, i) => (
                             <div key={record.id} style={{
                                 padding: '24px',
                                 borderBottom: i === records.length - 1 ? 'none' : '1px solid var(--border)',
@@ -292,8 +291,8 @@ function ListContent() {
                                     </div>
                                 </div>
                             </div>
-                        ))}
-                        {records.length === 0 && !loading && (
+                            ))}
+                            {records.length === 0 && !loading && (
                             <div style={{ padding: '80px', textAlign: 'center' }}>
                                 <Inbox size={48} style={{ margin: '0 auto 16px', opacity: 0.3 }} />
                                 <div style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '8px', opacity: 0.6 }}>
@@ -310,45 +309,46 @@ function ListContent() {
                         {loading && (
                             <div style={{ padding: '80px', textAlign: 'center', opacity: 0.4 }}>Loading...</div>
                         )}
-                    </div>
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginTop: '32px' }}>
-                    <button
-                        className="btn-outline"
-                        disabled={page === 1}
-                        onClick={() => setPage(p => p - 1)}
-                        style={{ padding: '8px 16px', fontSize: '0.9rem' }}
-                    >Previous</button>
-
-                    <div style={{ display: 'flex', gap: '8px', margin: '0 16px' }}>
-                        {Array.from({ length: totalPages }, (_, i) => i + 1)
-                            .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
-                            .map((pageNum, i, arr) => {
-                                const elements = [];
-                                if (i > 0 && arr[i - 1] !== pageNum - 1) {
-                                    elements.push(<span key={`sep-${pageNum}`} style={{ opacity: 0.3 }}>...</span>);
-                                }
-                                elements.push(
-                                    <button
-                                        key={pageNum}
-                                        onClick={() => setPage(pageNum)}
-                                        className={page === pageNum ? 'btn-primary' : 'btn-outline'}
-                                        style={{ width: '40px', height: '40px', padding: 0 }}
-                                    >
-                                        {pageNum}
-                                    </button>
-                                );
-                                return elements;
-                            })}
+                        </div>
                     </div>
 
-                    <button
-                        className="btn-outline"
-                        disabled={page === totalPages}
-                        onClick={() => setPage(p => p + 1)}
-                        style={{ padding: '8px 16px', fontSize: '0.9rem' }}
-                    >Next</button>
+                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', padding: '12px' }}>
+                        <button
+                            className="btn-outline"
+                            disabled={page === 1}
+                            onClick={() => setPage(p => p - 1)}
+                            style={{ padding: '8px 16px', fontSize: '0.9rem' }}
+                        >Previous</button>
+
+                        <div style={{ display: 'flex', gap: '8px', margin: '0 16px' }}>
+                            {Array.from({ length: totalPages }, (_, i) => i + 1)
+                                .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
+                                .map((pageNum, i, arr) => {
+                                    const elements = [];
+                                    if (i > 0 && arr[i - 1] !== pageNum - 1) {
+                                        elements.push(<span key={`sep-${pageNum}`} style={{ opacity: 0.3 }}>...</span>);
+                                    }
+                                    elements.push(
+                                        <button
+                                            key={pageNum}
+                                            onClick={() => setPage(pageNum)}
+                                            className={page === pageNum ? 'btn-primary' : 'btn-outline'}
+                                            style={{ width: '40px', height: '40px', padding: 0 }}
+                                        >
+                                            {pageNum}
+                                        </button>
+                                    );
+                                    return elements;
+                                })}
+                        </div>
+
+                        <button
+                            className="btn-outline"
+                            disabled={page === totalPages}
+                            onClick={() => setPage(p => p + 1)}
+                            style={{ padding: '8px 16px', fontSize: '0.9rem' }}
+                        >Next</button>
+                    </div>
                 </div>
             </main>
         </div>

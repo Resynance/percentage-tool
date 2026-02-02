@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { useProjects } from '@/hooks/useProjects';
 
 interface Project {
     id: string;
@@ -21,8 +22,7 @@ interface LikertRecord {
 
 export default function LikertScoring() {
     const searchParams = useSearchParams();
-    const [projects, setProjects] = useState<Project[]>([]);
-    const [selectedProjectId, setSelectedProjectId] = useState<string>(searchParams.get("projectId") || "");
+    const { projects, selectedProjectId, setSelectedProjectId } = useProjects({ initialProjectId: searchParams.get("projectId") || undefined });
     
     // Use centralized client which handles missing env vars gracefully
     const supabase = useMemo(() => createClient(), []);
@@ -43,24 +43,7 @@ export default function LikertScoring() {
     const [llmEvaluatedThisSession, setLlmEvaluatedThisSession] = useState(false);
     const [userSubmittedRecordIds, setUserSubmittedRecordIds] = useState<Set<string>>(new Set());
 
-    // Fetch available projects
-    useEffect(() => {
-        const fetchProjects = async () => {
-            try {
-                const res = await fetch("/api/projects");
-                const data = await res.json();
-                if (Array.isArray(data)) {
-                    setProjects(data);
-                    if (!selectedProjectId && data.length > 0) {
-                        setSelectedProjectId(data[0].id);
-                    }
-                }
-            } catch (err) {
-                console.error("Failed to fetch projects", err);
-            }
-        };
-        fetchProjects();
-    }, []);
+    // Projects and selected project are provided by ProjectContext via `useProjects`
 
     // Fetch current user from Supabase auth
     useEffect(() => {
@@ -354,24 +337,11 @@ export default function LikertScoring() {
                     }}
                 >
                     Likert Scoring
-                </h1>
-                <p style={{ color: "rgba(255,255,255,0.5)", fontSize: "12px", margin: 0 }}>
+                </h1>                
+                <p style={{ color: "rgba(255,255,255,0.5)", margin: 0 }}>
                     Rate prompts on Realism and Quality (1-7 scale)
-                </p>
-                
-                <div className="glass-card" style={{ padding: '16px', marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <label style={{ display: 'block', fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Project</label>
-                    <select
-                        value={selectedProjectId}
-                        onChange={(e) => setSelectedProjectId(e.target.value)}
-                        className="input-field"
-                        style={{ width: '100%', height: '42px', padding: '0 12px' }}
-                    >
-                        <option value="" disabled>Select a project</option>
-                        {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                    </select>
+                </p>            
                 </div>
-            </div>
 
             {authLoading ? (
                 <div style={{ textAlign: "center", color: "#60a5fa", padding: "60px 20px" }}>
@@ -495,13 +465,13 @@ export default function LikertScoring() {
                         </div>
 
                         <div
-                            style={{
+                         style={{
                                 backgroundColor: "rgba(0,0,0,0.3)",
                                 padding: "16px",
                                 borderRadius: "12px",
                                 border: "1px solid rgba(255,255,255,0.05)",
                                 marginBottom: "16px",
-                                height: "190px",
+                                height: "260px",
                                 overflowY: "auto",
                             }}
                         >

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { useProjects } from "@/hooks/useProjects";
 
@@ -108,6 +108,19 @@ export default function PromptSimilarityPage() {
     fetchSimilarity();
   }, [selectedPrompt, selectedProjectId]);
 
+  // Scroll ref for the left prompts list so we can reset scroll when user filter changes
+  const promptsListRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    // When the selected user filter changes, reset the left prompts scroll to top
+    if (promptsListRef.current) {
+      promptsListRef.current.scrollTo({ top: 0, behavior: 'auto' });
+    }
+    // Also reset selected prompt and similar prompts when user filter changes
+    setSelectedPrompt(null);
+    setSimilarPrompts([]);
+  }, [selectedUserId]);
+
   const getSimilarityColor = (similarity: number): string => {
     if (similarity >= 70) {
       return "#ef4444";
@@ -134,6 +147,8 @@ export default function PromptSimilarityPage() {
         width: "100%",
         maxWidth: "1600px",
         margin: "0 auto",
+        height: 'calc(100vh - 140px)',
+        overflow: 'hidden',
       }}
     >
       <div
@@ -143,17 +158,11 @@ export default function PromptSimilarityPage() {
       >
         <h1
           className="premium-gradient"
-          style={{ margin: 0, fontSize: "2.5rem", marginBottom: "8px" }}
+          style={{ margin: 0, fontSize: "1.5rem", marginBottom: "8px" }}
         >
           Prompt Similarity Analysis
         </h1>
-        <p
-          style={{
-            margin: 0,
-            color: "rgba(255,255,255,0.6)",
-            fontSize: "14px",
-          }}
-        >
+        <p style={{ margin: 0, color: 'rgba(255,255,255,0.8)' }}>
           Select a prompt to see similar prompts from the same user
         </p>
       </div>
@@ -162,9 +171,10 @@ export default function PromptSimilarityPage() {
         style={{
           display: "flex",
           flex: 1,
+          height: '100%',
           overflow: "hidden",
           gap: "16px",
-          padding: "16px",
+          padding: 0,
         }}
       >
         <div
@@ -176,47 +186,12 @@ export default function PromptSimilarityPage() {
             borderRadius: "12px",
             border: "1px solid var(--border)",
             overflow: "hidden",
+            height: '100%'
           }}
         >
           <div
             style={{ padding: "16px", borderBottom: "1px solid var(--border)" }}
           >
-            <label
-              style={{
-                display: "block",
-                marginBottom: "8px",
-                fontWeight: 600,
-                fontSize: "14px",
-                color: "rgba(255,255,255,0.8)",
-              }}
-            >
-              Project:
-            </label>
-            <select
-              value={selectedProjectId}
-              onChange={(e) => {
-                setSelectedProjectId(e.target.value);
-                setSelectedPrompt(null);
-                setSimilarPrompts([]);
-              }}
-              style={{
-                width: "100%",
-                padding: "10px 12px",
-                borderRadius: "8px",
-                border: "1px solid var(--border)",
-                fontSize: "14px",
-                background: "rgba(0, 0, 0, 0.3)",
-                color: "rgba(255,255,255,0.95)",
-                cursor: "pointer",
-                fontWeight: 500,
-                marginBottom: "16px",
-              }}
-            >
-              <option value="" disabled>Select a project</option>
-              {projects.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
 
             <label
               style={{
@@ -279,7 +254,7 @@ export default function PromptSimilarityPage() {
             {filteredPrompts.length !== 1 ? "s" : ""}
           </div>
 
-          <div style={{ flex: 1, overflowY: "auto", padding: "12px" }}>
+          <div ref={promptsListRef} style={{ flex: 1, overflowY: "auto", padding: "12px" }}>
             {filteredPrompts.length === 0 ? (
               <div
                 style={{
@@ -357,6 +332,7 @@ export default function PromptSimilarityPage() {
             borderRadius: "12px",
             border: "1px solid var(--border)",
             overflow: "hidden",
+            height: '100%'
           }}
         >
           {!selectedPrompt ? (
