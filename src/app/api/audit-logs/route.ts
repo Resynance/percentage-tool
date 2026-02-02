@@ -6,6 +6,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { prisma } from '@/lib/prisma';
+import { ERROR_IDS } from '@/constants/errorIds';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
@@ -61,11 +64,40 @@ export async function GET(request: NextRequest) {
 
     if (startDate || endDate) {
       where.createdAt = {};
+
+      let startDateTime: Date | undefined;
+      let endDateTime: Date | undefined;
+
       if (startDate) {
-        where.createdAt.gte = new Date(startDate);
+        const date = new Date(startDate);
+        if (isNaN(date.getTime())) {
+          return NextResponse.json(
+            { error: 'Invalid startDate format. Expected ISO 8601 date string.' },
+            { status: 400 }
+          );
+        }
+        startDateTime = date;
+        where.createdAt.gte = date;
       }
+
       if (endDate) {
-        where.createdAt.lte = new Date(endDate);
+        const date = new Date(endDate);
+        if (isNaN(date.getTime())) {
+          return NextResponse.json(
+            { error: 'Invalid endDate format. Expected ISO 8601 date string.' },
+            { status: 400 }
+          );
+        }
+        endDateTime = date;
+        where.createdAt.lte = date;
+      }
+
+      // Validate that endDate is after startDate
+      if (startDateTime && endDateTime && endDateTime < startDateTime) {
+        return NextResponse.json(
+          { error: 'endDate must be after startDate' },
+          { status: 400 }
+        );
       }
     }
 
@@ -87,9 +119,13 @@ export async function GET(request: NextRequest) {
       take,
     });
   } catch (error) {
-    console.error('Error fetching audit logs:', error);
+    console.error('Error fetching audit logs:', {
+      errorId: ERROR_IDS.AUDIT_LOGS_FETCH_FAILED,
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     return NextResponse.json(
-      { error: 'Failed to fetch audit logs' },
+      { error: 'Failed to fetch audit logs', errorId: ERROR_IDS.AUDIT_LOGS_FETCH_FAILED },
       { status: 500 }
     );
   }

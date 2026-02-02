@@ -77,6 +77,7 @@ export async function POST(request: Request) {
         await prisma.$transaction(operations);
 
         // Log audit event
+        // Log audit event (non-critical)
         await logAudit({
             action: 'SYSTEM_SETTINGS_UPDATED',
             entityType: 'SYSTEM_SETTING',

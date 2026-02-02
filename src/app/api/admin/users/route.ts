@@ -2,7 +2,7 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
-import { logAudit } from '@/lib/audit'
+import { logAudit, checkAuditResult } from '@/lib/audit'
 
 export async function GET() {
     const supabase = await createClient()
@@ -67,14 +67,19 @@ export async function PATCH(req: Request) {
 
         if (updateError) throw updateError
 
-        // Log audit event
-        await logAudit({
+        // Log audit event (critical operation)
+        const auditResult = await logAudit({
             action: 'USER_ROLE_CHANGED',
             entityType: 'USER',
             entityId: userId,
             userId: user.id,
             userEmail: user.email!,
             metadata: { newRole: role }
+        })
+
+        checkAuditResult(auditResult, 'USER_ROLE_CHANGED', {
+            entityId: userId,
+            userId: user.id
         })
 
         return NextResponse.json(updatedProfile)
@@ -133,14 +138,19 @@ export async function POST(req: Request) {
 
         if (updateError) throw updateError
 
-        // Log audit event
-        await logAudit({
+        // Log audit event (critical operation)
+        const auditResult = await logAudit({
             action: 'USER_CREATED',
             entityType: 'USER',
             entityId: authData.user.id,
             userId: adminUser.id,
             userEmail: adminUser.email!,
             metadata: { email, role }
+        })
+
+        checkAuditResult(auditResult, 'USER_CREATED', {
+            entityId: authData.user.id,
+            userId: adminUser.id
         })
 
         return NextResponse.json(updatedProfile)

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { createClient } from '@/lib/supabase/server';
-import { logAudit } from '@/lib/audit';
+import { logAudit, checkAuditResult } from '@/lib/audit';
 
 export const dynamic = 'force-dynamic';
 
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
             },
         });
 
-        // Log audit event
+        // Log audit event (non-critical)
         await logAudit({
             action: 'PROJECT_CREATED',
             entityType: 'PROJECT',
@@ -110,8 +110,8 @@ export async function DELETE(req: NextRequest) {
             where: { id },
         });
 
-        // Log audit event
-        await logAudit({
+        // Log audit event (critical operation)
+        const auditResult = await logAudit({
             action: 'PROJECT_DELETED',
             entityType: 'PROJECT',
             entityId: id,
@@ -119,6 +119,11 @@ export async function DELETE(req: NextRequest) {
             userId: user.id,
             userEmail: user.email!,
             metadata: {}
+        });
+
+        checkAuditResult(auditResult, 'PROJECT_DELETED', {
+            entityId: id,
+            userId: user.id
         });
 
         return NextResponse.json({ success: true });
@@ -169,7 +174,7 @@ export async function PATCH(req: NextRequest) {
             },
         });
 
-        // Log audit event
+        // Log audit event (non-critical)
         await logAudit({
             action: 'PROJECT_UPDATED',
             entityType: 'PROJECT',

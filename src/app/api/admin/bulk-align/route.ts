@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ message: 'No records to analyze.' });
         }
 
-        // Log audit event
+        // Log audit event (non-critical)
         await logAudit({
             action: 'BULK_ALIGNMENT_STARTED',
             entityType: 'DATA_RECORD',

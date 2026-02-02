@@ -136,7 +136,7 @@ export async function POST(req: Request) {
             }
         })
 
-        // Log audit event
+        // Log audit event (non-critical)
         await logAudit({
             action: 'BONUS_WINDOW_CREATED',
             entityType: 'BONUS_WINDOW',
@@ -201,7 +201,7 @@ export async function PATCH(req: Request) {
             data: updateData
         })
 
-        // Log audit event
+        // Log audit event (non-critical)
         await logAudit({
             action: 'BONUS_WINDOW_UPDATED',
             entityType: 'BONUS_WINDOW',
@@ -249,7 +249,7 @@ export async function DELETE(req: Request) {
             where: { id }
         })
 
-        // Log audit event
+        // Log audit event (non-critical)
         await logAudit({
             action: 'BONUS_WINDOW_DELETED',
             entityType: 'BONUS_WINDOW',

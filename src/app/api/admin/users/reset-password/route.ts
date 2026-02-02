@@ -1,6 +1,6 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { logAudit } from '@/lib/audit'
+import { logAudit, checkAuditResult } from '@/lib/audit'
 
 export async function POST(req: Request) {
     const supabase = await createClient()
@@ -54,14 +54,19 @@ export async function POST(req: Request) {
             throw updateProfileError
         }
 
-        // Log audit event
-        await logAudit({
+        // Log audit event (critical operation)
+        const auditResult = await logAudit({
             action: 'USER_PASSWORD_RESET',
             entityType: 'USER',
             entityId: userId,
             userId: adminUser.id,
             userEmail: adminUser.email!,
             metadata: { resetByAdmin: true }
+        })
+
+        checkAuditResult(auditResult, 'USER_PASSWORD_RESET', {
+            entityId: userId,
+            userId: adminUser.id
         })
 
         return NextResponse.json({

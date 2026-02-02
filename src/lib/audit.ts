@@ -19,6 +19,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { prisma } from '@/lib/prisma';
 import { createId } from '@paralleldrive/cuid2';
+import { ERROR_IDS } from '@/constants/errorIds';
 
 export type AuditAction =
   // User Management
@@ -57,11 +58,17 @@ export interface LogAuditParams {
   metadata?: Record<string, unknown>;
 }
 
+export interface LogAuditResult {
+  success: boolean;
+  error?: string;
+}
+
 /**
  * Log an audit event to the database.
- * Uses try/catch to prevent audit failures from breaking operations.
+ * Returns success/failure status to allow callers to handle audit failures appropriately.
+ * Does not throw errors - audit failures should not break primary operations.
  */
-export async function logAudit(params: LogAuditParams): Promise<void> {
+export async function logAudit(params: LogAuditParams): Promise<LogAuditResult> {
   try {
     await prisma.auditLog.create({
       data: {
@@ -72,12 +79,61 @@ export async function logAudit(params: LogAuditParams): Promise<void> {
         projectId: params.projectId,
         userId: params.userId,
         userEmail: params.userEmail,
-        metadata: params.metadata || null,
+        metadata: params.metadata ?? undefined,
       },
     });
+    return { success: true };
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
     // Log error but don't throw - audit failures shouldn't break operations
-    console.error('Failed to log audit event:', error);
+    // TODO: Consider integrating with error tracking service (e.g., Sentry) in production
+    console.error('CRITICAL: Failed to log audit event. Audit trail may be incomplete.', {
+      errorId: ERROR_IDS.AUDIT_LOG_FAILED,
+      action: params.action,
+      entityType: params.entityType,
+      entityId: params.entityId,
+      userId: params.userId,
+      error: errorMessage,
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+
+    return { success: false, error: errorMessage };
+  }
+}
+
+/**
+ * List of critical audit actions that should generate warnings when audit logging fails.
+ * These operations have compliance or security implications.
+ */
+export const CRITICAL_AUDIT_ACTIONS: AuditAction[] = [
+  'USER_CREATED',
+  'USER_ROLE_CHANGED',
+  'USER_PASSWORD_RESET',
+  'PROJECT_DELETED',
+  'DATA_CLEARED',
+  'ANALYTICS_CLEARED',
+];
+
+/**
+ * Helper function to check audit result and log warnings for critical operations.
+ * Use this after calling logAudit() for operations that have compliance requirements.
+ */
+export function checkAuditResult(
+  result: LogAuditResult,
+  action: AuditAction,
+  context: { entityId?: string; userId: string }
+): void {
+  if (!result.success && CRITICAL_AUDIT_ACTIONS.includes(action)) {
+    console.warn('WARNING: Critical operation completed but audit logging failed', {
+      errorId: ERROR_IDS.AUDIT_LOG_FAILED,
+      action,
+      entityId: context.entityId,
+      userId: context.userId,
+      auditError: result.error,
+      severity: 'HIGH',
+      complianceRisk: true,
+    });
   }
 }
 
@@ -104,7 +160,11 @@ export async function getCurrentUserForAudit(): Promise<{
       email: user.email,
     };
   } catch (error) {
-    console.error('Failed to get current user for audit:', error);
+    console.error('Failed to get current user for audit:', {
+      errorId: ERROR_IDS.AUDIT_AUTH_CHECK_FAILED,
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     return null;
   }
 }

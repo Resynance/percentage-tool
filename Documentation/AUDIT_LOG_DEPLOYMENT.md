@@ -86,7 +86,7 @@ WHERE tablename = 'audit_logs';
 
 Expected results:
 - 9 columns (id, action, entity_type, entity_id, project_id, user_id, user_email, metadata, created_at)
-- 6 indexes (1 primary key + 5 performance indexes)
+- 5 performance indexes (plus primary key constraint)
 - RLS enabled (rowsecurity = true)
 - 2 policies (admin read, authenticated insert)
 

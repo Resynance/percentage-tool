@@ -53,7 +53,7 @@ describe('logAudit', () => {
       createdAt: new Date(),
     });
 
-    await logAudit({
+    const result = await logAudit({
       action: 'USER_CREATED',
       entityType: 'USER',
       entityId: 'user-123',
@@ -62,6 +62,8 @@ describe('logAudit', () => {
       metadata: { role: 'USER' },
     });
 
+    expect(result.success).toBe(true);
+    expect(result.error).toBeUndefined();
     expect(mockPrisma.auditLog.create).toHaveBeenCalledWith({
       data: {
         id: 'test-cuid-12345',
@@ -107,29 +109,36 @@ describe('logAudit', () => {
 
     expect(mockPrisma.auditLog.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
-        metadata: null,
+        metadata: undefined,
       }),
     });
   });
 
-  it('should not throw on database error (graceful degradation)', async () => {
+  it('should return failure on database error (graceful degradation)', async () => {
     const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     mockPrisma.auditLog.create.mockRejectedValue(new Error('Database error'));
 
-    // Should not throw - audit failures shouldn't break operations
-    await expect(
-      logAudit({
+    // Should not throw but return failure
+    const result = await logAudit({
+      action: 'USER_CREATED',
+      entityType: 'USER',
+      userId: 'admin-123',
+      userEmail: 'admin@example.com',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Database error');
+
+    // Should log the error with structured context
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      'CRITICAL: Failed to log audit event. Audit trail may be incomplete.',
+      expect.objectContaining({
+        errorId: 'AUDIT_LOG_FAILED',
         action: 'USER_CREATED',
         entityType: 'USER',
         userId: 'admin-123',
-        userEmail: 'admin@example.com',
+        error: 'Database error',
       })
-    ).resolves.not.toThrow();
-
-    // Should log the error
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      'Failed to log audit event:',
-      expect.any(Error)
     );
 
     consoleErrorSpy.mockRestore();
@@ -213,7 +222,10 @@ describe('getCurrentUserForAudit', () => {
     expect(result).toBeNull();
     expect(consoleErrorSpy).toHaveBeenCalledWith(
       'Failed to get current user for audit:',
-      expect.any(Error)
+      expect.objectContaining({
+        errorId: 'AUDIT_AUTH_CHECK_FAILED',
+        error: 'Auth error',
+      })
     );
 
     consoleErrorSpy.mockRestore();

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
   Shield,
   ChevronDown,
@@ -53,7 +53,7 @@ export default function AuditLogsPage() {
   const [endDateFilter, setEndDateFilter] = useState('');
 
   // Fetch logs
-  const fetchLogs = async () => {
+  const fetchLogs = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -82,12 +82,12 @@ export default function AuditLogsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [skip, take, actionFilter, entityTypeFilter, startDateFilter, endDateFilter]);
 
   // Fetch logs on mount and when filters/pagination change
   useEffect(() => {
     fetchLogs();
-  }, [skip, actionFilter, entityTypeFilter, startDateFilter, endDateFilter]);
+  }, [fetchLogs]);
 
   // Action icon mapping
   const getActionIcon = (action: string) => {
@@ -303,6 +303,7 @@ export default function AuditLogsPage() {
             {logs.map((log) => (
               <div
                 key={log.id}
+                data-testid="audit-log-entry"
                 className={`p-4 bg-black/20 rounded-lg border-l-4 ${getActionColor(
                   log.action
                 )}`}
