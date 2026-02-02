@@ -179,7 +179,7 @@ export default function BugReportsPage() {
                   <select
                     className={styles.statusSelect}
                     value={report.status}
-                    onChange={(e) => updateStatus(report.id, e.target.value, report.assignedTo ? 'self' : undefined)}
+                    onChange={(e) => updateStatus(report.id, e.target.value)}
                     disabled={updatingId === report.id}
                   >
                     <option value="PENDING">Pending</option>
