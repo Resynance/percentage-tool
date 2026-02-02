@@ -1,18 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { RecordCategory, Prisma } from '@prisma/client';
+import { RecordCategory } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-
-type RecordWithoutScores = {
-    id: string;
-    content: string;
-    category: RecordCategory | null;
-    source: string;
-    metadata: Prisma.JsonValue;
-    alignmentAnalysis: string | null;
-    isCategoryCorrect: boolean | null;
-    hasBeenReviewed: boolean;
-    reviewedBy: string | null;
-};
 
 export async function GET(req: NextRequest) {
     try {
@@ -56,41 +44,47 @@ export async function GET(req: NextRequest) {
                 isCategoryCorrect: true,
                 hasBeenReviewed: true,
                 reviewedBy: true,
+                likertScores: {
+                    select: {
+                        realismScore: true,
+                        qualityScore: true,
+                    },
+                },
             },
             orderBy: {
                 createdAt: 'desc',
             },
         });
 
-        // Fetch Likert scores for each record and calculate averages
-        const recordsWithScores = await Promise.all(
-            records.map(async (record: RecordWithoutScores) => {
-                const likertScores = await prisma.likertScore.findMany({
-                    where: { recordId: record.id },
-                    select: {
-                        realismScore: true,
-                        qualityScore: true,
-                    },
-                });
+        // Calculate averages from the included likertScores
+        const recordsWithScores = records.map((record) => {
+            const likertScores = record.likertScores;
 
-                const avgRealism = likertScores.length > 0
-                    ? likertScores.reduce((sum: number, s: { realismScore: number; qualityScore: number }) => sum + s.realismScore, 0) / likertScores.length
-                    : null;
+            const avgRealism = likertScores.length > 0
+                ? likertScores.reduce((sum: number, s: { realismScore: number; qualityScore: number }) => sum + s.realismScore, 0) / likertScores.length
+                : null;
 
-                const avgQuality = likertScores.length > 0
-                    ? likertScores.reduce((sum: number, s: { realismScore: number; qualityScore: number }) => sum + s.qualityScore, 0) / likertScores.length
-                    : null;
+            const avgQuality = likertScores.length > 0
+                ? likertScores.reduce((sum: number, s: { realismScore: number; qualityScore: number }) => sum + s.qualityScore, 0) / likertScores.length
+                : null;
 
-                return {
-                    ...record,
-                    likertScores: {
-                        count: likertScores.length,
-                        avgRealism: avgRealism ? parseFloat(avgRealism.toFixed(1)) : null,
-                        avgQuality: avgQuality ? parseFloat(avgQuality.toFixed(1)) : null,
-                    },
-                };
-            })
-        );
+            return {
+                id: record.id,
+                content: record.content,
+                category: record.category,
+                source: record.source,
+                metadata: record.metadata,
+                alignmentAnalysis: record.alignmentAnalysis,
+                isCategoryCorrect: record.isCategoryCorrect,
+                hasBeenReviewed: record.hasBeenReviewed,
+                reviewedBy: record.reviewedBy,
+                likertScores: {
+                    count: likertScores.length,
+                    avgRealism: avgRealism ? parseFloat(avgRealism.toFixed(1)) : null,
+                    avgQuality: avgQuality ? parseFloat(avgQuality.toFixed(1)) : null,
+                },
+            };
+        });
 
         return NextResponse.json({ records: recordsWithScores, total: recordsWithScores.length });
     } catch (error) {
