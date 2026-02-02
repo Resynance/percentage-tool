@@ -62,7 +62,7 @@ export async function GET(req: NextRequest) {
         // Note: For very large datasets, this O(N*M) is slow.
         for (const task of taskEmbeds) {
             for (const feedback of feedbackEmbeds) {
-                const sim = await cosineSimilarity(task.embedding as number[], feedback.embedding as number[]);
+                const sim = cosineSimilarity(task.embedding as number[], feedback.embedding as number[]);
                 if (sim >= threshold) {
                     matches.push({
                         task: {
