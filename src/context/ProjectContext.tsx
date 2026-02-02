@@ -59,7 +59,6 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
             setLoading(false);
         }
     }, []);
->>>>>>> main
 
     useEffect(() => {
         fetchProjects();
