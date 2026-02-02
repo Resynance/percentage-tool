@@ -155,11 +155,14 @@ export async function GET(request: NextRequest) {
                     source: record.source,
                     metadata: record.metadata,
                     createdAt: record.createdAt,
+                    rawSimilarity: similarity,
                     similarity: Math.round(similarity * 100),
                 };
             })
-            // Filter out records with 0 similarity (likely dimension mismatches)
-            .filter(r => r.similarity > 0)
+            // Filter out records with exactly 0 raw similarity (dimension mismatches)
+            // This preserves legitimate low scores (0.1%-0.4%) that round to 0
+            .filter(r => r.rawSimilarity > 0)
+            .map(({ rawSimilarity, ...rest }) => rest) // Remove rawSimilarity from final output
             .sort((a, b) => b.similarity - a.similarity);
 
         return NextResponse.json({
