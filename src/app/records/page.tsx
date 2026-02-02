@@ -7,7 +7,7 @@ export const metadata = {
 
 export default function RecordsPage() {
     return (
-        <main style={{ padding: '40px 0' }}>
+        <main>
             <ListView />
         </main>
     );

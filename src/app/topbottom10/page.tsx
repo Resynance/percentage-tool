@@ -8,7 +8,7 @@ export const metadata = {
 
 export default function TopBottom10Page() {
   return (
-    <main style={{ padding: '40px 0' }}>
+    <main>
       <Suspense fallback={<div style={{ textAlign: 'center', color: '#60a5fa', padding: '40px 20px' }}>Loading...</div>}>
         <TopBottom10Review />
       </Suspense>

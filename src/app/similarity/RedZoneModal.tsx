@@ -20,9 +20,10 @@ interface RedZoneModalProps {
   isOpen: boolean;
   onClose: () => void;
   projectId: string;
+  threshold?: number;
 }
 
-export default function RedZoneModal({ isOpen, onClose, projectId }: RedZoneModalProps) {
+export default function RedZoneModal({ isOpen, onClose, projectId, threshold = 70 }: RedZoneModalProps) {
   const [pairs, setPairs] = useState<RedZonePair[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,7 +38,7 @@ export default function RedZoneModal({ isOpen, onClose, projectId }: RedZoneModa
 
       try {
         const response = await fetch(
-          `/api/analytics/red-zone?projectId=${projectId}&threshold=70`
+          `/api/analytics/red-zone?projectId=${projectId}&threshold=${threshold}`
         );
         const data = await response.json();
 
@@ -56,7 +57,7 @@ export default function RedZoneModal({ isOpen, onClose, projectId }: RedZoneModa
     };
 
     fetchRedZone();
-  }, [isOpen, projectId]);
+  }, [isOpen, projectId, threshold]);
 
   if (!isOpen) return null;
 
@@ -132,7 +133,7 @@ export default function RedZoneModal({ isOpen, onClose, projectId }: RedZoneModa
                   color: "rgba(255,255,255,0.5)",
                 }}
               >
-                Prompts with ≥70% similarity that need review
+                Prompts with ≥{threshold}% similarity that need review
               </p>
             </div>
           </div>
@@ -235,7 +236,7 @@ export default function RedZoneModal({ isOpen, onClose, projectId }: RedZoneModa
                 No Red Zone Prompts Found
               </div>
               <div style={{ fontSize: "13px" }}>
-                All prompts have less than 70% similarity
+                All prompts have less than {threshold}% similarity
               </div>
             </div>
           ) : (
