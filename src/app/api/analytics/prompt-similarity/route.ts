@@ -68,13 +68,17 @@ export async function GET(request: NextRequest) {
 
         let selectedEmbedding = selectedRecord.embedding;
         if (!selectedEmbedding || selectedEmbedding.length === 0) {
+            console.log('[Similarity] Selected record has no embedding, generating...');
             const freshEmbedding = await getEmbeddings([selectedRecord.content]);
-            
+
             if (!freshEmbedding || freshEmbedding.length === 0 || !freshEmbedding[0]) {
                 return NextResponse.json({ error: 'Failed to generate embedding for selected prompt' }, { status: 500 });
             }
-            
+
             selectedEmbedding = freshEmbedding[0];
+            console.log(`[Similarity] Generated embedding with dimension: ${selectedEmbedding.length}`);
+        } else {
+            console.log(`[Similarity] Using existing embedding with dimension: ${selectedEmbedding.length}`);
         }
 
         const userRecords = await prisma.dataRecord.findMany({
@@ -131,6 +135,14 @@ export async function GET(request: NextRequest) {
 
         const similarityResults = validRecordsWithEmbeddings
             .map(record => {
+                // Log dimension info for debugging
+                if (selectedEmbedding.length !== record.embedding!.length) {
+                    console.warn(
+                        `[Similarity] Dimension mismatch: selected=${selectedEmbedding.length}, ` +
+                        `record ${record.id}=${record.embedding!.length}`
+                    );
+                }
+
                 const similarity = cosineSimilarity(
                     selectedEmbedding as number[],
                     record.embedding as number[]
@@ -146,6 +158,8 @@ export async function GET(request: NextRequest) {
                     similarity: Math.round(similarity * 100),
                 };
             })
+            // Filter out records with 0 similarity (likely dimension mismatches)
+            .filter(r => r.similarity > 0)
             .sort((a, b) => b.similarity - a.similarity);
 
         return NextResponse.json({
