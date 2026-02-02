@@ -68,7 +68,7 @@ export default function PromptSimilarityPage() {
 
     const fetchPrompts = async () => {
       try {
-        const url = new URL("/api/analytics/prompts", window.location.origin);
+        const url = new URL("/api/analysis/prompts", window.location.origin);
         url.searchParams.set("projectId", selectedProjectId);
 
         const response = await fetch(url.toString());
@@ -110,7 +110,7 @@ export default function PromptSimilarityPage() {
 
       try {
         const response = await fetch(
-          `/api/analytics/prompt-similarity?projectId=${selectedProjectId}&recordId=${selectedPrompt.id}`,
+          `/api/analysis/prompt-similarity?projectId=${selectedProjectId}&recordId=${selectedPrompt.id}`,
         );
         const data = await response.json();
 
