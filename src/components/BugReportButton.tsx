@@ -8,6 +8,7 @@ export default function BugReportButton() {
   const [description, setDescription] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle')
+  const [showToast, setShowToast] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -33,6 +34,8 @@ export default function BugReportButton() {
         setTimeout(() => {
           setIsOpen(false)
           setSubmitStatus('idle')
+          setShowToast(true)
+          setTimeout(() => setShowToast(false), 5000)
         }, 2000)
       } else {
         setSubmitStatus('error')
@@ -124,7 +127,21 @@ export default function BugReportButton() {
 
               {submitStatus === 'success' && (
                 <div className={styles.success}>
-                  Bug report submitted successfully!
+                  <svg
+                    className={styles.successIcon}
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                  <span>Bug report submitted successfully! An admin will review it soon.</span>
                 </div>
               )}
 
@@ -147,6 +164,37 @@ export default function BugReportButton() {
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {/* Success Toast */}
+      {showToast && (
+        <div className={styles.toast}>
+          <svg
+            className={styles.toastIcon}
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+          <div className={styles.toastContent}>
+            <div className={styles.toastTitle}>Bug Report Submitted</div>
+            <div className={styles.toastMessage}>An admin will review your report soon.</div>
+          </div>
+          <button
+            className={styles.toastClose}
+            onClick={() => setShowToast(false)}
+            aria-label="Close notification"
+          >
+            ×
+          </button>
         </div>
       )}
     </>
