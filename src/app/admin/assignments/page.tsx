@@ -12,7 +12,9 @@ import {
     Users,
     User,
     Calendar,
-    Share2
+    Share2,
+    CheckSquare,
+    Square
 } from 'lucide-react';
 
 interface AssignmentBatch {
@@ -105,9 +107,11 @@ export default function AssignmentsPage() {
             const res = await fetch('/api/projects');
             if (res.ok) {
                 const data = await res.json();
-                setProjects(data.projects || []);
-                if (data.projects?.length > 0) {
-                    setSelectedProjectId(data.projects[0].id);
+                // Handle both wrapped { projects: [] } and direct array formats
+                const projectList = Array.isArray(data) ? data : (data.projects || []);
+                setProjects(projectList);
+                if (projectList.length > 0) {
+                    setSelectedProjectId(projectList[0].id);
                 }
             }
         } catch (error) {
@@ -545,7 +549,7 @@ export default function AssignmentsPage() {
                                     Select Records ({selectedRecordIds.length} selected)
                                 </label>
 
-                                <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
+                                <div style={{ display: 'flex', gap: '12px', marginBottom: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
                                     <select
                                         value={formData.filterCategory}
                                         onChange={e => setFormData({ ...formData, filterCategory: e.target.value as any })}
@@ -568,16 +572,40 @@ export default function AssignmentsPage() {
                                     </select>
                                     <button
                                         onClick={handleSelectAllFiltered}
-                                        className="btn-secondary"
-                                        style={{ whiteSpace: 'nowrap' }}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '6px',
+                                            padding: '10px 16px',
+                                            borderRadius: '8px',
+                                            border: '1px solid rgba(0,112,243,0.5)',
+                                            background: 'rgba(0,112,243,0.15)',
+                                            color: '#0070f3',
+                                            cursor: 'pointer',
+                                            fontWeight: 500,
+                                            whiteSpace: 'nowrap'
+                                        }}
                                     >
-                                        Select All Filtered ({getFilteredRecords().length})
+                                        <CheckSquare size={16} />
+                                        Select All ({getFilteredRecords().length})
                                     </button>
                                     <button
                                         onClick={() => setSelectedRecordIds([])}
-                                        className="btn-secondary"
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '6px',
+                                            padding: '10px 16px',
+                                            borderRadius: '8px',
+                                            border: '1px solid rgba(255,255,255,0.2)',
+                                            background: 'rgba(255,255,255,0.05)',
+                                            color: 'rgba(255,255,255,0.7)',
+                                            cursor: 'pointer',
+                                            fontWeight: 500
+                                        }}
                                     >
-                                        Clear
+                                        <Square size={16} />
+                                        Deselect All
                                     </button>
                                 </div>
 

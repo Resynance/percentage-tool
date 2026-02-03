@@ -8,7 +8,8 @@ import {
     Users,
     Bot,
     FileText,
-    TrendingUp
+    TrendingUp,
+    Trash2
 } from 'lucide-react';
 
 interface Project {
@@ -50,6 +51,7 @@ export default function AnalyticsPage() {
     const [selectedProjectId, setSelectedProjectId] = useState<string>('');
     const [loading, setLoading] = useState(true);
     const [loadingData, setLoadingData] = useState(false);
+    const [clearing, setClearing] = useState(false);
 
     // Data
     const [summary, setSummary] = useState<Summary | null>(null);
@@ -73,9 +75,11 @@ export default function AnalyticsPage() {
             const res = await fetch('/api/projects');
             if (res.ok) {
                 const data = await res.json();
-                setProjects(data.projects || []);
-                if (data.projects?.length > 0) {
-                    setSelectedProjectId(data.projects[0].id);
+                // Handle both wrapped { projects: [] } and direct array formats
+                const projectList = Array.isArray(data) ? data : (data.projects || []);
+                setProjects(projectList);
+                if (projectList.length > 0) {
+                    setSelectedProjectId(projectList[0].id);
                 }
             }
         } catch (error) {
@@ -114,6 +118,58 @@ export default function AnalyticsPage() {
 
     const handleExport = (format: 'csv' | 'json') => {
         window.open(`/api/analytics/export?projectId=${selectedProjectId}&format=${format}`, '_blank');
+    };
+
+    const handleClearLikertData = async () => {
+        if (!selectedProjectId) return;
+        const projectName = projects.find(p => p.id === selectedProjectId)?.name || 'this project';
+        if (!confirm(`Are you sure you want to clear all Likert ratings for "${projectName}"? This cannot be undone.`)) return;
+
+        setClearing(true);
+        try {
+            const res = await fetch('/api/admin/clear', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ target: 'LIKERT_SCORES', projectId: selectedProjectId })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                alert(data.message);
+                fetchAnalytics(); // Refresh the data
+            } else {
+                alert(data.error || 'Failed to clear data');
+            }
+        } catch (error) {
+            alert('Network error occurred');
+        } finally {
+            setClearing(false);
+        }
+    };
+
+    const handleClearAllRecords = async () => {
+        if (!selectedProjectId) return;
+        const projectName = projects.find(p => p.id === selectedProjectId)?.name || 'this project';
+        if (!confirm(`⚠️ WARNING: This will permanently delete ALL ${summary?.totalRecords || 0} records and ratings for "${projectName}".\n\nThis action cannot be undone. Are you sure?`)) return;
+
+        setClearing(true);
+        try {
+            const res = await fetch('/api/admin/clear', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ target: 'PROJECT_RECORDS', projectId: selectedProjectId })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                alert(data.message);
+                fetchAnalytics(); // Refresh the data
+            } else {
+                alert(data.error || 'Failed to clear data');
+            }
+        } catch (error) {
+            alert('Network error occurred');
+        } finally {
+            setClearing(false);
+        }
     };
 
     const DistributionChart = ({ data, label, color }: { data: number[]; label: string; color: string }) => {
@@ -178,6 +234,46 @@ export default function AnalyticsPage() {
                     >
                         <Download size={18} />
                         Export JSON
+                    </button>
+                    <button
+                        onClick={handleClearLikertData}
+                        disabled={!selectedProjectId || clearing}
+                        title="Clear Likert ratings only"
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            padding: '10px 16px',
+                            borderRadius: '8px',
+                            border: '1px solid rgba(255,170,0,0.3)',
+                            background: 'rgba(255,170,0,0.1)',
+                            color: '#ffaa00',
+                            cursor: !selectedProjectId || clearing ? 'not-allowed' : 'pointer',
+                            opacity: !selectedProjectId || clearing ? 0.5 : 1
+                        }}
+                    >
+                        <Trash2 size={18} />
+                        Clear Ratings
+                    </button>
+                    <button
+                        onClick={handleClearAllRecords}
+                        disabled={!selectedProjectId || clearing}
+                        title="Clear all records and ratings"
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            padding: '10px 16px',
+                            borderRadius: '8px',
+                            border: '1px solid rgba(255,77,77,0.3)',
+                            background: 'rgba(255,77,77,0.1)',
+                            color: '#ff4d4d',
+                            cursor: !selectedProjectId || clearing ? 'not-allowed' : 'pointer',
+                            opacity: !selectedProjectId || clearing ? 0.5 : 1
+                        }}
+                    >
+                        <Trash2 size={18} />
+                        {clearing ? 'Clearing...' : 'Clear All Records'}
                     </button>
                 </div>
             </header>

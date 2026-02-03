@@ -113,11 +113,13 @@ export const LM_STUDIO_MODEL_OPTIONS = [
 ] as const;
 
 export const OPENROUTER_MODEL_OPTIONS = [
-  'anthropic/claude-sonnet-4-5',
+  'google/gemini-3-flash-preview',
   'anthropic/claude-sonnet-4.5',
   'anthropic/claude-opus-4.5',
   'anthropic/claude-3.5-sonnet',
   'openai/gpt-oss-120b',
+  'google/gemini-3-pro-preview',
+  'openai/gpt-5.2-chat',
 ] as const;
 
 export const OPENROUTER_EMBEDDING_OPTIONS = [
@@ -222,8 +224,8 @@ export const LLMConfig = {
   /** Temperature for evaluation requests (lower = more consistent) */
   EVALUATION_TEMPERATURE: 0.3,
 
-  /** Maximum tokens for evaluation responses */
-  EVALUATION_MAX_TOKENS: 100,
+  /** Maximum tokens for evaluation responses (higher for reasoning models like o1/o3/gpt-5.2) */
+  EVALUATION_MAX_TOKENS: 500,
 
   /** Maximum prompt length before truncation */
   MAX_PROMPT_LENGTH: 20000,

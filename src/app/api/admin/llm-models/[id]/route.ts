@@ -27,7 +27,8 @@ export async function GET(
         .eq('id', user.id)
         .single();
 
-    if ((profile as any)?.role !== 'ADMIN') {
+    const role = (profile as any)?.role;
+    if (!['ADMIN', 'MANAGER'].includes(role)) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -89,7 +90,8 @@ export async function PATCH(
         .eq('id', user.id)
         .single();
 
-    if ((profile as any)?.role !== 'ADMIN') {
+    const patchRole = (profile as any)?.role;
+    if (!['ADMIN', 'MANAGER'].includes(patchRole)) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -187,7 +189,8 @@ export async function DELETE(
         .eq('id', user.id)
         .single();
 
-    if ((profile as any)?.role !== 'ADMIN') {
+    const deleteRole = (profile as any)?.role;
+    if (!['ADMIN', 'MANAGER'].includes(deleteRole)) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

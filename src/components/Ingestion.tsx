@@ -340,7 +340,7 @@ export default function IngestionPage() {
         try {
             const res = await fetch('/api/projects');
             const data = await res.json();
-            const projectsArray = Array.isArray(data) ? data : [];
+            const projectsArray = Array.isArray(data) ? data : (data.projects || []);
             setProjects(projectsArray);
             if (projectsArray.length > 0) {
                 setSelectedProjectId(projectsArray[0].id);

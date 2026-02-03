@@ -83,9 +83,11 @@ export default function RaterGroupsPage() {
             const res = await fetch('/api/projects');
             if (res.ok) {
                 const data = await res.json();
-                setProjects(data.projects || []);
-                if (data.projects?.length > 0) {
-                    setSelectedProjectId(data.projects[0].id);
+                // Handle both wrapped { projects: [] } and direct array formats
+                const projectList = Array.isArray(data) ? data : (data.projects || []);
+                setProjects(projectList);
+                if (projectList.length > 0) {
+                    setSelectedProjectId(projectList[0].id);
                 }
             }
         } catch (error) {

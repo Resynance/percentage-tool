@@ -221,6 +221,7 @@ model LikertScore {
   createdAt       DateTime    @default(now()) @map("createdAt")
   updatedAt       DateTime    @updatedAt @map("updatedAt")
 
+  @@unique([recordId, userId, llmModel], name: "likert_scores_record_user_model_key")
   @@index([recordId])
   @@index([userId])
   @@index([llmModel])

@@ -16,8 +16,12 @@ import {
     X,
     PlayCircle,
     StopCircle,
-    RefreshCw
+    RefreshCw,
+    Star,
+    ExternalLink
 } from 'lucide-react';
+import Link from 'next/link';
+import { OPENROUTER_MODEL_OPTIONS } from '@/lib/constants';
 
 interface LLMModelConfig {
     id: string;
@@ -70,19 +74,14 @@ interface EvaluationJob {
     };
 }
 
-// Popular OpenRouter models with pricing
-const POPULAR_MODELS = [
-    { id: 'openai/gpt-4o', name: 'GPT-4o', inputCost: 2.5, outputCost: 10 },
-    { id: 'openai/gpt-4o-mini', name: 'GPT-4o Mini', inputCost: 0.15, outputCost: 0.6 },
-    { id: 'anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet', inputCost: 3, outputCost: 15 },
-    { id: 'anthropic/claude-3-haiku', name: 'Claude 3 Haiku', inputCost: 0.25, outputCost: 1.25 },
-    { id: 'google/gemini-pro-1.5', name: 'Gemini Pro 1.5', inputCost: 1.25, outputCost: 5 },
-    { id: 'google/gemini-flash-1.5', name: 'Gemini Flash 1.5', inputCost: 0.075, outputCost: 0.3 },
-    { id: 'meta-llama/llama-3.1-70b-instruct', name: 'Llama 3.1 70B', inputCost: 0.52, outputCost: 0.75 },
-    { id: 'meta-llama/llama-3.1-8b-instruct', name: 'Llama 3.1 8B', inputCost: 0.055, outputCost: 0.055 },
-    { id: 'mistralai/mistral-large', name: 'Mistral Large', inputCost: 2, outputCost: 6 },
-    { id: 'deepseek/deepseek-chat', name: 'DeepSeek Chat', inputCost: 0.14, outputCost: 0.28 },
-];
+// Model preset interface for the quick select
+interface ModelPreset {
+    id: string;
+    name: string;
+    inputCost: number | null;
+    outputCost: number | null;
+    fromDatabase: boolean;
+}
 
 export default function LLMModelsPage() {
     const [models, setModels] = useState<LLMModelConfig[]>([]);
@@ -129,7 +128,9 @@ export default function LLMModelsPage() {
             const res = await fetch('/api/projects');
             if (res.ok) {
                 const data = await res.json();
-                setProjects(data.projects || []);
+                // Handle both wrapped { projects: [] } and direct array formats
+                const projectList = Array.isArray(data) ? data : (data.projects || []);
+                setProjects(projectList);
             }
         } catch (error) {
             console.error('Error fetching projects:', error);
@@ -203,13 +204,53 @@ export default function LLMModelsPage() {
         }
     };
 
-    const handlePresetSelect = (preset: typeof POPULAR_MODELS[0]) => {
+    // Generate dynamic presets from saved models + OPENROUTER_MODEL_OPTIONS
+    const getModelPresets = (): ModelPreset[] => {
+        const presets: ModelPreset[] = [];
+        const seenIds = new Set<string>();
+
+        // First, add all existing models from database (they have accurate pricing)
+        for (const model of models) {
+            presets.push({
+                id: model.modelId,
+                name: model.name,
+                inputCost: model.inputCostPer1k,
+                outputCost: model.outputCostPer1k,
+                fromDatabase: true
+            });
+            seenIds.add(model.modelId);
+        }
+
+        // Then add OPENROUTER_MODEL_OPTIONS that aren't already in database
+        for (const modelId of OPENROUTER_MODEL_OPTIONS) {
+            if (!seenIds.has(modelId)) {
+                // Extract a display name from the model ID
+                const nameParts = modelId.split('/');
+                const displayName = nameParts[nameParts.length - 1]
+                    .split('-')
+                    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                    .join(' ');
+                presets.push({
+                    id: modelId,
+                    name: displayName,
+                    inputCost: null,
+                    outputCost: null,
+                    fromDatabase: false
+                });
+                seenIds.add(modelId);
+            }
+        }
+
+        return presets;
+    };
+
+    const handlePresetSelect = (preset: ModelPreset) => {
         setFormData({
             ...formData,
             name: preset.name,
             modelId: preset.id,
-            inputCostPer1k: preset.inputCost.toString(),
-            outputCostPer1k: preset.outputCost.toString()
+            inputCostPer1k: preset.inputCost?.toString() || '',
+            outputCostPer1k: preset.outputCost?.toString() || ''
         });
     };
 
@@ -361,14 +402,25 @@ export default function LLMModelsPage() {
                         Configure OpenRouter models for bulk Likert evaluations
                     </p>
                 </div>
-                <button
-                    onClick={() => { resetForm(); setEditingModel(null); setShowAddModal(true); }}
-                    className="btn-primary"
-                    style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-                >
-                    <Plus size={20} />
-                    Add Model
-                </button>
+                <div style={{ display: 'flex', gap: '12px' }}>
+                    <Link
+                        href="/likert-scoring"
+                        className="btn-secondary"
+                        style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                    >
+                        <Star size={20} />
+                        Likert Scoring
+                        <ExternalLink size={14} />
+                    </Link>
+                    <button
+                        onClick={() => { resetForm(); setEditingModel(null); setShowAddModal(true); }}
+                        className="btn-primary"
+                        style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                    >
+                        <Plus size={20} />
+                        Add Model
+                    </button>
+                </div>
             </header>
 
             {status && (
@@ -748,8 +800,8 @@ export default function LLMModelsPage() {
                                 </div>
 
                                 {formData.usePreset && (
-                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
-                                        {POPULAR_MODELS.map(preset => (
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', maxHeight: '300px', overflowY: 'auto' }}>
+                                        {getModelPresets().map(preset => (
                                             <button
                                                 key={preset.id}
                                                 type="button"
@@ -759,18 +811,31 @@ export default function LLMModelsPage() {
                                                     borderRadius: '8px',
                                                     border: formData.modelId === preset.id
                                                         ? '1px solid var(--accent)'
-                                                        : '1px solid rgba(255,255,255,0.1)',
+                                                        : preset.fromDatabase
+                                                            ? '1px solid rgba(0,255,136,0.2)'
+                                                            : '1px solid rgba(255,255,255,0.1)',
                                                     background: formData.modelId === preset.id
                                                         ? 'rgba(0,112,243,0.1)'
-                                                        : 'rgba(255,255,255,0.02)',
+                                                        : preset.fromDatabase
+                                                            ? 'rgba(0,255,136,0.03)'
+                                                            : 'rgba(255,255,255,0.02)',
                                                     textAlign: 'left',
                                                     cursor: 'pointer',
                                                     color: 'inherit'
                                                 }}
                                             >
-                                                <div style={{ fontWeight: 500, marginBottom: '4px' }}>{preset.name}</div>
+                                                <div style={{ fontWeight: 500, marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                    {preset.name}
+                                                    {preset.fromDatabase && (
+                                                        <span style={{ fontSize: '0.65rem', background: 'rgba(0,255,136,0.15)', padding: '2px 6px', borderRadius: '4px', color: '#00ff88' }}>
+                                                            Saved
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 <div style={{ fontSize: '0.75rem', opacity: 0.5 }}>
-                                                    ${preset.inputCost} / ${preset.outputCost} per 1K
+                                                    {preset.inputCost != null && preset.outputCost != null
+                                                        ? `$${preset.inputCost} / $${preset.outputCost} per 1K`
+                                                        : preset.id}
                                                 </div>
                                             </button>
                                         ))}

@@ -165,22 +165,44 @@ export async function processEvaluationBatch(jobId: string): Promise<{ completed
             );
 
             if (result) {
-                await prisma.likertScore.create({
-                    data: {
+                // Check if score already exists for this record/user/model combo
+                const existingScore = await prisma.likertScore.findFirst({
+                    where: {
                         recordId: record.id,
                         userId: LLM_SYSTEM_UUID,
-                        realismScore: result.realism,
-                        qualityScore: result.quality,
                         llmModel: job.modelConfig.modelId
                     }
                 });
 
+                if (existingScore) {
+                    await prisma.likertScore.update({
+                        where: { id: existingScore.id },
+                        data: {
+                            realismScore: result.realism,
+                            qualityScore: result.quality
+                        }
+                    });
+                } else {
+                    await prisma.likertScore.create({
+                        data: {
+                            recordId: record.id,
+                            userId: LLM_SYSTEM_UUID,
+                            realismScore: result.realism,
+                            qualityScore: result.quality,
+                            llmModel: job.modelConfig.modelId
+                        }
+                    });
+                }
+
                 tokens += result.tokensUsed || 0;
 
-                // Calculate cost
-                if (job.modelConfig.inputCostPer1k && job.modelConfig.outputCostPer1k) {
-                    const inputCost = (result.promptTokens || 0) * (job.modelConfig.inputCostPer1k / 1000);
-                    const outputCost = (result.completionTokens || 0) * (job.modelConfig.outputCostPer1k / 1000);
+                // Calculate cost (works if at least one cost is configured)
+                const inputCostPer1k = job.modelConfig.inputCostPer1k ?? 0;
+                const outputCostPer1k = job.modelConfig.outputCostPer1k ?? 0;
+
+                if (inputCostPer1k > 0 || outputCostPer1k > 0) {
+                    const inputCost = (result.promptTokens || 0) * (inputCostPer1k / 1000);
+                    const outputCost = (result.completionTokens || 0) * (outputCostPer1k / 1000);
                     cost += inputCost + outputCost;
                 }
 
@@ -226,35 +248,53 @@ async function callLLMForEvaluation(
     content: string,
     systemPrompt: string
 ): Promise<EvaluationResult | null> {
-    const response = await fetch(`${baseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: {
-            [HTTPHeaders.AUTHORIZATION]: `Bearer ${apiKey}`,
-            [HTTPHeaders.CONTENT_TYPE]: 'application/json',
-            [HTTPHeaders.REFERER]: process.env.NEXT_PUBLIC_APP_URL || EnvDefaults.NEXT_PUBLIC_APP_URL,
-            [HTTPHeaders.TITLE]: HTTPHeaders.BULK_EVAL_TITLE
-        },
-        body: JSON.stringify({
-            model: modelId,
-            messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: `Please evaluate this prompt:\n\n${content}` }
-            ],
-            max_tokens: LLMConfig.EVALUATION_MAX_TOKENS,
-            temperature: LLMConfig.EVALUATION_TEMPERATURE
-        })
-    });
-
-    if (!response.ok) return null;
-
-    const data = await response.json();
-    const responseContent = data.choices?.[0]?.message?.content || '';
-    const usage = data.usage || {};
-
     try {
+        const response = await fetch(`${baseUrl}/chat/completions`, {
+            method: 'POST',
+            headers: {
+                [HTTPHeaders.AUTHORIZATION]: `Bearer ${apiKey}`,
+                [HTTPHeaders.CONTENT_TYPE]: 'application/json',
+                [HTTPHeaders.REFERER]: process.env.NEXT_PUBLIC_APP_URL || EnvDefaults.NEXT_PUBLIC_APP_URL,
+                [HTTPHeaders.TITLE]: HTTPHeaders.BULK_EVAL_TITLE
+            },
+            body: JSON.stringify({
+                model: modelId,
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: `Please evaluate this prompt:\n\n${content}` }
+                ],
+                max_tokens: LLMConfig.EVALUATION_MAX_TOKENS,
+                temperature: LLMConfig.EVALUATION_TEMPERATURE
+            })
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`LLM API error for model ${modelId}: ${response.status} ${response.statusText}`, errorText);
+            return null;
+        }
+
+        const data = await response.json();
+        const responseContent = data.choices?.[0]?.message?.content || '';
+        const usage = data.usage || {};
+
+        if (!responseContent) {
+            console.error(`Empty response from model ${modelId}:`, JSON.stringify(data));
+            return null;
+        }
+
         const jsonMatch = responseContent.match(/\{[^}]+\}/);
-        if (!jsonMatch) throw new Error('No JSON found');
+        if (!jsonMatch) {
+            console.error(`No JSON found in response from model ${modelId}:`, responseContent.substring(0, 200));
+            return null;
+        }
+
         const parsed = JSON.parse(jsonMatch[0]);
+
+        if (typeof parsed.realism !== 'number' || typeof parsed.quality !== 'number') {
+            console.error(`Invalid score format from model ${modelId}:`, jsonMatch[0]);
+            return null;
+        }
 
         return {
             realism: Math.max(1, Math.min(7, Math.round(parsed.realism))),
@@ -264,6 +304,7 @@ async function callLLMForEvaluation(
             completionTokens: usage.completion_tokens || 0
         };
     } catch (e) {
+        console.error(`Exception in callLLMForEvaluation for model ${modelId}:`, e);
         return null;
     }
 }
