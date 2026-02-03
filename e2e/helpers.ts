@@ -143,6 +143,17 @@ export async function login(
 }
 
 /**
+ * Alias for login function (for clarity in tests)
+ */
+export async function loginAsUser(
+  page: Page,
+  email: string,
+  password: string = 'testpassword123'
+) {
+  return login(page, email, password);
+}
+
+/**
  * Logout helper for E2E tests
  */
 export async function logout(page: Page) {

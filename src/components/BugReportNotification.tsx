@@ -38,7 +38,7 @@ export default function BugReportNotification({ userRole }: BugReportNotificatio
 
   return (
     <Link
-      href="/admin/bug-reports"
+      href="/bug-reports"
       style={{
         display: 'flex',
         alignItems: 'center',
