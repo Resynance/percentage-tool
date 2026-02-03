@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
+import { getStatusPriority, getStatusLabel, getStatusColor } from '@/lib/bug-reports'
 import styles from './UserBugReportTracker.module.css'
 
 interface BugReport {
@@ -16,19 +17,6 @@ export default function UserBugReportTracker() {
   const [isOpen, setIsOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const dropdownRef = useRef<HTMLDivElement>(null)
-
-  const getStatusPriority = (status: string): number => {
-    switch (status) {
-      case 'PENDING':
-        return 1
-      case 'IN_PROGRESS':
-        return 2
-      case 'RESOLVED':
-        return 3
-      default:
-        return 4
-    }
-  }
 
   useEffect(() => {
     fetchReports()
@@ -96,32 +84,6 @@ export default function UserBugReportTracker() {
       month: 'short',
       day: 'numeric',
     }).format(date)
-  }
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'PENDING':
-        return '#fbbf24' // amber
-      case 'IN_PROGRESS':
-        return '#60a5fa' // blue
-      case 'RESOLVED':
-        return '#34d399' // green
-      default:
-        return '#9ca3af' // gray
-    }
-  }
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'PENDING':
-        return 'Pending'
-      case 'IN_PROGRESS':
-        return 'In Progress'
-      case 'RESOLVED':
-        return 'Resolved'
-      default:
-        return status
-    }
   }
 
   const formatPageUrl = (url: string) => {
