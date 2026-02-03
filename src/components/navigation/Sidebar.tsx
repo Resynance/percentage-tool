@@ -17,13 +17,10 @@ import {
     ChevronLeft,
     ChevronRight,
     LucideIcon,
-<<<<<<< HEAD
     Target,
     BarChart3,
-    TrendingUp
-=======
+    TrendingUp,
     Bug
->>>>>>> main
 } from 'lucide-react';
 import { useState } from 'react';
 

@@ -565,7 +565,7 @@ export default function ActivityOverTimePage() {
                                 if (day.taskCount === 0) return null;
                                 const x = dayCount > 1 ? (index / (dayCount - 1)) * 1000 : 500;
                                 const y = 380 - ((day.taskCount / maxCount) * 380);
-                                const [year, month, dayNum] = day.date.split('-').map(Number);
+                                const [, month, dayNum] = day.date.split('-').map(Number);
                                 const dateLabel = `${month}/${dayNum}`;
 
                                 return (
@@ -598,7 +598,7 @@ export default function ActivityOverTimePage() {
                                 if (day.feedbackCount === 0) return null;
                                 const x = dayCount > 1 ? (index / (dayCount - 1)) * 1000 : 500;
                                 const y = 380 - ((day.feedbackCount / maxCount) * 380);
-                                const [year, month, dayNum] = day.date.split('-').map(Number);
+                                const [, month, dayNum] = day.date.split('-').map(Number);
                                 const dateLabel = `${month}/${dayNum}`;
 
                                 return (
@@ -685,7 +685,7 @@ export default function ActivityOverTimePage() {
                         }}>
                             {data.dailyActivity.map((day, index) => {
                                 // Parse date without timezone conversion
-                                const [year, month, dayNum] = day.date.split('-').map(Number);
+                                const [, month, dayNum] = day.date.split('-').map(Number);
                                 const dateLabel = `${month}/${dayNum}`;
 
                                 // Show every nth label based on total days
