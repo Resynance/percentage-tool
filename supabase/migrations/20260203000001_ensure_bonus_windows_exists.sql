@@ -38,11 +38,8 @@ CREATE TRIGGER bonus_windows_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION update_bonus_windows_updated_at();
 
--- Grant permissions
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.bonus_windows TO authenticated;
-GRANT SELECT ON public.bonus_windows TO anon;
-
 -- Create policies only if they don't already exist
+-- Note: RLS policies control all access; role-level GRANTs are not needed when RLS is enabled
 DO $$
 BEGIN
   IF NOT EXISTS (
