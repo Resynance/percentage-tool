@@ -4,6 +4,7 @@ import BalanceIndicator from './AI/BalanceIndicator'
 import UserProfileDropdown from './navigation/UserProfileDropdown'
 import ProjectSelector from './navigation/ProjectSelector'
 import BugReportNotification from './BugReportNotification'
+import UserBugReportTracker from './UserBugReportTracker'
 
 export default async function Header() {
     const supabase = await createClient()
@@ -46,8 +47,9 @@ export default async function Header() {
             </div>
 
             {user ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                     {profile?.role === 'ADMIN' && <BalanceIndicator />}
+                    <UserBugReportTracker />
                     <BugReportNotification userRole={profile?.role || 'USER'} />
                     <UserProfileDropdown
                         email={user.email || ''}

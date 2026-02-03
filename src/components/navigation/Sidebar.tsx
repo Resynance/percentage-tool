@@ -21,7 +21,8 @@ import {
     Bot,
     Users,
     ClipboardList,
-    BarChart3
+    BarChart3,
+    Bug
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -82,6 +83,7 @@ export default function Sidebar({ userRole }: { userRole?: string }) {
             title: 'System',
             role: ['ADMIN'],
             items: [
+                { label: 'Bug Reports', href: '/bug-reports', icon: Bug },
                 { label: 'Admin', href: '/admin', icon: ShieldCheck },
                 { label: 'LLM Models', href: '/admin/llm-models', icon: Bot },
                 { label: 'Status', href: '/status', icon: Activity },
