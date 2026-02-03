@@ -17,9 +17,13 @@ import {
     ChevronLeft,
     ChevronRight,
     LucideIcon,
+<<<<<<< HEAD
     Target,
     BarChart3,
     TrendingUp
+=======
+    Bug
+>>>>>>> main
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -72,6 +76,7 @@ export default function Sidebar({ userRole }: { userRole?: string }) {
             title: 'System',
             role: ['ADMIN'],
             items: [
+                { label: 'Bug Reports', href: '/bug-reports', icon: Bug },
                 { label: 'Admin', href: '/admin', icon: ShieldCheck },
                 { label: 'Status', href: '/status', icon: Activity },
             ]

@@ -36,7 +36,13 @@ test.describe('Example E2E Test Suite', () => {
     await expect(page.locator('input[type="password"]')).toBeVisible();
   });
 
+<<<<<<< HEAD
   test('should create user and login', async ({ page }) => {
+=======
+  // Skipping this test until proper authentication flow is implemented
+  // TODO: Implement complete login test with password setup and assertions
+  test.skip('should create user and login', async ({ page }) => {
+>>>>>>> main
     // Create test user in database
     const user = await createTestUser('newuser@example.com', 'USER');
 

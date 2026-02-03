@@ -2,6 +2,10 @@
 
 import { useEffect, useState, Fragment } from 'react'
 import { useRoleCheck } from '@/hooks/useRoleCheck'
+<<<<<<< HEAD
+=======
+import { getStatusPriority, getStatusLabel, getStatusColor } from '@/lib/bug-reports'
+>>>>>>> main
 import styles from './page.module.css'
 
 interface BugReport {
@@ -33,6 +37,7 @@ export default function BugReportsPage() {
     fetchReports()
   }, [])
 
+<<<<<<< HEAD
   const getStatusPriority = (status: string): number => {
     switch (status) {
       case 'PENDING':
@@ -46,6 +51,8 @@ export default function BugReportsPage() {
     }
   }
 
+=======
+>>>>>>> main
   const fetchReports = async () => {
     try {
       setLoading(true)
@@ -57,6 +64,17 @@ export default function BugReportsPage() {
 
       const data = await response.json()
 
+<<<<<<< HEAD
+=======
+      // Validate response structure
+      if (!data.bugReports || !Array.isArray(data.bugReports)) {
+        console.error('Invalid API response: bugReports is not an array')
+        setError('Invalid response from server')
+        setReports([])
+        return
+      }
+
+>>>>>>> main
       // Sort by status priority (PENDING > IN_PROGRESS > RESOLVED), then by date (newest first)
       const sortedReports = data.bugReports.sort((a: BugReport, b: BugReport) => {
         const statusDiff = getStatusPriority(a.status) - getStatusPriority(b.status)
@@ -119,6 +137,7 @@ export default function BugReportsPage() {
     }).format(date)
   }
 
+<<<<<<< HEAD
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'PENDING':
@@ -145,6 +164,8 @@ export default function BugReportsPage() {
     }
   }
 
+=======
+>>>>>>> main
   if (loading) {
     return (
       <div className={styles.container}>
@@ -207,6 +228,19 @@ export default function BugReportsPage() {
                   <tr
                     className={`${styles.tableRow} ${expandedId === report.id ? styles.expandedRow : ''}`}
                     onClick={() => setExpandedId(expandedId === report.id ? null : report.id)}
+<<<<<<< HEAD
+=======
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        setExpandedId(expandedId === report.id ? null : report.id)
+                      }
+                    }}
+                    tabIndex={0}
+                    role="button"
+                    aria-expanded={expandedId === report.id}
+                    aria-label={`Bug report from ${report.userEmail} - ${getStatusLabel(report.status)}`}
+>>>>>>> main
                   >
                     <td className={styles.td}>
                       <div
@@ -239,6 +273,10 @@ export default function BugReportsPage() {
                         strokeWidth="2"
                         strokeLinecap="round"
                         strokeLinejoin="round"
+<<<<<<< HEAD
+=======
+                        aria-hidden="true"
+>>>>>>> main
                       >
                         <polyline points="6 9 12 15 18 9"></polyline>
                       </svg>

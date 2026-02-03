@@ -1,6 +1,10 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
+<<<<<<< HEAD
+=======
+import { getStatusPriority, getStatusLabel, getStatusColor } from '@/lib/bug-reports'
+>>>>>>> main
 import styles from './UserBugReportTracker.module.css'
 
 interface BugReport {
@@ -17,6 +21,7 @@ export default function UserBugReportTracker() {
   const [loading, setLoading] = useState(true)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
+<<<<<<< HEAD
   const getStatusPriority = (status: string): number => {
     switch (status) {
       case 'PENDING':
@@ -30,6 +35,8 @@ export default function UserBugReportTracker() {
     }
   }
 
+=======
+>>>>>>> main
   useEffect(() => {
     fetchReports()
     // Refresh every 60 seconds
@@ -59,6 +66,16 @@ export default function UserBugReportTracker() {
       if (response.ok) {
         const data = await response.json()
 
+<<<<<<< HEAD
+=======
+        // Validate response structure
+        if (!data.bugReports || !Array.isArray(data.bugReports)) {
+          console.error('Invalid API response: bugReports is not an array')
+          setReports([])
+          return
+        }
+
+>>>>>>> main
         // Sort by status priority (PENDING > IN_PROGRESS > RESOLVED), then by date (newest first)
         const sortedReports = data.bugReports.sort((a: BugReport, b: BugReport) => {
           const statusDiff = getStatusPriority(a.status) - getStatusPriority(b.status)
@@ -74,9 +91,19 @@ export default function UserBugReportTracker() {
           : sortedReports
 
         setReports(filteredReports)
+<<<<<<< HEAD
       }
     } catch (error) {
       console.error('Failed to fetch bug reports:', error)
+=======
+      } else {
+        console.error('Failed to fetch bug reports:', response.status)
+        setReports([])
+      }
+    } catch (error) {
+      console.error('Failed to fetch bug reports:', error)
+      setReports([])
+>>>>>>> main
     } finally {
       setLoading(false)
     }
@@ -98,6 +125,7 @@ export default function UserBugReportTracker() {
     }).format(date)
   }
 
+<<<<<<< HEAD
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'PENDING':
@@ -124,6 +152,8 @@ export default function UserBugReportTracker() {
     }
   }
 
+=======
+>>>>>>> main
   const formatPageUrl = (url: string) => {
     try {
       const urlObj = new URL(url)
@@ -133,15 +163,26 @@ export default function UserBugReportTracker() {
     }
   }
 
+<<<<<<< HEAD
   if (loading) return null
 
+=======
+>>>>>>> main
   return (
     <div className={styles.container} ref={dropdownRef}>
       <button
         className={styles.iconButton}
+<<<<<<< HEAD
         onClick={() => setIsOpen(!isOpen)}
         aria-label="My Bug Reports"
         title="My Bug Reports"
+=======
+        onClick={() => !loading && setIsOpen(!isOpen)}
+        aria-label="My Bug Reports"
+        title="My Bug Reports"
+        disabled={loading}
+        style={{ opacity: loading ? 0.6 : 1, cursor: loading ? 'not-allowed' : 'pointer' }}
+>>>>>>> main
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
