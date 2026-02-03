@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import styles from './BugReportButton.module.css'
 
 export default function BugReportButton() {
@@ -9,6 +9,70 @@ export default function BugReportButton() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle')
   const [showToast, setShowToast] = useState(false)
+
+  const closeTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const toastTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const modalRef = useRef<HTMLDivElement | null>(null)
+
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current) clearTimeout(closeTimerRef.current)
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
+    }
+  }, [])
+
+  // Focus trap for modal
+  useEffect(() => {
+    if (!isOpen) return
+
+    const modal = modalRef.current
+    if (!modal) return
+
+    // Get all focusable elements in the modal
+    const focusableElements = modal.querySelectorAll<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    )
+    const firstElement = focusableElements[0]
+    const lastElement = focusableElements[focusableElements.length - 1]
+
+    // Focus first element when modal opens
+    firstElement?.focus()
+
+    // Handle tab key to trap focus
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return
+
+      if (e.shiftKey) {
+        // Shift + Tab
+        if (document.activeElement === firstElement) {
+          e.preventDefault()
+          lastElement?.focus()
+        }
+      } else {
+        // Tab
+        if (document.activeElement === lastElement) {
+          e.preventDefault()
+          firstElement?.focus()
+        }
+      }
+    }
+
+    // Handle Escape key to close modal
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsOpen(false)
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    document.addEventListener('keydown', handleEscape)
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [isOpen])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -31,11 +95,11 @@ export default function BugReportButton() {
       if (response.ok) {
         setSubmitStatus('success')
         setDescription('')
-        setTimeout(() => {
+        closeTimerRef.current = setTimeout(() => {
           setIsOpen(false)
           setSubmitStatus('idle')
           setShowToast(true)
-          setTimeout(() => setShowToast(false), 5000)
+          toastTimerRef.current = setTimeout(() => setShowToast(false), 5000)
         }, 2000)
       } else {
         setSubmitStatus('error')
@@ -85,9 +149,16 @@ export default function BugReportButton() {
       {/* Modal */}
       {isOpen && (
         <div className={styles.modalOverlay} onClick={() => setIsOpen(false)}>
-          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+          <div
+            ref={modalRef}
+            className={styles.modal}
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="bug-report-modal-title"
+          >
             <div className={styles.modalHeader}>
-              <h2>Report a Bug</h2>
+              <h2 id="bug-report-modal-title">Report a Bug</h2>
               <button
                 className={styles.closeButton}
                 onClick={() => setIsOpen(false)}

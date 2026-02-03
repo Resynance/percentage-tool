@@ -47,6 +47,13 @@ export default function UserBugReportTracker() {
       if (response.ok) {
         const data = await response.json()
 
+        // Validate response structure
+        if (!data.bugReports || !Array.isArray(data.bugReports)) {
+          console.error('Invalid API response: bugReports is not an array')
+          setReports([])
+          return
+        }
+
         // Sort by status priority (PENDING > IN_PROGRESS > RESOLVED), then by date (newest first)
         const sortedReports = data.bugReports.sort((a: BugReport, b: BugReport) => {
           const statusDiff = getStatusPriority(a.status) - getStatusPriority(b.status)
@@ -62,9 +69,13 @@ export default function UserBugReportTracker() {
           : sortedReports
 
         setReports(filteredReports)
+      } else {
+        console.error('Failed to fetch bug reports:', response.status)
+        setReports([])
       }
     } catch (error) {
       console.error('Failed to fetch bug reports:', error)
+      setReports([])
     } finally {
       setLoading(false)
     }
