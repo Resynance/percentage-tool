@@ -71,10 +71,11 @@ CREATE POLICY "Admins can delete profiles"
 -- AUDIT_LOGS TABLE
 -- ============================================================================
 
--- Drop existing policy
+-- Drop existing policies
 DROP POLICY IF EXISTS "Admins can read all audit logs" ON public.audit_logs;
+DROP POLICY IF EXISTS "Authenticated users can insert audit logs" ON public.audit_logs;
 
--- Recreate with optimized auth.uid() call
+-- Recreate SELECT policy with optimized auth.uid() call
 CREATE POLICY "Admins can read all audit logs"
   ON public.audit_logs
   AS PERMISSIVE
@@ -89,6 +90,14 @@ CREATE POLICY "Admins can read all audit logs"
     )
   );
 
+-- Allow all authenticated users to insert audit logs
+CREATE POLICY "Authenticated users can insert audit logs"
+  ON public.audit_logs
+  AS PERMISSIVE
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (true);
+
 -- ============================================================================
 -- BUG_REPORTS TABLE
 -- ============================================================================
@@ -96,6 +105,7 @@ CREATE POLICY "Admins can read all audit logs"
 -- Drop existing policies
 DROP POLICY IF EXISTS "Admins can view all bug reports" ON public.bug_reports;
 DROP POLICY IF EXISTS "Users can view own bug reports" ON public.bug_reports;
+DROP POLICY IF EXISTS "Users can create bug reports" ON public.bug_reports;
 DROP POLICY IF EXISTS "Admins can update bug reports" ON public.bug_reports;
 DROP POLICY IF EXISTS "Users can view bug reports" ON public.bug_reports;
 DROP POLICY IF EXISTS "All users can view bug reports" ON public.bug_reports;
@@ -119,6 +129,13 @@ CREATE POLICY "Users can view bug reports"
       AND profiles.role = ANY (ARRAY['MANAGER'::"UserRole", 'ADMIN'::"UserRole"])
     )
   );
+
+-- Allow all authenticated users to create bug reports
+CREATE POLICY "Users can create bug reports"
+  ON public.bug_reports
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (true);
 
 -- Recreate update policy with optimized auth.uid() call and WITH CHECK clause
 CREATE POLICY "Admins can update bug reports"
@@ -146,18 +163,11 @@ CREATE POLICY "Admins can update bug reports"
 -- LIKERT_SCORES TABLE
 -- ============================================================================
 
--- Drop existing policy
+-- Drop existing UPDATE policy
+-- Note: Application only uses INSERT and SELECT operations on likert_scores
+-- No UPDATE policy is needed, removing it eliminates unnecessary security exposure
 DROP POLICY IF EXISTS "Users can update own likert scores" ON public.likert_scores;
 DROP POLICY IF EXISTS "Users can update any likert scores" ON public.likert_scores;
-
--- Recreate with optimized auth.uid() call
--- Note: Will be updated in next migration to allow all users to update any scores
-CREATE POLICY "Users can update own likert scores"
-  ON public.likert_scores
-  FOR UPDATE
-  TO authenticated
-  USING ("userId" = (select auth.uid())::text)
-  WITH CHECK ("userId" = (select auth.uid())::text);
 
 -- ============================================================================
 -- BONUS_WINDOWS TABLE
