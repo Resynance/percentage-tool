@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import { Prisma } from '@prisma/client'
+import { ERROR_IDS } from '@/constants/errorIds'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,8 +19,14 @@ export async function GET(req: Request) {
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
-        console.warn('[Activity Over Time API] Unauthorized access attempt')
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        console.warn('[Activity Over Time API] Unauthorized access attempt:', {
+            errorId: ERROR_IDS.AUTH_UNAUTHORIZED,
+            timestamp: new Date().toISOString()
+        })
+        return NextResponse.json({
+            error: 'Unauthorized',
+            errorId: ERROR_IDS.AUTH_UNAUTHORIZED
+        }, { status: 401 })
     }
 
     // Check if user is MANAGER or ADMIN
@@ -31,20 +38,28 @@ export async function GET(req: Request) {
 
     if (profileError) {
         console.error('[Activity Over Time API] Profile query error:', {
+            errorId: ERROR_IDS.DB_QUERY_FAILED,
             userId: user.id,
-            error: profileError.message
+            error: profileError.message,
+            code: profileError.code,
+            details: profileError.details
         })
         return NextResponse.json({
-            error: 'Failed to verify permissions. Please try again.'
+            error: 'Failed to verify permissions. Please try again.',
+            errorId: ERROR_IDS.DB_QUERY_FAILED
         }, { status: 500 })
     }
 
     if (!profile || !profile.role || !['MANAGER', 'ADMIN'].includes(profile.role)) {
         console.warn('[Activity Over Time API] Forbidden access attempt:', {
+            errorId: ERROR_IDS.AUTH_FORBIDDEN,
             userId: user.id,
             userRole: profile?.role || 'NONE'
         })
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        return NextResponse.json({
+            error: 'Forbidden',
+            errorId: ERROR_IDS.AUTH_FORBIDDEN
+        }, { status: 403 })
     }
 
     try {
@@ -63,11 +78,17 @@ export async function GET(req: Request) {
 
             // Validate dates
             if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-                return NextResponse.json({ error: 'Invalid date format' }, { status: 400 })
+                return NextResponse.json({
+                    error: 'Invalid date format',
+                    errorId: ERROR_IDS.INVALID_DATE_FORMAT
+                }, { status: 400 })
             }
 
             if (startDate > endDate) {
-                return NextResponse.json({ error: 'Start date must be before end date' }, { status: 400 })
+                return NextResponse.json({
+                    error: 'Start date must be before end date',
+                    errorId: ERROR_IDS.INVALID_DATE_RANGE
+                }, { status: 400 })
             }
 
             // Set to start and end of day
@@ -112,12 +133,15 @@ export async function GET(req: Request) {
         }
 
         // Count records by day
-        records.forEach(record => {
+        records.forEach((record, index) => {
             try {
                 if (!record.createdAt || !(record.createdAt instanceof Date)) {
                     console.error('[Activity Over Time API] Invalid createdAt date:', {
+                        errorId: ERROR_IDS.INVALID_DATE_FORMAT,
                         recordType: record.type,
-                        createdAt: record.createdAt
+                        createdAt: record.createdAt,
+                        recordIndex: index,
+                        userId: user.id
                     })
                     return // Skip this record
                 }
@@ -134,14 +158,21 @@ export async function GET(req: Request) {
                 } else {
                     // Record falls outside requested range - data integrity issue
                     console.warn('[Activity Over Time API] Record outside date range:', {
+                        errorId: ERROR_IDS.INVALID_DATE_RANGE,
                         dateKey,
                         requestedRange: `${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`,
-                        recordType: record.type
+                        recordType: record.type,
+                        recordIndex: index
                     })
                 }
             } catch (error) {
                 console.error('[Activity Over Time API] Error processing record:', {
-                    error: error instanceof Error ? error.message : String(error)
+                    errorId: ERROR_IDS.SYSTEM_ERROR,
+                    error: error instanceof Error ? error.message : String(error),
+                    stack: error instanceof Error ? error.stack : undefined,
+                    recordType: record.type,
+                    recordIndex: index,
+                    userId: user.id
                 })
                 // Continue processing other records
             }
@@ -166,32 +197,40 @@ export async function GET(req: Request) {
         // Handle specific error types
         if (error instanceof Prisma.PrismaClientKnownRequestError) {
             console.error('[Activity Over Time API] Database error:', {
+                errorId: ERROR_IDS.DB_QUERY_FAILED,
                 code: error.code,
                 meta: error.meta,
-                message: error.message
+                message: error.message,
+                userId: user?.id
             })
             return NextResponse.json({
-                error: 'Database query failed. Please try again or contact support if the issue persists.'
+                error: 'Database query failed. Please try again or contact support if the issue persists.',
+                errorId: ERROR_IDS.DB_QUERY_FAILED
             }, { status: 500 })
         }
 
         if (error instanceof RangeError) {
             console.error('[Activity Over Time API] Date range calculation error:', {
-                error: error.message
+                errorId: ERROR_IDS.INVALID_DATE_RANGE,
+                error: error.message,
+                userId: user?.id
             })
             return NextResponse.json({
-                error: 'Invalid date range calculation. Please verify your dates and try again.'
+                error: 'Invalid date range calculation. Please verify your dates and try again.',
+                errorId: ERROR_IDS.INVALID_DATE_RANGE
             }, { status: 400 })
         }
 
         // Unexpected errors
         console.error('[Activity Over Time API] Unexpected error:', {
+            errorId: ERROR_IDS.SYSTEM_ERROR,
             userId: user?.id,
             error: error instanceof Error ? error.message : String(error),
             stack: error instanceof Error ? error.stack : undefined
         })
         return NextResponse.json({
-            error: 'An unexpected error occurred. Please try again.'
+            error: 'An unexpected error occurred. Please try again.',
+            errorId: ERROR_IDS.SYSTEM_ERROR
         }, { status: 500 })
     }
 }

@@ -27,9 +27,9 @@ test.describe('Activity Over Time (Manager/Admin Access)', () => {
         await expect(page.locator('input[type="date"]')).toHaveCount(2); // Start and End date
 
         // Check for quick select buttons
-        await expect(page.locator('button:has-text("Last 7 Days")')).toBeVisible();
-        await expect(page.locator('button:has-text("Last 30 Days")')).toBeVisible();
-        await expect(page.locator('button:has-text("Last 90 Days")')).toBeVisible();
+        await expect(page.locator('button:has-text("7 Days")')).toBeVisible();
+        await expect(page.locator('button:has-text("30 Days")')).toBeVisible();
+        await expect(page.locator('button:has-text("90 Days")')).toBeVisible();
 
         // Check for chart legend
         await expect(page.locator('text=Tasks')).toBeVisible();
@@ -72,8 +72,8 @@ test.describe('Activity Over Time - Date Range Controls', () => {
         // Wait for initial load
         await page.waitForSelector('text=Total Items', { timeout: 5000 });
 
-        // Click "Last 7 Days"
-        await page.locator('button:has-text("Last 7 Days")').click();
+        // Click "7 Days"
+        await page.locator('button:has-text("7 Days")').click();
 
         // Wait for data to refresh
         await page.waitForTimeout(500);
@@ -81,8 +81,8 @@ test.describe('Activity Over Time - Date Range Controls', () => {
         // Chart should still be visible
         await expect(page.locator('svg').first()).toBeVisible();
 
-        // Click "Last 90 Days"
-        await page.locator('button:has-text("Last 90 Days")').click();
+        // Click "90 Days"
+        await page.locator('button:has-text("90 Days")').click();
 
         // Wait for data to refresh
         await page.waitForTimeout(500);
