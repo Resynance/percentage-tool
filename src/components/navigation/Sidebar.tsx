@@ -17,7 +17,11 @@ import {
     Activity,
     ChevronLeft,
     ChevronRight,
-    LucideIcon
+    LucideIcon,
+    Bot,
+    Users,
+    ClipboardList,
+    BarChart3
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -65,10 +69,21 @@ export default function Sidebar({ userRole }: { userRole?: string }) {
             ]
         },
         {
+            title: 'Rater Management',
+            role: ['ADMIN', 'MANAGER'],
+            items: [
+                { label: 'My Assignments', href: '/my-assignments', icon: ClipboardList },
+                { label: 'Rater Groups', href: '/admin/rater-groups', icon: Users, role: ['ADMIN', 'MANAGER'] },
+                { label: 'Assignments', href: '/admin/assignments', icon: ClipboardList, role: ['ADMIN', 'MANAGER'] },
+                { label: 'Analytics', href: '/analytics', icon: BarChart3 },
+            ]
+        },
+        {
             title: 'System',
             role: ['ADMIN'],
             items: [
                 { label: 'Admin', href: '/admin', icon: ShieldCheck },
+                { label: 'LLM Models', href: '/admin/llm-models', icon: Bot },
                 { label: 'Status', href: '/status', icon: Activity },
             ]
         }
