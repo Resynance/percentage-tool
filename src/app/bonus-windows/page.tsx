@@ -289,9 +289,10 @@ export default function BonusWindowsPage() {
     }
 
     return (
-        <div style={{ width: '100%', maxWidth: '1200px', margin: '0 auto' }}>
-            <div style={{ marginBottom: '32px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+        <div style={{ padding: '40px', minHeight: 'calc(100vh - 73px)' }}>
+            <div style={{ width: '100%', maxWidth: '1200px', margin: '0 auto' }}>
+                <div style={{ marginBottom: '32px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
                     <div>
                         <h1 className="premium-gradient" style={{ fontSize: '2.5rem', marginBottom: '8px' }}>
                             Bonus Windows
@@ -473,6 +474,7 @@ export default function BonusWindowsPage() {
                     </div>
                 )}
             </section>
+            </div>
         </div>
     );
 }

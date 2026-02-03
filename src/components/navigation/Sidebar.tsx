@@ -6,7 +6,6 @@ import {
     LayoutDashboard,
     Database,
     FileText,
-    Clock,
     Sparkles,
     FileCheck,
     Star,
@@ -17,7 +16,10 @@ import {
     Activity,
     ChevronLeft,
     ChevronRight,
-    LucideIcon
+    LucideIcon,
+    Target,
+    BarChart3,
+    TrendingUp
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -60,7 +62,9 @@ export default function Sidebar({ userRole }: { userRole?: string }) {
             title: 'Operations Tools',
             items: [
                 { label: 'Ingest', href: '/ingest', icon: Database, role: ['ADMIN', 'MANAGER'] },
-                { label: 'Time Tracking', href: '/time-tracking', icon: Clock, role: ['ADMIN', 'MANAGER'] },
+                { label: 'Bonus Windows', href: '/bonus-windows', icon: Target, role: ['ADMIN', 'MANAGER'] },
+                { label: 'Activity Over Time', href: '/activity-over-time', icon: BarChart3, role: ['ADMIN', 'MANAGER'] },
+                { label: 'Time Analytics', href: '/time-analytics', icon: TrendingUp, role: ['ADMIN', 'MANAGER'] },
                 { label: 'Project Management', href: '/manage', icon: Settings, role: ['ADMIN', 'MANAGER'] },
             ]
         },

@@ -2,23 +2,23 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Bonus Windows (Manager/Admin Access)', () => {
     test('should block access for unauthenticated users', async ({ page }) => {
-        await page.goto('/time-tracking/bonus-windows');
+        await page.goto('/bonus-windows');
         // Should redirect to login
         await expect(page).toHaveURL(/\/login/);
     });
 
-    test('should show Time and Bonus navigation link for managers', async ({ page }) => {
+    test('should show Bonus Windows navigation link for managers', async ({ page }) => {
         // This test assumes a manager user is logged in
         // In a real test, you would authenticate first
-        await page.goto('/time-tracking/bonus-windows');
+        await page.goto('/bonus-windows');
 
-        // Should see the time tracking layout
+        // Should see the page content
         await expect(page.locator('text=Bonus Windows')).toBeVisible();
     });
 
     test('should show bonus windows page with key elements', async ({ page }) => {
         // Navigate to bonus windows (assumes proper auth)
-        await page.goto('/time-tracking/bonus-windows');
+        await page.goto('/bonus-windows');
 
         // Check for main header
         await expect(page.locator('h1')).toContainText(/Bonus Windows/);
@@ -31,7 +31,7 @@ test.describe('Bonus Windows (Manager/Admin Access)', () => {
     });
 
     test('should show create form when clicking New Bonus Window', async ({ page }) => {
-        await page.goto('/time-tracking/bonus-windows');
+        await page.goto('/bonus-windows');
 
         // Click New Bonus Window button
         await page.locator('button:has-text("New Bonus Window")').click();
@@ -52,7 +52,7 @@ test.describe('Bonus Windows (Manager/Admin Access)', () => {
     });
 
     test('should validate required fields', async ({ page }) => {
-        await page.goto('/time-tracking/bonus-windows');
+        await page.goto('/bonus-windows');
 
         // Open form
         await page.locator('button:has-text("New Bonus Window")').click();
@@ -68,7 +68,7 @@ test.describe('Bonus Windows (Manager/Admin Access)', () => {
 
 test.describe('Bonus Windows - User Breakdown', () => {
     test('should show expand/collapse button for user breakdown', async ({ page }) => {
-        await page.goto('/time-tracking/bonus-windows');
+        await page.goto('/bonus-windows');
 
         // Assuming at least one bonus window exists
         // Look for the expand button
@@ -90,7 +90,7 @@ test.describe('Bonus Windows - User Breakdown', () => {
     });
 
     test('should show tier badges when users qualify', async ({ page }) => {
-        await page.goto('/time-tracking/bonus-windows');
+        await page.goto('/bonus-windows');
 
         // Expand a bonus window that has user data
         const expandButton = page.locator('button:has-text("View User Breakdown")');
@@ -109,25 +109,28 @@ test.describe('Bonus Windows - User Breakdown', () => {
     });
 });
 
-test.describe('Bonus Windows - Navigation', () => {
-    test('should show time tracking sidebar', async ({ page }) => {
-        await page.goto('/time-tracking/bonus-windows');
+test.describe('Operations Tools - Navigation', () => {
+    test('should show Operations Tools in main sidebar', async ({ page }) => {
+        await page.goto('/bonus-windows');
 
-        // Check for sidebar navigation items
+        // Check for main sidebar navigation items under Operations Tools
+        await expect(page.locator('text=Operations Tools')).toBeVisible();
         await expect(page.locator('a:has-text("Bonus Windows")')).toBeVisible();
+        await expect(page.locator('a:has-text("Activity Over Time")')).toBeVisible();
         await expect(page.locator('a:has-text("Time Analytics")')).toBeVisible();
     });
 
-    test('should navigate to Time Analytics', async ({ page }) => {
-        await page.goto('/time-tracking/bonus-windows');
+    test('should navigate between Operations Tools pages', async ({ page }) => {
+        await page.goto('/bonus-windows');
 
-        // Click Time Analytics link
+        // Navigate to Activity Over Time
+        await page.locator('a:has-text("Activity Over Time")').click();
+        await expect(page).toHaveURL(/\/activity-over-time/);
+        await expect(page.locator('text=Daily Activity Chart')).toBeVisible();
+
+        // Navigate to Time Analytics
         await page.locator('a:has-text("Time Analytics")').click();
-
-        // Should navigate to time analytics page
-        await expect(page).toHaveURL(/\/time-tracking\/time-analytics/);
-
-        // Should show under construction message
+        await expect(page).toHaveURL(/\/time-analytics/);
         await expect(page.locator('text=Under Construction')).toBeVisible();
     });
 });
