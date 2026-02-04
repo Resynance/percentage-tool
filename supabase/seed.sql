@@ -39,7 +39,7 @@ END $$;
 DO $$
 BEGIN
     -- Delete projects owned by seed users first (to avoid FK constraint issues)
-    DELETE FROM public."Project"
+    DELETE FROM public.projects
     WHERE "ownerId" IN (
         SELECT id FROM public.profiles
         WHERE email IN (
