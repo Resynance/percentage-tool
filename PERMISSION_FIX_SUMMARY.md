@@ -70,8 +70,12 @@ CREATE POLICY "Users can view profiles"
 
 ### 1. New Migration
 - **File**: `supabase/migrations/20260203000003_fix_profile_rls_circular_dependency.sql`
-- **Purpose**: Creates `is_manager_or_admin()` function and updates profiles RLS policy
-- **Impact**: Fixes permission issues in local development
+- **Purpose**: Creates `is_manager_or_admin()` function and updates RLS policies for:
+  - `profiles` table (9 policies)
+  - `bug_reports` table (2 policies)
+  - `bonus_windows` table (4 policies)
+  - `audit_logs` table (1 policy)
+- **Impact**: Eliminates ALL circular RLS dependencies - verified with database query
 
 ### 2. Production Setup
 - **File**: `supabase/setup.sql`
@@ -128,11 +132,20 @@ Affected files (no changes needed, fallbacks remain for safety):
 - `src/app/api/records/topbottom-review/update/route.ts`
 - `src/app/api/analysis/compare/route.ts`
 
-## Related Issues
+## Tables Fixed
 
-This fix also resolves the same circular dependency in:
-- `audit_logs` table RLS policy (updated in `setup.sql`)
-- Any other policies that tried to query `profiles` to check roles
+This migration fixes circular RLS dependencies in ALL tables that check user roles:
+
+| Table | Policies Fixed | Issue |
+|-------|---------------|-------|
+| `profiles` | 3 SELECT/UPDATE/DELETE | Querying profiles from within profiles RLS |
+| `bug_reports` | 2 SELECT/UPDATE | Querying profiles for role check |
+| `bonus_windows` | 4 SELECT/INSERT/UPDATE/DELETE | Querying profiles for role check |
+| `audit_logs` | 1 SELECT | Querying profiles for role check |
+
+**Total**: 10 RLS policies converted from inline `EXISTS` queries to `SECURITY DEFINER` functions.
+
+All policies now use `is_admin()` or `is_manager_or_admin()` functions that safely bypass RLS to check user roles without creating circular dependencies.
 
 ## Prevention
 
