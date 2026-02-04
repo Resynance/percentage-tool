@@ -1,0 +1,208 @@
+# Automatically seed preview databases when preview branches are created
+# This workflow runs the seed.sql file in Supabase preview branch databases
+
+name: Seed Preview Database
+
+on:
+  # Trigger when a PR is opened or reopened for preview branches
+  pull_request:
+    types: [opened, reopened]
+    branches:
+      - main
+
+  # Also support manual triggering
+  workflow_dispatch:
+    inputs:
+      branch_name:
+        description: 'Branch name to seed (optional - uses current branch if not specified)'
+        required: false
+        type: string
+
+jobs:
+  seed-preview:
+    runs-on: ubuntu-latest
+    # Only run for PRs targeting main, or manual triggers
+    # Never run if the source branch is main or production
+    if: |
+      (github.event_name == 'pull_request' && github.head_ref != 'main' && github.head_ref != 'production') ||
+      (github.event_name == 'workflow_dispatch')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Get Branch Name
+        id: branch
+        env:
+          GITHUB_REF: ${{ github.ref }}
+          GITHUB_HEAD_REF: ${{ github.head_ref }}
+          INPUT_BRANCH: ${{ inputs.branch_name }}
+        run: |
+          # For pull_request events, use head_ref (the PR source branch)
+          # For workflow_dispatch, use input or current branch
+          if [ -n "$INPUT_BRANCH" ]; then
+            BRANCH_NAME="$INPUT_BRANCH"
+          elif [ -n "$GITHUB_HEAD_REF" ]; then
+            BRANCH_NAME="$GITHUB_HEAD_REF"
+          else
+            BRANCH_NAME="${GITHUB_REF#refs/heads/}"
+          fi
+
+          echo "name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
+          echo "Branch name: $BRANCH_NAME"
+
+      - name: Find Preview Project Reference
+        id: preview-ref
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_ORG_ID: ${{ secrets.SUPABASE_ORG_ID }}
+          SUPABASE_MAIN_PROJECT_REF: ${{ secrets.SUPABASE_MAIN_PROJECT_REF }}
+          BRANCH_NAME: ${{ steps.branch.outputs.name }}
+        run: |
+          echo "Fetching projects and branches for branch: $BRANCH_NAME"
+
+          # Fetch all projects
+          PROJECTS=$(curl -s -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/organizations/$SUPABASE_ORG_ID/projects")
+
+          # Extract projects array
+          if echo "$PROJECTS" | jq -e 'has("projects")' >/dev/null 2>&1; then
+            PROJECTS_ARRAY=$(echo "$PROJECTS" | jq '.projects')
+          else
+            PROJECTS_ARRAY="$PROJECTS"
+          fi
+
+          # Fetch branches from main project
+          echo "Fetching branches from main project..."
+          BRANCHES=$(curl -s -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/projects/$SUPABASE_MAIN_PROJECT_REF/branches")
+
+          # Check for API errors in branches response
+          if echo "$BRANCHES" | jq -e '.error' >/dev/null 2>&1; then
+            echo "Warning: Failed to fetch branches from main project"
+            ERROR_MSG=$(echo "$BRANCHES" | jq -r '.error')
+            echo "API Error: $ERROR_MSG"
+            echo "Continuing with projects only..."
+            BRANCHES="[]"
+          fi
+
+          # Merge branches into projects array
+          PROJECTS_ARRAY=$(echo "$PROJECTS_ARRAY $BRANCHES" | jq -s 'add')
+
+          # Find the preview project by matching git_branch field
+          PROJECT_REF=$(echo "$PROJECTS_ARRAY" | jq -r \
+            ".[] | select(.git_branch == \"$BRANCH_NAME\") | (.project_ref // .ref // .id)" | head -1)
+
+          if [ -z "$PROJECT_REF" ] || [ "$PROJECT_REF" == "null" ]; then
+            echo "ERROR: Could not find preview project for branch $BRANCH_NAME"
+            echo "Available branches:"
+            echo "$PROJECTS_ARRAY" | jq -r '.[] | select(.git_branch != null) | .git_branch'
+            exit 1
+          fi
+
+          # Validate PROJECT_REF format (Supabase project refs are 20 lowercase alphanumeric chars)
+          if [[ ! "$PROJECT_REF" =~ ^[a-z0-9]{20}$ ]]; then
+            echo "ERROR: Invalid project ref format: $PROJECT_REF"
+            echo "Expected 20 lowercase alphanumeric characters"
+            exit 1
+          fi
+
+          PROJECT_NAME=$(echo "$PROJECTS_ARRAY" | jq -r \
+            ".[] | select((.project_ref // .ref // .id) == \"$PROJECT_REF\") | .name")
+
+          echo "Found preview project:"
+          echo "  Name: $PROJECT_NAME"
+          echo "  Ref: $PROJECT_REF"
+          echo "ref=$PROJECT_REF" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link to Preview Project
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ steps.preview-ref.outputs.ref }}
+        run: |
+          echo "Linking to preview project: $PROJECT_REF"
+          supabase link --project-ref "$PROJECT_REF"
+
+      - name: Deploy Migrations to Preview Database
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          echo "Deploying migrations to preview database..."
+
+          # Preview changes (dry-run)
+          echo "Previewing database changes..."
+          supabase db push --dry-run
+
+          # Apply migrations
+          echo "Applying migrations..."
+          supabase db push
+
+          echo "✅ Migrations deployed successfully"
+
+      - name: Enable Seeding for Preview Database
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ steps.preview-ref.outputs.ref }}
+        run: |
+          echo "Enabling seeding for preview database..."
+
+          RESPONSE=$(curl -s -X POST \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            -H "Content-Type: application/json" \
+            "https://api.supabase.com/v1/projects/$PROJECT_REF/database/query" \
+            -d '{"query": "ALTER DATABASE postgres SET app.seed_allowed = '\''true'\'';"}')
+
+          # Check for errors
+          if echo "$RESPONSE" | jq -e '.error' >/dev/null 2>&1; then
+            ERROR_MSG=$(echo "$RESPONSE" | jq -r '.error')
+            echo "ERROR: Failed to enable seeding: $ERROR_MSG"
+            exit 1
+          fi
+
+          echo "✅ Seeding enabled for preview database"
+
+      - name: Seed Preview Database
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          GITHUB_REF: ${{ github.ref }}
+          BRANCH_NAME: ${{ steps.branch.outputs.name }}
+          PROJECT_REF: ${{ steps.preview-ref.outputs.ref }}
+        run: |
+          # Safety check - verify this is not production
+          if [ "$GITHUB_REF" == "refs/heads/main" ] || [ "$GITHUB_REF" == "refs/heads/production" ]; then
+            echo "ERROR: Refusing to seed main/production branch"
+            exit 1
+          fi
+
+          echo "Seeding preview database:"
+          echo "  Branch: $BRANCH_NAME"
+          echo "  Project Ref: $PROJECT_REF"
+
+          # Read the seed file
+          SEED_SQL=$(cat supabase/seed.sql)
+
+          # Execute SQL on remote database using Supabase Management API
+          echo "Executing SQL on remote database..."
+          RESPONSE=$(curl -s -X POST \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            -H "Content-Type: application/json" \
+            "https://api.supabase.com/v1/projects/$PROJECT_REF/database/query" \
+            -d "{\"query\": $(echo "$SEED_SQL" | jq -Rs .)}")
+
+          # Check for errors
+          if echo "$RESPONSE" | jq -e '.error' >/dev/null 2>&1; then
+            ERROR_MSG=$(echo "$RESPONSE" | jq -r '.error')
+            echo "ERROR: $ERROR_MSG"
+            exit 1
+          fi
+
+          echo "✅ Seed data applied successfully to preview database"
+          echo "Preview database seeded for branch: $BRANCH_NAME"

@@ -339,32 +339,58 @@ export async function processAndStore(records: any[], options: IngestOptions, jo
             validChunk.push({ record, content, category });
         }
 
-        // 2. DUPLICATE DETECTION
-        const uniqueness = await Promise.all(validChunk.map(async (v) => {
-            const taskId = v.record.task_id || v.record.id || v.record.uuid || v.record.record_id;
-            if (!taskId) return true;
+        // 2. DUPLICATE DETECTION (Optimized: Single query per chunk instead of per record)
+        // Extract all task IDs from the chunk
+        const taskIds = validChunk
+            .map(v => v.record.task_id || v.record.id || v.record.uuid || v.record.record_id)
+            .filter(id => id != null);
 
-            // Use raw SQL for reliable JSON querying in PostgreSQL
-            const existing = await prisma.$queryRaw<any[]>`
-                SELECT id FROM public.data_records
+        // Single query to find all existing task IDs in this chunk
+        let existingTaskIds: Set<string> = new Set();
+        if (taskIds.length > 0) {
+            const taskIdStrings = taskIds.map(id => String(id));
+            const existing = await prisma.$queryRaw<{
+                task_id: string | null;
+                id: string | null;
+                uuid: string | null;
+                record_id: string | null;
+            }[]>`
+                SELECT
+                    metadata->>'task_id' as task_id,
+                    metadata->>'id' as id,
+                    metadata->>'uuid' as uuid,
+                    metadata->>'record_id' as record_id
+                FROM public.data_records
                 WHERE "projectId" = ${projectId}
                 AND type = ${type}::"RecordType"
                 AND (
-                    metadata->>'task_id' = ${String(taskId)}
-                    OR metadata->>'id' = ${String(taskId)}
-                    OR metadata->>'uuid' = ${String(taskId)}
-                    OR metadata->>'record_id' = ${String(taskId)}
+                    metadata->>'task_id' IN (${Prisma.join(taskIdStrings)})
+                    OR metadata->>'id' IN (${Prisma.join(taskIdStrings)})
+                    OR metadata->>'uuid' IN (${Prisma.join(taskIdStrings)})
+                    OR metadata->>'record_id' IN (${Prisma.join(taskIdStrings)})
                 )
-                LIMIT 1
             `;
+            // Add all non-null IDs from all fields to the set
+            for (const row of existing) {
+                if (row.task_id) existingTaskIds.add(row.task_id);
+                if (row.id) existingTaskIds.add(row.id);
+                if (row.uuid) existingTaskIds.add(row.uuid);
+                if (row.record_id) existingTaskIds.add(row.record_id);
+            }
+        }
 
-            if (existing && existing.length > 0) {
+        // Filter out duplicates in memory
+        const finalChunk = validChunk.filter(v => {
+            const taskId = v.record.task_id || v.record.id || v.record.uuid || v.record.record_id;
+            if (!taskId) return true; // No ID to check, allow it
+
+            const isDuplicate = existingTaskIds.has(String(taskId));
+            if (isDuplicate) {
                 chunkSkipDetails['Duplicate ID'] = (chunkSkipDetails['Duplicate ID'] || 0) + 1;
             }
-            return !(existing && existing.length > 0);
-        }));
+            return !isDuplicate;
+        });
 
-        const finalChunk = validChunk.filter((_, idx) => uniqueness[idx]);
         skippedCount += (validChunk.length - finalChunk.length);
 
         // Merge details
