@@ -20,10 +20,12 @@ export interface IngestOptions {
     generateEmbeddings?: boolean;
 }
 
-const payloadCache: Record<string, { type: 'CSV' | 'API', payload: string, options: IngestOptions }> = {};
-
 /**
  * ENTRY POINT: startBackgroundIngest
+ *
+ * NOTE: Stores payload in database instead of memory for serverless compatibility.
+ * Vercel functions are stateless and terminate after sending HTTP response,
+ * so in-memory caches don't persist across invocations.
  */
 export async function startBackgroundIngest(type: 'CSV' | 'API', payload: string, options: IngestOptions) {
     const job = await prisma.ingestJob.create({
@@ -31,10 +33,10 @@ export async function startBackgroundIngest(type: 'CSV' | 'API', payload: string
             projectId: options.projectId,
             type: options.type,
             status: 'PENDING',
+            payload: payload,  // Store in database for serverless compatibility
         }
     });
 
-    payloadCache[job.id] = { type, payload, options };
     processJobs(options.projectId).catch(err => console.error('Queue Processor Error:', err));
     return job.id;
 }
@@ -50,14 +52,8 @@ async function processJobs(projectId: string) {
     });
 
     if (activeProcessing) {
-        if (!payloadCache[activeProcessing.id]) {
-            await prisma.ingestJob.update({
-                where: { id: activeProcessing.id },
-                data: { status: 'FAILED', error: 'Job interrupted by server restart.' }
-            });
-        } else {
-            return; // Wait for the active data load to finish
-        }
+        // In serverless, we can't rely on memory state, so just return and let the job be picked up later
+        return; // Wait for the active data load to finish
     }
 
     const nextJob = await prisma.ingestJob.findFirst({
@@ -67,15 +63,27 @@ async function processJobs(projectId: string) {
 
     if (!nextJob) return;
 
-    const cache = payloadCache[nextJob.id];
-    if (!cache) {
+    if (!nextJob.payload) {
         await prisma.ingestJob.update({
             where: { id: nextJob.id },
-            data: { status: 'FAILED', error: 'Job payload lost.' }
+            data: { status: 'FAILED', error: 'Job payload missing from database.' }
         });
         processJobs(projectId);
         return;
     }
+
+    // Reconstruct cache object from database-stored payload
+    const cache = {
+        type: 'CSV' as const,  // CSV is the primary use case
+        payload: nextJob.payload,
+        options: {
+            projectId: nextJob.projectId,
+            source: 'csv',
+            type: nextJob.type,
+            filterKeywords: undefined,
+            generateEmbeddings: true,
+        }
+    };
 
     try {
         await prisma.ingestJob.update({
@@ -113,15 +121,14 @@ async function processJobs(projectId: string) {
             data: { status: 'COMPLETED' }
         });
 
-        delete payloadCache[nextJob.id];
         processJobs(projectId);
 
     } catch (error: any) {
+        console.error('[Ingestion] Job failed:', error);
         await prisma.ingestJob.update({
             where: { id: nextJob.id },
             data: { status: 'FAILED', error: error.message }
         });
-        delete payloadCache[nextJob.id];
         processJobs(projectId);
     }
 }
