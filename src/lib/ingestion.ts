@@ -8,6 +8,15 @@
  * - Parallel processing with chunking for large datasets
  * - Serverless-compatible: Payload stored in database, cleared after completion
  *
+ * SERVERLESS ARCHITECTURE:
+ * - Jobs are created with PENDING status
+ * - Processing is triggered on job creation AND on each status check
+ * - This "double trigger" pattern ensures jobs actually get processed:
+ *   1. Initial trigger may be killed when serverless function terminates
+ *   2. Status endpoint re-triggers processing on each poll
+ * - Internal locking prevents concurrent processing of the same job
+ * - This approach works without external queue services or cron jobs
+ *
  * SECURITY NOTE:
  * - CSV payloads may contain PII and are stored temporarily in the database
  * - Payloads are automatically cleared after job completion (success or failure)
@@ -48,8 +57,26 @@ export async function startBackgroundIngest(type: 'CSV' | 'API', payload: string
         }
     });
 
-    processJobs(options.projectId).catch(err => console.error('Queue Processor Error:', err));
+    // Trigger processing (will be killed in serverless, but status endpoint will re-trigger)
+    processQueuedJobs(options.projectId).catch(err => console.error('Queue Processor Error:', err));
     return job.id;
+}
+
+/**
+ * PUBLIC ENTRY POINT: processQueuedJobs
+ * Triggers processing of both Phase 1 (Data Loading) and Phase 2 (Vectorization) jobs.
+ * Safe to call repeatedly - internal locking prevents concurrent processing.
+ *
+ * SERVERLESS COMPATIBILITY: This function is called by the status endpoint on each poll
+ * to ensure jobs actually get processed (since background triggers get killed when the
+ * serverless function terminates after returning the HTTP response).
+ */
+export async function processQueuedJobs(projectId: string) {
+    // Trigger both queues - they have internal locking to prevent concurrent execution
+    await Promise.allSettled([
+        processJobs(projectId),
+        processVectorizationJobs(projectId)
+    ]);
 }
 
 /**
