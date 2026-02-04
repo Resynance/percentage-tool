@@ -28,7 +28,8 @@ export default function ManagementPage() {
         try {
             const res = await fetch('/api/projects');
             const data = await res.json();
-            setProjects(Array.isArray(data) ? data : []);
+            const projectList = Array.isArray(data) ? data : (data.projects || []);
+            setProjects(projectList);
         } catch (err) {
             console.error('Failed to fetch projects', err);
             setProjects([]);

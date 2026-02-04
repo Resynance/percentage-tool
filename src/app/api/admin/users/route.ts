@@ -19,7 +19,9 @@ export async function GET() {
         .eq('id', user.id)
         .single()
 
-    if ((adminProfile as any)?.role !== 'ADMIN') {
+    const role = (adminProfile as any)?.role;
+    // Allow ADMIN and MANAGER to view users list (needed for assignments)
+    if (!['ADMIN', 'MANAGER'].includes(role)) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
@@ -27,7 +29,7 @@ export async function GET() {
         const users = await prisma.profile.findMany({
             orderBy: { createdAt: 'desc' }
         })
-        return NextResponse.json(users)
+        return NextResponse.json({ users })
     } catch (error: any) {
         return NextResponse.json({ error: error.message }, { status: 500 })
     }

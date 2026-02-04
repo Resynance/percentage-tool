@@ -16,9 +16,9 @@ model Project {
   id                   String         @id @default(cuid())
   name                 String         @unique
   ownerId              String?        @map("ownerId") @db.Uuid
-  lastTaskAnalysis     String?        @map("lastTaskAnalysis")
-  lastFeedbackAnalysis String?        @map("lastFeedbackAnalysis")
-  guidelines           String?
+  lastTaskAnalysis     String?        @map("lastTaskAnalysis") @db.Text
+  lastFeedbackAnalysis String?        @map("lastFeedbackAnalysis") @db.Text
+  guidelines           String?        @db.Text
   guidelinesFileName   String?        @map("guidelinesFileName")
   createdAt            DateTime       @default(now()) @map("createdAt") @db.Timestamptz(6)
   updatedAt            DateTime       @default(now()) @updatedAt @map("updatedAt") @db.Timestamptz(6)
@@ -26,6 +26,11 @@ model Project {
   records              DataRecord[]
   ingestJobs           IngestJob[]
   owner                Profile?       @relation(fields: [ownerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  // Rater management relations
+  raterGroups       RaterGroup[]
+  assignmentBatches AssignmentBatch[]
+  llmEvaluationJobs LLMEvaluationJob[]
 
   @@map("projects")
   @@schema("public")
@@ -43,6 +48,12 @@ model Profile {
   updatedAt         DateTime  @default(now()) @updatedAt @map("updatedAt") @db.Timestamptz(6)
   users             users     @relation(fields: [id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   projects          Project[]
+
+  // Rater management relations
+  raterGroupMemberships RaterGroupMember[]
+  assignedBatches       AssignmentBatch[]  @relation("AssignedBatches")
+  createdBatches        AssignmentBatch[]  @relation("CreatedBatches")
+  assignedRecords       AssignmentRecord[] @relation("AssignedRecords")
 
   @@map("profiles")
   @@schema("public")
@@ -88,10 +99,10 @@ model DataRecord {
   createdByEmail    String?                @map("createdByEmail")
   project           Project                @relation(fields: [projectId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   likertScores      LikertScore[]
+  assignments       AssignmentRecord[]
   /// Cross-encoder cache relations: lists of cache entries where this record is source/target
   ceAsSource        CrossEncoderCache[]    @relation("ce_source")
   ceAsTarget        CrossEncoderCache[]    @relation("ce_target")
-  
 
   @@index([category], map: "idx_data_records_category")
   @@index([createdById], map: "idx_data_records_created_by")
@@ -236,15 +247,15 @@ model BugReport {
  * and llmModel contains the model name (e.g., "gpt-4", "claude-3").
  */
 model LikertScore {
-  id              String      @id
-  recordId        String      @map("recordId")
-  record          DataRecord  @relation(fields: [recordId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  userId          String      @map("userId")
-  realismScore    Int         @map("realismScore")
-  qualityScore    Int         @map("qualityScore")
-  llmModel        String?     @map("llmModel")
-  createdAt       DateTime    @default(now()) @map("createdAt") @db.Timestamptz(6)
-  updatedAt       DateTime    @default(now()) @updatedAt @map("updatedAt") @db.Timestamptz(6)
+  id           String     @id
+  recordId     String     @map("recordId")
+  record       DataRecord @relation(fields: [recordId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  userId       String     @map("userId")
+  realismScore Int        @map("realismScore")
+  qualityScore Int        @map("qualityScore")
+  llmModel     String?    @map("llmModel")
+  createdAt    DateTime   @default(now()) @map("createdAt") @db.Timestamptz(6)
+  updatedAt    DateTime   @default(now()) @updatedAt @map("updatedAt") @db.Timestamptz(6)
 
   @@unique([recordId, userId], map: "likert_scores_unique_user_record")
   @@index([recordId], map: "idx_likert_scores_record")
@@ -752,4 +763,232 @@ enum one_time_token_type {
   phone_change_token
 
   @@schema("auth")
+}
+
+// ============================================
+// ENUMS FOR RATING SYSTEM
+// ============================================
+
+enum JobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+
+  @@schema("public")
+}
+
+enum AssignmentStatus {
+  PENDING // Created but not started
+  IN_PROGRESS // At least one record being rated
+  COMPLETED // All records rated
+  CANCELLED
+
+  @@schema("public")
+}
+
+enum RecordAssignmentStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+
+  @@schema("public")
+}
+
+// ============================================
+// LLM MODEL CONFIGURATION (OpenRouter)
+// ============================================
+
+/**
+ * LLM MODEL CONFIG: Configures OpenRouter models for bulk evaluation.
+ * Tracks usage statistics and costs per model.
+ */
+model LLMModelConfig {
+  id       String  @id @default(cuid())
+  name     String // Display name (e.g., "GPT-4o")
+  modelId  String  @unique @map("model_id") // OpenRouter ID (e.g., "openai/gpt-4o")
+  isActive Boolean @default(true) @map("is_active")
+  priority Int     @default(0) // Order for batch processing (lower = higher priority)
+
+  // Custom system prompt for this model (overrides default prompt)
+  systemPrompt String? @map("system_prompt") @db.Text
+
+  // Cost tracking (per 1k tokens)
+  inputCostPer1k  Float? @map("input_cost_per_1k")
+  outputCostPer1k Float? @map("output_cost_per_1k")
+
+  // Usage statistics (updated after each evaluation)
+  totalTokensUsed Int   @default(0) @map("total_tokens_used")
+  totalCost       Float @default(0) @map("total_cost")
+  totalRatings    Int   @default(0) @map("total_ratings")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  evaluationJobs LLMEvaluationJob[]
+
+  @@map("llm_model_configs")
+  @@schema("public")
+}
+
+/**
+ * LLM EVALUATION JOB: Tracks bulk LLM evaluation progress.
+ * One job per model per project for batch rating operations.
+ */
+model LLMEvaluationJob {
+  id            String @id @default(cuid())
+  projectId     String @map("project_id")
+  modelConfigId String @map("model_config_id")
+
+  status         JobStatus @default(PENDING)
+  totalRecords   Int       @default(0) @map("total_records")
+  processedCount Int       @default(0) @map("processed_count")
+  errorCount     Int       @default(0) @map("error_count")
+
+  // Cost tracking for this job
+  tokensUsed Int   @default(0) @map("tokens_used")
+  cost       Float @default(0)
+
+  error       String?   @db.Text
+  startedAt   DateTime? @map("started_at")
+  completedAt DateTime? @map("completed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  project     Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  modelConfig LLMModelConfig @relation(fields: [modelConfigId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([modelConfigId])
+  @@index([status])
+  @@map("llm_evaluation_jobs")
+  @@schema("public")
+}
+
+// ============================================
+// RATER MANAGEMENT
+// ============================================
+
+/**
+ * RATER GROUP: Organizes human raters into teams.
+ * Groups can be assigned batches of records to rate.
+ */
+model RaterGroup {
+  id          String  @id @default(cuid())
+  name        String
+  description String? @db.Text
+  projectId   String  @map("project_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  project     Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  members     RaterGroupMember[]
+  assignments AssignmentBatch[]
+
+  @@unique([projectId, name])
+  @@index([projectId])
+  @@map("rater_groups")
+  @@schema("public")
+}
+
+/**
+ * RATER GROUP MEMBER: Links users to rater groups.
+ */
+model RaterGroupMember {
+  id           String @id @default(cuid())
+  raterGroupId String @map("rater_group_id")
+  userId       String @map("user_id") @db.Uuid
+
+  joinedAt DateTime @default(now()) @map("joined_at")
+
+  // Relations
+  raterGroup RaterGroup @relation(fields: [raterGroupId], references: [id], onDelete: Cascade)
+  user       Profile    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([raterGroupId, userId])
+  @@index([userId])
+  @@map("rater_group_members")
+  @@schema("public")
+}
+
+// ============================================
+// ASSIGNMENT MANAGEMENT
+// ============================================
+
+/**
+ * ASSIGNMENT BATCH: A group of records assigned for rating.
+ * Can be assigned to a rater group OR an individual user.
+ */
+model AssignmentBatch {
+  id          String  @id @default(cuid())
+  name        String
+  description String? @db.Text
+  projectId   String  @map("project_id")
+
+  // Assignment target (either group OR individual, not both)
+  raterGroupId     String? @map("rater_group_id")
+  assignedToUserId String? @map("assigned_to_user_id") @db.Uuid
+
+  // Batch criteria (how records were selected)
+  criteria Json? // { category?: "TOP_10"|"BOTTOM_10", type?: "TASK"|"FEEDBACK", ... }
+
+  // Status tracking
+  status         AssignmentStatus @default(PENDING)
+  totalRecords   Int              @default(0) @map("total_records")
+  completedCount Int              @default(0) @map("completed_count")
+
+  dueDate     DateTime? @map("due_date")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  createdById String    @map("created_by_id") @db.Uuid
+
+  // Relations
+  project        Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  raterGroup     RaterGroup?        @relation(fields: [raterGroupId], references: [id], onDelete: SetNull)
+  assignedToUser Profile?           @relation("AssignedBatches", fields: [assignedToUserId], references: [id], onDelete: SetNull)
+  createdBy      Profile            @relation("CreatedBatches", fields: [createdById], references: [id])
+  records        AssignmentRecord[]
+
+  @@index([projectId])
+  @@index([raterGroupId])
+  @@index([assignedToUserId])
+  @@index([status])
+  @@map("assignment_batches")
+  @@schema("public")
+}
+
+/**
+ * ASSIGNMENT RECORD: Links individual records to assignment batches.
+ * Tracks completion status per record within a batch.
+ */
+model AssignmentRecord {
+  id                String @id @default(cuid())
+  assignmentBatchId String @map("assignment_batch_id")
+  recordId          String @map("record_id")
+
+  // Individual assignment within batch (for distributing within a group)
+  assignedToUserId String? @map("assigned_to_user_id") @db.Uuid
+
+  status      RecordAssignmentStatus @default(PENDING)
+  completedAt DateTime?              @map("completed_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  assignmentBatch AssignmentBatch @relation(fields: [assignmentBatchId], references: [id], onDelete: Cascade)
+  record          DataRecord      @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  assignedToUser  Profile?        @relation("AssignedRecords", fields: [assignedToUserId], references: [id], onDelete: SetNull)
+
+  @@unique([assignmentBatchId, recordId])
+  @@index([recordId])
+  @@index([assignedToUserId])
+  @@index([status])
+  @@map("assignment_records")
+  @@schema("public")
 }

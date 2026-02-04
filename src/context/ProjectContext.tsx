@@ -35,22 +35,19 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
             }
 
             const data = await res.json();
-            if (Array.isArray(data)) {
-                setProjects(data);
+            const projectList = Array.isArray(data) ? data : (data.projects || []);
+            setProjects(projectList);
 
-                // If we have projects and none is selected (or selected project no longer exists), select the first one
-                if (data.length > 0) {
-                    setSelectedProjectId(prev => {
-                        // If we already have a valid selection, keep it
-                        if (prev && data.find(p => p.id === prev)) {
-                            return prev;
-                        }
-                        // Otherwise, select first project
-                        return data[0].id;
-                    });
-                }
-            } else {
-                throw new Error('Invalid response format');
+            // If we have projects and none is selected (or selected project no longer exists), select the first one
+            if (projectList.length > 0) {
+                setSelectedProjectId(prev => {
+                    // If we already have a valid selection, keep it
+                    if (prev && projectList.find((p: Project) => p.id === prev)) {
+                        return prev;
+                    }
+                    // Otherwise, select first project
+                    return projectList[0].id;
+                });
             }
         } catch (err) {
             console.error('Failed to fetch projects:', err);

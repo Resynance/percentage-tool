@@ -55,7 +55,7 @@ export default function AdminConsole() {
             try {
                 const res = await fetch('/api/projects');
                 const data = await res.json();
-                const projectsArray = Array.isArray(data) ? data : [];
+                const projectsArray = Array.isArray(data) ? data : (data.projects || []);
                 setProjects(projectsArray);
                 if (projectsArray.length > 0) {
                     setSelectedProjectId(projectsArray[0].id);
@@ -398,7 +398,7 @@ export default function AdminConsole() {
                     <div>
                         <h3 style={{ fontSize: '1.1rem', marginBottom: '8px' }}>Wipe All Data</h3>
                         <p style={{ opacity: 0.6, marginBottom: '16px', lineHeight: '1.6', fontSize: '0.9rem' }}>
-                            Permanently delete all ingested Tasks, Feedback, and similarity data from the database. This action is irreversible. Projects themselves will be preserved, but all their records will be wiped.
+                            Permanently delete all ingested Tasks, Feedback, similarity data, and Likert ratings from the database. This action is irreversible. Projects and LLM model usage stats will be preserved, but all records and ratings will be wiped.
                         </p>
                         <button
                             onClick={() => handleClear('ALL_DATA')}

@@ -18,7 +18,7 @@ export async function GET() {
         const projects = await prisma.project.findMany({
             orderBy: { name: 'asc' },
         });
-        return NextResponse.json(projects);
+        return NextResponse.json({ projects });
     } catch (error: any) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
             metadata: { name }
         });
 
-        return NextResponse.json(project);
+        return NextResponse.json({ project });
     } catch (error: any) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
@@ -185,7 +185,7 @@ export async function PATCH(req: NextRequest) {
             metadata: { guidelinesFileName }
         });
 
-        return NextResponse.json(project);
+        return NextResponse.json({ project });
     } catch (error: any) {
         console.error('Project PATCH Error:', error);
         return NextResponse.json({ error: error.message }, { status: 500 });
