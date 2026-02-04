@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { processQueuedJobs } from '@/lib/ingestion';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 export async function GET(req: NextRequest) {
     try {
@@ -17,6 +19,15 @@ export async function GET(req: NextRequest) {
 
         if (!job) {
             return NextResponse.json({ error: 'Job not found' }, { status: 404 });
+        }
+
+        // SERVERLESS FIX: Trigger processing on status check
+        // This ensures jobs actually get processed even if the initial trigger was killed
+        if (job.status === 'PENDING' || job.status === 'QUEUED_FOR_VEC') {
+            // Don't await - let it run in the background during this request
+            processQueuedJobs(job.projectId).catch(err =>
+                console.error('Queue Processor Error:', err)
+            );
         }
 
         return NextResponse.json(job);
