@@ -139,7 +139,8 @@ model IngestJob {
   skippedCount   Int        @default(0) @map("skippedCount")
   skippedDetails Json?      @map("skippedDetails")
   error          String?
-  payload        String?    // CSV content or API URL stored in database for serverless compatibility
+  payload        String?    // CSV content or API URL stored in database for serverless compatibility (cleared after completion)
+  options        Json?      // IngestOptions (source, filterKeywords, generateEmbeddings) preserved for serverless job reconstruction
   createdAt      DateTime   @default(now()) @map("createdAt") @db.Timestamptz(6)
   updatedAt      DateTime   @default(now()) @updatedAt @map("updatedAt") @db.Timestamptz(6)
   project        Project    @relation(fields: [projectId], references: [id], onDelete: Cascade, onUpdate: NoAction)

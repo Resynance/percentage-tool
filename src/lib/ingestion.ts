@@ -6,6 +6,13 @@
  * - Flexible rating detection (top_10, Top 10%, numerical scores, etc.)
  * - Type-aware duplicate prevention (TASK vs FEEDBACK)
  * - Parallel processing with chunking for large datasets
+ * - Serverless-compatible: Payload stored in database, cleared after completion
+ *
+ * SECURITY NOTE:
+ * - CSV payloads may contain PII and are stored temporarily in the database
+ * - Payloads are automatically cleared after job completion (success or failure)
+ * - RLS policies on ingest_jobs table should restrict access to authorized users
+ * - For sensitive data, consider encrypting payloads at rest or using separate storage
  */
 import { parse } from 'csv-parse/sync';
 import { prisma } from './prisma';
@@ -23,7 +30,7 @@ export interface IngestOptions {
 /**
  * ENTRY POINT: startBackgroundIngest
  *
- * NOTE: Stores payload in database instead of memory for serverless compatibility.
+ * NOTE: Stores payload and options in database instead of memory for serverless compatibility.
  * Vercel functions are stateless and terminate after sending HTTP response,
  * so in-memory caches don't persist across invocations.
  */
@@ -34,6 +41,10 @@ export async function startBackgroundIngest(type: 'CSV' | 'API', payload: string
             type: options.type,
             status: 'PENDING',
             payload: payload,  // Store in database for serverless compatibility
+            options: {
+                ...options,
+                type: type,  // Store whether CSV or API
+            } as any,
         }
     });
 
@@ -72,16 +83,26 @@ async function processJobs(projectId: string) {
         return;
     }
 
-    // Reconstruct cache object from database-stored payload
+    if (!nextJob.options) {
+        await prisma.ingestJob.update({
+            where: { id: nextJob.id },
+            data: { status: 'FAILED', error: 'Job options missing from database.' }
+        });
+        processJobs(projectId);
+        return;
+    }
+
+    // Reconstruct cache object from database-stored payload and options
+    const storedOptions = nextJob.options as any;
     const cache = {
-        type: 'CSV' as const,  // CSV is the primary use case
+        type: (storedOptions.type || 'CSV') as 'CSV' | 'API',
         payload: nextJob.payload,
         options: {
             projectId: nextJob.projectId,
-            source: 'csv',
+            source: storedOptions.source || 'csv',
             type: nextJob.type,
-            filterKeywords: undefined,
-            generateEmbeddings: true,
+            filterKeywords: storedOptions.filterKeywords,
+            generateEmbeddings: storedOptions.generateEmbeddings ?? true,
         }
     };
 
@@ -107,19 +128,21 @@ async function processJobs(projectId: string) {
 
         await processAndStore(records, cache.options, nextJob.id);
 
-        // Phase 2: Vectorization (Optional)
+        // Phase 1 Complete: Mark as queued for vectorization
         if (cache.options.generateEmbeddings) {
             await prisma.ingestJob.update({
                 where: { id: nextJob.id },
-                data: { status: 'VECTORIZING' }
+                data: { status: 'QUEUED_FOR_VEC' }
             });
-            await vectorizeJob(nextJob.id, projectId);
+            // Trigger vectorization queue processor
+            processVectorizationJobs(projectId).catch(err => console.error('Vectorization Queue Error:', err));
+        } else {
+            // No vectorization needed, mark as complete and clear payload
+            await prisma.ingestJob.update({
+                where: { id: nextJob.id },
+                data: { status: 'COMPLETED', payload: null }
+            });
         }
-
-        await prisma.ingestJob.update({
-            where: { id: nextJob.id },
-            data: { status: 'COMPLETED' }
-        });
 
         processJobs(projectId);
 
@@ -127,9 +150,61 @@ async function processJobs(projectId: string) {
         console.error('[Ingestion] Job failed:', error);
         await prisma.ingestJob.update({
             where: { id: nextJob.id },
-            data: { status: 'FAILED', error: error.message }
+            data: { status: 'FAILED', error: error.message, payload: null }
         });
         processJobs(projectId);
+    }
+}
+
+/**
+ * VECTORIZATION QUEUE PROCESSOR: processVectorizationJobs
+ * Manages Phase 2 (Vectorization). Only one VECTORIZING job per project is allowed
+ * to prevent overloading the AI server.
+ */
+async function processVectorizationJobs(projectId: string) {
+    // Check if there's already a job vectorizing for this project
+    const activeVectorizing = await prisma.ingestJob.findFirst({
+        where: { projectId, status: 'VECTORIZING' }
+    });
+
+    if (activeVectorizing) {
+        return; // Wait for active vectorization to finish
+    }
+
+    // Get the next job queued for vectorization
+    const nextJob = await prisma.ingestJob.findFirst({
+        where: { projectId, status: 'QUEUED_FOR_VEC' },
+        orderBy: { createdAt: 'asc' }
+    });
+
+    if (!nextJob) return;
+
+    try {
+        // Mark as vectorizing
+        await prisma.ingestJob.update({
+            where: { id: nextJob.id },
+            data: { status: 'VECTORIZING' }
+        });
+
+        // Run vectorization
+        await vectorizeJob(nextJob.id, projectId);
+
+        // Mark as complete and clear payload
+        await prisma.ingestJob.update({
+            where: { id: nextJob.id },
+            data: { status: 'COMPLETED', payload: null }
+        });
+
+        // Process next job in queue
+        processVectorizationJobs(projectId);
+
+    } catch (error: any) {
+        console.error('[Vectorization] Job failed:', error);
+        await prisma.ingestJob.update({
+            where: { id: nextJob.id },
+            data: { status: 'FAILED', error: error.message, payload: null }
+        });
+        processVectorizationJobs(projectId);
     }
 }
 
