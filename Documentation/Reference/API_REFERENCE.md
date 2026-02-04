@@ -629,6 +629,166 @@ Cookie: sb-auth-token=...
 
 ---
 
+### GET /api/admin/bonus-windows
+
+Get all bonus windows with user breakdown data (Manager/Admin only).
+
+**Authentication**: Required
+**Authorization**: ADMIN, MANAGER
+
+**Response** (200 OK)
+```json
+{
+  "bonusWindows": [
+    {
+      "id": "uuid",
+      "projectId": "uuid",
+      "name": "Q1 2024 Bonus",
+      "startTime": "2024-01-01T00:00:00Z",
+      "endTime": "2024-03-31T23:59:59Z",
+      "targetTaskCount": 100,
+      "targetFeedbackCount": 50,
+      "targetTaskCountTier2": 150,
+      "targetFeedbackCountTier2": 75,
+      "createdAt": "2024-01-01T10:00:00Z",
+      "updatedAt": "2024-01-01T10:00:00Z"
+    }
+  ]
+}
+```
+
+---
+
+### POST /api/admin/bonus-windows
+
+Create a new bonus window (Manager/Admin only).
+
+**Authentication**: Required
+**Authorization**: ADMIN, MANAGER
+
+**Request**
+```http
+POST /api/admin/bonus-windows HTTP/1.1
+Content-Type: application/json
+Cookie: sb-auth-token=...
+
+{
+  "projectId": "uuid",
+  "name": "Q1 2024 Bonus",
+  "startTime": "2024-01-01T00:00:00Z",
+  "endTime": "2024-03-31T23:59:59Z",
+  "targetTaskCount": 100,
+  "targetFeedbackCount": 50,
+  "targetTaskCountTier2": 150,
+  "targetFeedbackCountTier2": 75
+}
+```
+
+**Request Body**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `projectId` | string | Yes | Target project ID |
+| `name` | string | Yes | Bonus window name |
+| `startTime` | ISO 8601 | Yes | Window start date/time |
+| `endTime` | ISO 8601 | Yes | Window end date/time |
+| `targetTaskCount` | number | Yes | Tier 1 task target |
+| `targetFeedbackCount` | number | Yes | Tier 1 feedback target |
+| `targetTaskCountTier2` | number | No | Tier 2 task target (optional) |
+| `targetFeedbackCountTier2` | number | No | Tier 2 feedback target (optional) |
+
+**Response** (201 Created)
+```json
+{
+  "bonusWindow": {
+    "id": "uuid",
+    "projectId": "uuid",
+    "name": "Q1 2024 Bonus",
+    "startTime": "2024-01-01T00:00:00Z",
+    "endTime": "2024-03-31T23:59:59Z"
+  }
+}
+```
+
+---
+
+### DELETE /api/admin/bonus-windows/:id
+
+Delete a bonus window (Manager/Admin only).
+
+**Authentication**: Required
+**Authorization**: ADMIN, MANAGER
+
+**Request**
+```http
+DELETE /api/admin/bonus-windows/uuid HTTP/1.1
+Cookie: sb-auth-token=...
+```
+
+**Response** (200 OK)
+```json
+{
+  "message": "Bonus window deleted successfully"
+}
+```
+
+---
+
+### GET /api/admin/activity-over-time
+
+Get daily activity statistics for tasks and feedback over a configurable date range (Manager/Admin only).
+
+**Authentication**: Required
+**Authorization**: ADMIN, MANAGER
+
+**Query Parameters**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `start` | string (YYYY-MM-DD) | 29 days ago | Start date for the range |
+| `end` | string (YYYY-MM-DD) | Today | End date for the range |
+
+**Request**
+```http
+GET /api/admin/activity-over-time?start=2026-01-01&end=2026-01-31 HTTP/1.1
+Cookie: sb-auth-token=...
+```
+
+**Response** (200 OK)
+```json
+{
+  "dailyActivity": [
+    {
+      "date": "2026-01-01",
+      "taskCount": 45,
+      "feedbackCount": 23,
+      "totalCount": 68
+    },
+    {
+      "date": "2026-01-02",
+      "taskCount": 52,
+      "feedbackCount": 18,
+      "totalCount": 70
+    }
+  ],
+  "startDate": "2026-01-01T00:00:00.000Z",
+  "endDate": "2026-01-31T23:59:59.999Z"
+}
+```
+
+**Notes**
+- If no date range is provided, defaults to the past 30 days (29 days ago + today)
+- Start time is set to 00:00:00.000 of the start date
+- End time is set to 23:59:59.999 of the end date
+- All dates in the range are returned, even if they have zero counts
+- Dates are returned in YYYY-MM-DD format, sorted chronologically
+
+**Error Responses**
+- `400 Bad Request` - Invalid date format or start date after end date
+- `401 Unauthorized` - Not authenticated
+- `403 Forbidden` - Insufficient permissions (USER role)
+- `500 Internal Server Error` - Database error
+
+---
+
 ## AI Services
 
 ### GET /api/ai/balance

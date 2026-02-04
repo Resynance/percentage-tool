@@ -83,9 +83,9 @@ If you're using OpenRouter as your AI provider, the tool provides real-time cost
 
 ---
 
-## Time Tracking and Bonus Management (Manager/Admin Only)
+## Operations Tools (Manager/Admin Only)
 
-The Time and Bonus section provides managers and administrators with tools to track team performance and manage bonus qualification periods.
+The Operations Tools section provides managers and administrators with specialized tools to track team performance, analyze activity trends, and manage bonus qualification periods.
 
 ### Bonus Windows
 
@@ -100,15 +100,14 @@ Bonus windows are time-bounded performance periods where team members work towar
 
 #### Creating a Bonus Window
 
-1. Navigate to **Operations Tools → Time Tracking**
-2. Click the **Bonus Windows** tab.
-3. Click "New Bonus Window"
-4. Configure:
+1. Navigate to **Operations Tools → Bonus Windows**
+2. Click "New Bonus Window"
+3. Configure:
    - **Window Name**: Descriptive name (e.g., "Q1 2024 Performance Period")
    - **Start/End Times**: Define the time period
    - **Tier 1 Targets**: Set task and feedback count targets (set to 0 to skip either)
    - **Tier 2 Targets** (Optional): Set higher targets for enhanced bonuses
-5. Click "Create Window"
+4. Click "Create Window"
 
 #### Understanding Tier Qualification
 
@@ -124,6 +123,66 @@ Bonus windows are time-bounded performance periods where team members work towar
   - 🟠 Orange (50-74%): Approaching target
   - 🔵 Blue (75-99%): Near completion
   - 🟢 Green (100%+): Target met
+
+---
+
+### Activity Over Time
+
+The Activity Over Time tool provides managers and administrators with interactive visualizations of daily task and feedback activity trends. This feature helps you understand team productivity patterns and identify trends over time.
+
+#### Features
+
+- **Interactive Line Chart**: Visualize daily task counts, feedback counts, and total activity
+- **Configurable Date Range**: Select custom date ranges or use quick-select buttons
+- **Real-time Statistics**: View total items, daily averages, and breakdown by type
+- **Hover Tooltips**: Get detailed information by hovering over any data point
+- **Toggleable Lines**: Show or hide individual data series (Tasks, Feedback, Total)
+
+#### Accessing Activity Over Time
+
+1. Navigate to **Operations Tools → Activity Over Time**
+2. The page loads with the past 30 days of activity by default
+
+#### Using Date Range Controls
+
+**Quick Select Options**:
+- **Last 7 Days**: View the most recent week of activity
+- **Last 30 Days**: View the past month (default)
+- **Last 90 Days**: View quarterly trends
+
+**Custom Date Range**:
+1. Click the **Start Date** picker and select your desired start date
+2. Click the **End Date** picker and select your desired end date
+3. The chart updates automatically with the new date range
+
+#### Understanding the Chart
+
+The line chart displays three data series:
+
+- **Tasks** (Blue line): Daily count of task records created
+- **Feedback** (Purple line): Daily count of feedback records created
+- **Total** (Green line): Combined daily count of all records
+
+**Interactive Features**:
+- **Hover**: Move your mouse over any point to see exact counts for that date
+- **Toggle Lines**: Click any legend button to show/hide that data series
+- **Zoom**: The chart automatically scales to fit your selected date range
+
+#### Statistics Summary
+
+Below the date controls, you'll see key metrics:
+
+- **Total Items**: Sum of all tasks and feedback in the selected range
+- **Tasks**: Total task count
+- **Feedback**: Total feedback count
+- **Daily Average**: Average number of items per day
+
+#### Use Cases
+
+- **Identify Trends**: Spot patterns in team productivity over time
+- **Monitor Workload**: Track daily activity levels to balance team capacity
+- **Report Performance**: Generate insights for stakeholder reports
+- **Plan Resources**: Use historical data to forecast future needs
 
 ---
 
@@ -224,8 +283,56 @@ Use the collapsible filter panel to narrow down logs:
 
 ---
 
+## Reporting Bugs
+
+If you encounter any issues while using the application, you can easily report them using the built-in bug reporting system.
+
+### Submitting a Bug Report
+
+1. **Find the Bug Button**: Look for the purple bug icon in the bottom-right corner of any page
+2. **Click to Open**: A modal will appear with a form
+3. **Describe the Issue**:
+   - The current page URL is automatically captured
+   - Enter a detailed description of what went wrong
+   - Include what you were trying to do when the bug occurred
+4. **Submit**: Click "Submit Report"
+5. **Confirmation**: You'll see a success message and a toast notification confirming your report was submitted
+
+### Tracking Your Reports
+
+- **Header Icon**: Click the bug icon in the top navigation bar to see all your submitted reports
+- **Status Updates**: Each report shows its current status:
+  - **Pending** (Amber): Waiting for admin review
+  - **In Progress** (Blue): Being investigated
+  - **Resolved** (Green): Bug has been fixed
+- **Badge Count**: The number on the icon shows how many reports you've submitted
+- **Smart Filtering**: If you have more than 5 reports, only active ones (Pending/In Progress) are shown to keep the list focused
+
+### What Information is Captured
+
+When you submit a bug report, the system automatically records:
+- The page where the bug occurred
+- Your email address
+- Your browser and device information
+- Timestamp of submission
+- Your description of the issue
+
+This information helps administrators quickly identify and fix the problem.
+
+### Tips for Good Bug Reports
+
+- **Be Specific**: Describe exactly what you were doing when the bug occurred
+- **Include Steps**: If you can reproduce the bug, list the steps
+- **One Issue Per Report**: Submit separate reports for different bugs
+- **Check Your Tracker**: Monitor your reports to see when they're resolved
+
+For detailed bug report documentation, see [BUG_REPORTS.md](./BUG_REPORTS.md).
+
+---
+
 ## Best Practices
 
 - **Guideline Clarity**: Ensure your PDF is text-readable (not just images) for the best AI grounding results.
 - **GPU Optimization**: For the fastest "Vectorizing" phase, ensure LM Studio is configured to use GPU acceleration for your embedding model.
 - **Bonus Window Timing**: Configure bonus windows in advance to give team members clear visibility on targets and timelines.
+- **Report Issues Promptly**: Use the bug reporting system to report any issues you encounter so they can be addressed quickly.
