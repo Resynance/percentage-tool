@@ -156,6 +156,7 @@ async function getUserFeedbackDetails(projectId: string, userId: string) {
                     isPositive: fbMetadata?.is_positive === true || fbMetadata?.is_positive === 'true' ? 1 : 0,
                     feedbackId: fbMetadata?.feedback_id || null,
                     promptQualityRating: fbMetadata?.prompt_quality_rating || null,
+                    rejectionReason: fbMetadata?.rejection_reason || null,
                     createdAt: fb.createdAt,
                 };
             });
