@@ -231,17 +231,31 @@ async function vectorizeJob(jobId: string, projectId: string) {
             const record = recordsToProcess[i];
 
             if (vector && vector.length > 0) {
-                // Use parameterized raw SQL - Prisma escapes all parameters
-                const vectorString = `[${vector.join(',')}]`;
-                await prisma.$executeRaw`
-                    UPDATE public.data_records
-                    SET embedding = ${vectorString}::vector
-                    WHERE id = ${record.id}
-                `;
-                batchSuccess++;
-                totalEmbedded++;
-                // Clear from failed attempts on success
-                failedRecordAttempts.delete(record.id);
+                try {
+                    // Use parameterized raw SQL - Prisma escapes all parameters
+                    const vectorString = `[${vector.join(',')}]`;
+                    await prisma.$executeRaw`
+                        UPDATE public.data_records
+                        SET embedding = ${vectorString}::vector
+                        WHERE id = ${record.id}
+                    `;
+                    batchSuccess++;
+                    totalEmbedded++;
+                    // Clear from failed attempts on success
+                    failedRecordAttempts.delete(record.id);
+                } catch (error: any) {
+                    // Check for dimension mismatch error
+                    if (error.message?.includes('expected') && error.message?.includes('dimensions')) {
+                        const dimensionMatch = error.message.match(/expected (\d+) dimensions, not (\d+)/);
+                        if (dimensionMatch) {
+                            throw new Error(
+                                `Vector dimension mismatch: Database expects ${dimensionMatch[1]} dimensions, but embedding model returned ${dimensionMatch[2]} dimensions. ` +
+                                `Update the migration: ALTER TABLE public.data_records ALTER COLUMN embedding TYPE vector(${dimensionMatch[2]});`
+                            );
+                        }
+                    }
+                    throw error;
+                }
             } else {
                 // Track failed attempt
                 const attempts = failedRecordAttempts.get(record.id) || 0;

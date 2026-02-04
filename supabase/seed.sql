@@ -3,8 +3,29 @@
 
 -- IMPORTANT: These are test credentials. Never use in production!
 
--- Enable pgcrypto extension for password hashing
+-- Enable extensions for local development
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
+CREATE EXTENSION IF NOT EXISTS vector;
+
+-- Fix embedding column type for local development
+-- This ensures vector embeddings work properly in dev environment
+DO $$
+BEGIN
+    -- Check if column is wrong type (double precision[])
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'data_records'
+        AND column_name = 'embedding'
+        AND data_type = 'ARRAY'
+    ) THEN
+        -- Convert to vector type with 1024 dimensions (adjust for your model)
+        ALTER TABLE public.data_records
+        ALTER COLUMN embedding TYPE vector(1024)
+        USING embedding::text::vector;
+
+        RAISE NOTICE 'Fixed embedding column type to vector(1024)';
+    END IF;
+END $$;
 
 -- SAFETY CHECK: Prevent running in production
 -- Uses opt-in approach: databases must explicitly allow seeding
