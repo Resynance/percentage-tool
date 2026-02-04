@@ -17,6 +17,7 @@ import {
     Activity,
     ChevronLeft,
     ChevronRight,
+    MessageSquare,
     LucideIcon
 } from 'lucide-react';
 import { useState } from 'react';
@@ -62,6 +63,7 @@ export default function Sidebar({ userRole }: { userRole?: string }) {
                 { label: 'Ingest', href: '/ingest', icon: Database, role: ['ADMIN', 'MANAGER'] },
                 { label: 'Time Tracking', href: '/time-tracking', icon: Clock, role: ['ADMIN', 'MANAGER'] },
                 { label: 'Project Management', href: '/manage', icon: Settings, role: ['ADMIN', 'MANAGER'] },
+                { label: 'Candidate Review', href: '/candidate-review', icon: MessageSquare },
             ]
         },
         {

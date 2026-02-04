@@ -659,6 +659,21 @@ model users {
   @@schema("auth")
 }
 
+model CandidateStatus {
+  id        String   @id @default(cuid())
+  userId    String   @map("userId")
+  email     String
+  projectId String   @map("projectId")
+  status    String   // 'ACCEPTED' or 'REJECTED'
+  createdAt DateTime @default(now()) @map("createdAt") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updatedAt") @db.Timestamptz(6)
+
+  @@unique([userId, projectId])
+  @@index([projectId], map: "idx_candidate_status_project")
+  @@map("candidate_status")
+  @@schema("public")
+}
+
 enum UserRole {
   PENDING
   USER
