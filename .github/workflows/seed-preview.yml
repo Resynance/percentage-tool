@@ -138,6 +138,28 @@ jobs:
 
           echo "✅ Migrations deployed successfully"
 
+      - name: Enable Seeding for Preview Database
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ steps.preview-ref.outputs.ref }}
+        run: |
+          echo "Enabling seeding for preview database..."
+
+          RESPONSE=$(curl -s -X POST \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            -H "Content-Type: application/json" \
+            "https://api.supabase.com/v1/projects/$PROJECT_REF/database/query" \
+            -d '{"query": "ALTER DATABASE postgres SET app.seed_allowed = '\''true'\'';"}')
+
+          # Check for errors
+          if echo "$RESPONSE" | jq -e '.error' >/dev/null 2>&1; then
+            ERROR_MSG=$(echo "$RESPONSE" | jq -r '.error')
+            echo "ERROR: Failed to enable seeding: $ERROR_MSG"
+            exit 1
+          fi
+
+          echo "✅ Seeding enabled for preview database"
+
       - name: Seed Preview Database
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}

@@ -51,13 +51,16 @@ Preview branches automatically run:
 
 1. **Manual Method**: Run seed file in preview branch:
    ```bash
-   supabase db remote commit --project-ref <preview-ref> --file supabase/seed.sql
+   ./scripts/test-preview-seed.sh <branch-name>
    ```
+   The script automatically enables seeding and runs the seed file.
 
 2. **Automated Method**: Use the GitHub Actions workflow at `.github/workflows/seed-preview.yml`
-   - Automatically seeds preview databases when branches are pushed
+   - Automatically seeds preview databases when PRs are opened
+   - Automatically enables seeding by setting `app.seed_allowed = 'true'`
+   - Deploys migrations before seeding
    - Includes safety checks to prevent seeding production
-   - Requires `SUPABASE_ACCESS_TOKEN` secret in GitHub
+   - Requires GitHub secrets: `SUPABASE_ACCESS_TOKEN`, `SUPABASE_ORG_ID`, `SUPABASE_MAIN_PROJECT_REF`
 
 ### Login
 

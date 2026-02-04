@@ -190,8 +190,34 @@ supabase link --project-ref "$PROJECT_REF" 2>&1 || {
     exit 1
 }
 
-# Step 4: Run the seed file
-echo -e "\n${BLUE}Step 4: Running seed file...${NC}"
+# Step 4: Enable seeding for the database
+echo -e "\n${BLUE}Step 4: Enabling seeding for preview database...${NC}"
+
+ENABLE_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+    -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+    -H "Content-Type: application/json" \
+    "https://api.supabase.com/v1/projects/$PROJECT_REF/database/query" \
+    -d '{"query": "ALTER DATABASE postgres SET app.seed_allowed = '\''true'\'';"}')
+
+ENABLE_HTTP_CODE=$(echo "$ENABLE_RESPONSE" | tail -n1)
+ENABLE_RESULT=$(echo "$ENABLE_RESPONSE" | sed '$d')
+
+if [ "$ENABLE_HTTP_CODE" != "200" ]; then
+    echo -e "${RED}ERROR: HTTP $ENABLE_HTTP_CODE${NC}"
+    echo "Response: $ENABLE_RESULT"
+    exit 1
+fi
+
+if echo "$ENABLE_RESULT" | jq -e '.error' >/dev/null 2>&1; then
+    ERROR_MSG=$(echo "$ENABLE_RESULT" | jq -r '.error')
+    echo -e "${RED}ERROR: Failed to enable seeding: $ERROR_MSG${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}✓ Seeding enabled for preview database${NC}"
+
+# Step 5: Run the seed file
+echo -e "\n${BLUE}Step 5: Running seed file...${NC}"
 echo -e "${YELLOW}This will create test users in the preview database:${NC}"
 echo "  - admin@test.com (password: test)"
 echo "  - manager@test.com (password: test)"
@@ -240,7 +266,7 @@ echo -e "${GREEN}✓ SQL executed successfully${NC}"
 echo -e "\n${GREEN}=== ✓ Seed script executed! ===${NC}"
 
 # Verify the users were actually created using Supabase Management API
-echo -e "\n${BLUE}Step 5: Verifying users were created...${NC}"
+echo -e "\n${BLUE}Step 6: Verifying users were created...${NC}"
 
 # Get database connection details from Supabase API
 echo "Fetching database connection details..."
