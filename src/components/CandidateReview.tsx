@@ -359,6 +359,12 @@ export default function CandidateReview() {
     Map<string, string>
   >(new Map());
   const pendingStatusUpdateRef = useRef<AbortController | null>(null);
+  const candidateStatusesRef = useRef<Map<string, string>>(candidateStatuses);
+
+  // Keep candidateStatusesRef in sync with candidateStatuses state
+  useEffect(() => {
+    candidateStatusesRef.current = candidateStatuses;
+  }, [candidateStatuses]);
 
   // Fetch user stats when project changes
   useEffect(() => {
@@ -422,7 +428,7 @@ export default function CandidateReview() {
         setFeedbackItems(feedbackData.tasks || []);
 
         // Get status from the already-fetched candidateStatuses map
-        const status = candidateStatuses.get(selectedUserId);
+        const status = candidateStatusesRef.current.get(selectedUserId);
         setCandidateStatus(status || null);
       } catch (err) {
         setError(
@@ -434,7 +440,7 @@ export default function CandidateReview() {
     };
 
     fetchFeedbackDetails();
-  }, [selectedProjectId, selectedUserId, candidateStatuses]);
+  }, [selectedProjectId, selectedUserId]);
 
   const selectedUserStats = useMemo(
     () => userStats.find((u) => u.userId === selectedUserId),
