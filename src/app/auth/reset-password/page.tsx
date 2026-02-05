@@ -56,8 +56,6 @@ export default function ResetPasswordPage() {
 
             // Wait for DB propagation, then hard reload so middleware sees fresh state
             setTimeout(() => {
-                                //router.push('/');
-
                 window.location.href = '/';
             }, 2000);
         } catch (err: any) {
