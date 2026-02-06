@@ -1,0 +1,5 @@
+[     718ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/projects:0
+[     718ms] [ERROR] Failed to fetch projects: Error: Failed to fetch projects: 401
+    at http://localhost:3000/_next/static/chunks/51c657c89408e4f9.js:1:15585 @ http://localhost:3000/_next/static/chunks/51c657c89408e4f9.js:0
+[     758ms] Unexpected token '<'
+[     759ms] Unexpected token '<'

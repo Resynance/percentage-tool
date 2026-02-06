@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { createClient } from '@/lib/supabase/server';
 import { logAudit, checkAuditResult } from '@/lib/audit';
+import { createId } from '@paralleldrive/cuid2';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,29 +27,45 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
     try {
+        console.log('[Projects API] POST request received');
         const supabase = await createClient();
         const { data: { user }, error: authError } = await supabase.auth.getUser();
 
+        console.log('[Projects API] User:', user?.email, 'User ID:', user?.id, 'Auth error:', authError?.message);
+
         if (authError || !user) {
+            console.log('[Projects API] Unauthorized - no user or auth error');
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
+
+        console.log('[Projects API] Looking up profile for user ID:', user.id);
 
         // Get user's role
         const profile = await prisma.profile.findUnique({
             where: { id: user.id },
-            select: { role: true }
+            select: { role: true, email: true, id: true }
         });
+
+        console.log('[Projects API] User profile query result:', JSON.stringify(profile), 'Role:', profile?.role);
 
         const role = profile?.role || 'USER';
 
         // Only MANAGER and ADMIN can create projects
         if (role !== 'MANAGER' && role !== 'ADMIN') {
+            console.log('[Projects API] Forbidden - user role is:', role);
             return NextResponse.json({ error: 'Forbidden: Only managers and admins can create projects' }, { status: 403 });
         }
 
+        console.log('[Projects API] Role check passed, creating project');
+
         const { name } = await req.json();
+
+        // Generate ID explicitly (database doesn't have DEFAULT clause)
+        const projectId = createId();
+
         const project = await prisma.project.create({
             data: {
+                id: projectId,
                 name,
                 ownerId: user.id
             },
