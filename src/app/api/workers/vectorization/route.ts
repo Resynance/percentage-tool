@@ -49,10 +49,11 @@ async function vectorizeBatch(records: any[], projectId: string, jobId?: string)
         const embedding = embeddings[j];
 
         if (embedding && embedding.length > 0) {
-          // Convert to PostgreSQL array format
+          // Convert to PostgreSQL vector format (matches existing pattern in src/lib/ingestion.ts)
+          const vectorString = `[${embedding.join(',')}]`;
           await prisma.$executeRaw`
             UPDATE public.data_records
-            SET embedding = ${embedding}
+            SET embedding = ${vectorString}::vector
             WHERE id = ${record.id}
           `;
 
@@ -85,6 +86,15 @@ export async function GET(request: Request) {
   // Verify request is from Vercel Cron
   const authHeader = request.headers.get('authorization');
   const cronSecret = process.env.CRON_SECRET;
+
+  // Security: Require CRON_SECRET in production
+  if (!cronSecret) {
+    if (process.env.NODE_ENV === 'production') {
+      console.error('[Vectorization Worker] CRON_SECRET not set in production - worker endpoints are unauthenticated!');
+      return NextResponse.json({ error: 'Configuration error' }, { status: 500 });
+    }
+    console.warn('[Vectorization Worker] CRON_SECRET not set - worker endpoint is unauthenticated');
+  }
 
   if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
     console.warn('[Vectorization Worker] Unauthorized cron request');
@@ -147,13 +157,13 @@ export async function GET(request: Request) {
         const vectorizedCount = await vectorizeBatch(records, projectId, job.job_id);
 
         // Check if there are more records to vectorize using raw SQL
-        const remainingResult: { count: bigint }[] = await prisma.$queryRaw`
+        const remainingResult: { count: number }[] = await prisma.$queryRaw`
           SELECT COUNT(*)::int as count
           FROM public.data_records
           WHERE "projectId" = ${projectId}
           AND embedding IS NULL
         `;
-        const remainingCount = Number(remainingResult[0]?.count || 0);
+        const remainingCount = remainingResult[0]?.count || 0;
 
         if (remainingCount > 0) {
           // Re-enqueue for more vectorization

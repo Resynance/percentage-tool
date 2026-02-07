@@ -92,12 +92,11 @@ export class DatabaseQueue {
    */
   static async claimJob(workerTypes: JobType[]): Promise<ClaimedJob | null> {
     try {
-      // Use raw SQL to call the claim_next_job function
-      // Format array as PostgreSQL array literal: ARRAY['val1', 'val2']
-      const arrayLiteral = `ARRAY[${workerTypes.map(t => `'${t}'`).join(', ')}]::text[]`;
-      const result = await prisma.$queryRawUnsafe<ClaimedJob[]>(
-        `SELECT * FROM claim_next_job(${arrayLiteral})`
-      );
+      // Use parameterized query to safely pass array to PostgreSQL function
+      // Prisma will properly escape and format the array
+      const result = await prisma.$queryRaw<ClaimedJob[]>`
+        SELECT * FROM claim_next_job(${workerTypes}::text[])
+      `;
 
       if (!result || result.length === 0) {
         return null;
@@ -125,6 +124,7 @@ export class DatabaseQueue {
         data: {
           status: 'COMPLETED',
           result: result ?? null,
+          payload: null, // Clear payload to free up space (can be large for CSV ingestion)
           completedAt: new Date(),
           updatedAt: new Date(),
         },
@@ -151,21 +151,57 @@ export class DatabaseQueue {
       const errorMessage = error instanceof Error ? error.message : String(error);
       const errorStack = error instanceof Error ? error.stack : undefined;
 
-      await prisma.jobQueue.update({
+      // Get current job state to check retry attempts
+      const job = await prisma.jobQueue.findUnique({
         where: { id: jobId },
-        data: {
-          status: 'FAILED',
-          result: {
-            error: errorMessage,
-            stack: errorStack,
-            timestamp: new Date().toISOString(),
-          },
-          completedAt: new Date(),
-          updatedAt: new Date(),
-        },
+        select: { attempts: true, maxAttempts: true },
       });
 
-      console.error(`[DatabaseQueue] Failed job ${jobId}:`, errorMessage);
+      if (!job) {
+        throw new Error(`Job ${jobId} not found`);
+      }
+
+      const hasRetriesRemaining = job.attempts < job.maxAttempts;
+
+      if (hasRetriesRemaining) {
+        // Still have retries - set back to PENDING with exponential backoff
+        const backoffSeconds = Math.min(300, Math.pow(2, job.attempts) * 10); // Max 5 min
+        const scheduledFor = new Date(Date.now() + backoffSeconds * 1000);
+
+        await prisma.jobQueue.update({
+          where: { id: jobId },
+          data: {
+            status: 'PENDING',
+            scheduledFor,
+            result: {
+              lastError: errorMessage,
+              lastErrorStack: errorStack,
+              timestamp: new Date().toISOString(),
+            },
+            updatedAt: new Date(),
+          },
+        });
+
+        console.warn(`[DatabaseQueue] Job ${jobId} failed (attempt ${job.attempts}/${job.maxAttempts}), will retry in ${backoffSeconds}s`);
+      } else {
+        // No retries remaining - mark as permanently FAILED
+        await prisma.jobQueue.update({
+          where: { id: jobId },
+          data: {
+            status: 'FAILED',
+            result: {
+              error: errorMessage,
+              stack: errorStack,
+              timestamp: new Date().toISOString(),
+            },
+            payload: null, // Clear payload to free up space
+            completedAt: new Date(),
+            updatedAt: new Date(),
+          },
+        });
+
+        console.error(`[DatabaseQueue] Job ${jobId} permanently failed after ${job.attempts} attempts:`, errorMessage);
+      }
     } catch (updateError) {
       console.error('[DatabaseQueue] Failed to mark job as failed:', updateError);
       throw new Error(`Failed to mark job as failed: ${updateError instanceof Error ? updateError.message : String(updateError)}`);
@@ -198,8 +234,12 @@ export class DatabaseQueue {
    */
   static async getQueueStats() {
     try {
-      const jobs = await prisma.jobQueue.findMany({
-        select: { status: true },
+      // Use GROUP BY to efficiently count by status (avoids fetching all rows)
+      const results = await prisma.jobQueue.groupBy({
+        by: ['status'],
+        _count: {
+          status: true,
+        },
       });
 
       const stats = {
@@ -209,10 +249,10 @@ export class DatabaseQueue {
         failed: 0,
       };
 
-      jobs.forEach((job) => {
-        const status = job.status.toLowerCase();
+      results.forEach((result) => {
+        const status = result.status.toLowerCase();
         if (status in stats) {
-          stats[status as keyof typeof stats]++;
+          stats[status as keyof typeof stats] = result._count.status;
         }
       });
 

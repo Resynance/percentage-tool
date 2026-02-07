@@ -39,37 +39,28 @@ export default function ManagementPage() {
     };
 
     const handleCreateProject = async () => {
-        console.log('[Management] handleCreateProject called, newName:', newName);
         if (!newName) {
-            console.log('[Management] No name provided, returning');
             return;
         }
         try {
-            console.log('[Management] Making POST request to /api/projects');
             const res = await fetch('/api/projects', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name: newName }),
             });
 
-            console.log('[Management] Response status:', res.status, 'ok:', res.ok);
-
             if (!res.ok) {
                 const errorData = await res.json();
-                console.error('[Management] Error response:', errorData);
                 alert(`Failed to create project: ${errorData.error || 'Unknown error'}`);
                 return;
             }
-
-            const responseData = await res.json();
-            console.log('[Management] Success response:', responseData);
 
             await fetchProjects();
             await refreshGlobalProjects(); // Update the global project selector
             setNewName('');
             setShowNewProject(false);
         } catch (err) {
-            console.error('[Management] Create project error:', err);
+            console.error('Failed to create project:', err);
             alert('Failed to create project: ' + (err instanceof Error ? err.message : String(err)));
         }
     };

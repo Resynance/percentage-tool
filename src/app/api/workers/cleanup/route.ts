@@ -21,6 +21,15 @@ export async function GET(request: Request) {
   const authHeader = request.headers.get('authorization');
   const cronSecret = process.env.CRON_SECRET;
 
+  // Security: Require CRON_SECRET in production
+  if (!cronSecret) {
+    if (process.env.NODE_ENV === 'production') {
+      console.error('[Cleanup Worker] CRON_SECRET not set in production - worker endpoints are unauthenticated!');
+      return NextResponse.json({ error: 'Configuration error' }, { status: 500 });
+    }
+    console.warn('[Cleanup Worker] CRON_SECRET not set - worker endpoint is unauthenticated');
+  }
+
   if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
     console.warn('[Cleanup Worker] Unauthorized cron request');
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

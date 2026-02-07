@@ -19,72 +19,13 @@
 import { NextResponse } from 'next/server';
 import { DatabaseQueue } from '@/lib/queue/db-queue';
 import { prisma } from '@/lib/prisma';
-import { parseCSV } from '@/lib/ingestion';
+import { processAndStore } from '@/lib/ingestion';
 
 // Vercel function configuration
 export const maxDuration = 60; // 60 seconds (Pro plan)
 export const dynamic = 'force-dynamic';
 
-/**
- * Process a batch of records into the database
- */
-async function processDataBatch(records: any[], projectId: string, ingestJobId: string, source: string, jobId?: string) {
-  const BATCH_SIZE = 100;
-  let savedCount = 0;
-  let skippedCount = 0;
-  const skippedDetails: any[] = [];
-
-  for (let i = 0; i < records.length; i += BATCH_SIZE) {
-    const batch = records.slice(i, i + BATCH_SIZE);
-
-    for (const record of batch) {
-      try {
-        // Create data record
-        await prisma.dataRecord.create({
-          data: {
-            projectId,
-            type: record.type || 'TASK',
-            source,
-            content: record.content,
-            metadata: record.metadata || {},
-            createdByEmail: record.createdByEmail || null,
-            createdAt: record.createdAt ? new Date(record.createdAt) : new Date(),
-          },
-        });
-
-        savedCount++;
-      } catch (error) {
-        skippedCount++;
-        skippedDetails.push({
-          record: record.content?.substring(0, 50),
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
-    }
-
-    // Update progress
-    await prisma.ingestJob.update({
-      where: { id: ingestJobId },
-      data: {
-        savedCount,
-        skippedCount,
-        ...(skippedDetails.length > 0 && { skippedDetails }),
-      },
-    });
-
-    // Update job queue progress
-    if (jobId) {
-      await DatabaseQueue.updateProgress(
-        jobId,
-        savedCount + skippedCount,
-        records.length,
-        `Saved ${savedCount} records`
-      );
-    }
-  }
-
-  return { savedCount, skippedCount, skippedDetails };
-}
+// Removed processDataBatch - using processAndStore from @/lib/ingestion for feature parity
 
 /**
  * GET handler for Vercel Cron
@@ -93,6 +34,15 @@ export async function GET(request: Request) {
   // Verify request is from Vercel Cron
   const authHeader = request.headers.get('authorization');
   const cronSecret = process.env.CRON_SECRET;
+
+  // Security: Require CRON_SECRET in production
+  if (!cronSecret) {
+    if (process.env.NODE_ENV === 'production') {
+      console.error('[Ingestion Worker] CRON_SECRET not set in production - worker endpoints are unauthenticated!');
+      return NextResponse.json({ error: 'Configuration error' }, { status: 500 });
+    }
+    console.warn('[Ingestion Worker] CRON_SECRET not set - worker endpoint is unauthenticated');
+  }
 
   if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
     console.warn('[Ingestion Worker] Unauthorized cron request');
@@ -119,7 +69,7 @@ export async function GET(request: Request) {
       console.log(`[Ingestion Worker] Processing job ${job.job_id}`);
 
       try {
-        const { ingestJobId, projectId, records, generateEmbeddings, source } = job.payload;
+        const { ingestJobId, projectId, records, generateEmbeddings, source, filterKeywords, type } = job.payload;
 
         // Update IngestJob status
         await prisma.ingestJob.update({
@@ -130,8 +80,16 @@ export async function GET(request: Request) {
           },
         });
 
-        // Process data batch
-        const result = await processDataBatch(records, projectId, ingestJobId, source || 'queue', job.job_id);
+        // Use processAndStore for full feature parity (duplicate detection, category detection, keyword filtering)
+        const options = {
+          projectId,
+          source: source || 'queue',
+          type: type || 'TASK',
+          filterKeywords,
+          generateEmbeddings,
+        };
+
+        const result = await processAndStore(records, options, ingestJobId);
 
         // Update IngestJob to completed
         await prisma.ingestJob.update({
@@ -140,7 +98,6 @@ export async function GET(request: Request) {
             status: generateEmbeddings ? 'QUEUED_FOR_VEC' : 'COMPLETED',
             savedCount: result.savedCount,
             skippedCount: result.skippedCount,
-            ...(result.skippedDetails.length > 0 && { skippedDetails: result.skippedDetails }),
           },
         });
 
