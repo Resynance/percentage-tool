@@ -18,6 +18,7 @@
  */
 
 import { prisma } from '@/lib/prisma';
+import { Prisma } from '@prisma/client';
 
 export type JobType = 'INGEST_DATA' | 'VECTORIZE';
 export type JobStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
@@ -124,7 +125,7 @@ export class DatabaseQueue {
         data: {
           status: 'COMPLETED',
           result: result ?? null,
-          payload: null, // Clear payload to free up space (can be large for CSV ingestion)
+          payload: Prisma.JsonNull, // Clear payload to free up space (can be large for CSV ingestion)
           completedAt: new Date(),
           updatedAt: new Date(),
         },
@@ -194,7 +195,7 @@ export class DatabaseQueue {
               stack: errorStack,
               timestamp: new Date().toISOString(),
             },
-            payload: null, // Clear payload to free up space
+            payload: Prisma.JsonNull, // Clear payload to free up space
             completedAt: new Date(),
             updatedAt: new Date(),
           },
