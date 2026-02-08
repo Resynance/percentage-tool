@@ -353,10 +353,7 @@ export default function IngestionPage() {
 
     return (
         <div style={{ width: '100%', maxWidth: '1000px', margin: '0 auto' }}>
-            <style jsx>{`
-                .tooltip-content { opacity: 0; visibility: hidden; transition: opacity 0.2s; pointer-events: none; }
-                .tooltip-container:hover .tooltip-content { opacity: 1; visibility: visible; }
-            `}</style>
+            
             <div style={{ marginBottom: '40px' }}>
                 <h1 className="premium-gradient" style={{ fontSize: '2.5rem', marginBottom: '8px' }}>Ingest</h1>
                 <p style={{ color: 'rgba(255,255,255,0.6)' }}>Choose your method to import task data</p>

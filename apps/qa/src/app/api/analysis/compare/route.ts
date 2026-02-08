@@ -13,9 +13,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@repo/database';
 import { generateCompletionWithUsage } from '@repo/core/ai';
+import { extractTextFromPDF } from '@repo/core/utils';
 import { createClient } from '@repo/auth/server';
-// @ts-expect-error - pdf-parse lacks modern TS definitions but is the most stable for Node PDF scraping
-import pdf from 'pdf-parse/lib/pdf-parse.js';
 
 export async function POST(req: NextRequest) {
     const supabase = await createClient();
@@ -116,7 +115,7 @@ export async function POST(req: NextRequest) {
 
         try {
             const buffer = Buffer.from(base64Data, 'base64');
-            const parsed = await pdf(buffer);
+            const parsed = await extractTextFromPDF(buffer);
             guidelinesText = parsed.text;
 
             if (!guidelinesText || guidelinesText.trim().length === 0) {

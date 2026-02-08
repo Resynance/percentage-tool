@@ -4,7 +4,7 @@
 import { prisma } from '@repo/database';
 import { generateCompletion } from '../ai';
 // @ts-ignore
-import pdf from 'pdf-parse/lib/pdf-parse.js';
+import { extractTextFromPDF } from '../utils/pdf';
 /**
  * ENTRY POINT: startBulkAlignment
  */
@@ -49,7 +49,7 @@ async function runBulkAlignment(jobId, projectId) {
         const base64Data = project.guidelines.split(';base64,').pop();
         if (base64Data) {
             const buffer = Buffer.from(base64Data, 'base64');
-            const parsed = await pdf(buffer);
+            const parsed = await extractTextFromPDF(buffer);
             guidelinesText = parsed.text;
         }
         if (!guidelinesText)

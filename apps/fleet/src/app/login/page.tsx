@@ -18,6 +18,13 @@ export default function LoginPage() {
 
         try {
             const supabase = createClient();
+
+            if (!supabase) {
+                setError('Configuration error: Unable to connect to authentication service');
+                setLoading(false);
+                return;
+            }
+
             const { error: signInError } = await supabase.auth.signInWithPassword({
                 email,
                 password,

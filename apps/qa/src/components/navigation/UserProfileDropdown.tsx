@@ -134,22 +134,7 @@ export default function UserProfileDropdown({ email, role }: UserProfileDropdown
                 onClose={() => setIsModalOpen(false)} 
             />
 
-            <style jsx>{`
-                @keyframes dropdownFade {
-                    from { opacity: 0; transform: translateY(-10px); }
-                    to { opacity: 1; transform: translateY(0); }
-                }
-                .hover-bright:hover {
-                    background: rgba(255, 255, 255, 0.08) !important;
-                }
-                .hover-subtle:hover {
-                    background: rgba(255, 255, 255, 0.05);
-                    color: white !important;
-                }
-                .hover-error-subtle:hover {
-                    background: rgba(255, 68, 68, 0.05);
-                }
-            `}</style>
+            
         </div>
     );
 }

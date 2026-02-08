@@ -166,11 +166,7 @@ export default function LinksPage() {
                 ))}
             </div>
 
-            <style jsx>{`
-                a:hover .link-hover-bar {
-                    transform: scaleX(1);
-                }
-            `}</style>
+            
         </div>
     );
 }
