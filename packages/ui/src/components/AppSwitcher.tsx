@@ -158,17 +158,23 @@ export function AppSwitcher({ currentApp, userRole }: AppSwitcherProps) {
                                 }
 
                                 // Fallback: construct URL based on current domain pattern
-                                // This assumes apps are deployed as subdomains or paths
                                 const currentHost = window.location.host;
                                 const currentProtocol = window.location.protocol;
 
-                                // Check if current domain uses subdomain pattern (e.g., fleet.example.com)
-                                if (currentHost.includes('.')) {
-                                    const baseDomain = currentHost.split('.').slice(-2).join('.');
-                                    return `${currentProtocol}//${appName}.${baseDomain}`;
+                                // Handle Vercel deployment pattern (e.g., fleet-app.vercel.app)
+                                if (currentHost.includes('.vercel.app')) {
+                                    return `${currentProtocol}//${appName}-app.vercel.app`;
                                 }
 
-                                // Fallback to current host with path
+                                // Handle custom subdomain pattern (e.g., fleet.example.com -> user.example.com)
+                                if (currentHost.includes('.')) {
+                                    const parts = currentHost.split('.');
+                                    // Replace the subdomain with the target app name
+                                    parts[0] = appName;
+                                    return `${currentProtocol}//${parts.join('.')}`;
+                                }
+
+                                // Fallback to current host (single domain, no pattern detected)
                                 return `${currentProtocol}//${currentHost}`;
                             }
 
