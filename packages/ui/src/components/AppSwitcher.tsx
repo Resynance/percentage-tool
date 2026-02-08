@@ -137,7 +137,46 @@ export function AppSwitcher({ currentApp, userRole }: AppSwitcherProps) {
                 }}>
                     {accessibleApps.map(app => {
                         const isCurrent = app.name === currentApp;
-                        const url = `http://localhost:${app.port}`;
+
+                        // Generate environment-appropriate URL
+                        const getAppUrl = (appName: string, port: number): string => {
+                            // In browser, check if we're on localhost
+                            if (typeof window !== 'undefined') {
+                                const isDevelopment = window.location.hostname === 'localhost' ||
+                                                     window.location.hostname === '127.0.0.1';
+
+                                if (isDevelopment) {
+                                    return `http://localhost:${port}`;
+                                }
+
+                                // Production: use environment variables or construct from current domain
+                                const envVarName = `NEXT_PUBLIC_${appName.toUpperCase()}_APP_URL`;
+                                const envUrl = process.env[envVarName];
+
+                                if (envUrl) {
+                                    return envUrl;
+                                }
+
+                                // Fallback: construct URL based on current domain pattern
+                                // This assumes apps are deployed as subdomains or paths
+                                const currentHost = window.location.host;
+                                const currentProtocol = window.location.protocol;
+
+                                // Check if current domain uses subdomain pattern (e.g., fleet.example.com)
+                                if (currentHost.includes('.')) {
+                                    const baseDomain = currentHost.split('.').slice(-2).join('.');
+                                    return `${currentProtocol}//${appName}.${baseDomain}`;
+                                }
+
+                                // Fallback to current host with path
+                                return `${currentProtocol}//${currentHost}`;
+                            }
+
+                            // Server-side fallback
+                            return `http://localhost:${port}`;
+                        };
+
+                        const url = getAppUrl(app.name, app.port);
 
                         return (
                             <a
