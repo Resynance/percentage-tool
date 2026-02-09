@@ -11,7 +11,6 @@ Role-specific user guides for Operations Tools. Each guide covers all features a
 **Features Covered**:
 - ⏱️ Time Tracking - Record work hours
 - 🔗 Links & Resources - Access documentation
-- 💰 Bonus Windows - View performance (read-only)
 - 👤 Profile Management - Account settings
 - 🐛 Bug Reporting - Report issues
 

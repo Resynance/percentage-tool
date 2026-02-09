@@ -11,14 +11,13 @@ All guides are in: `Documentation/UserGuides/`
 ### 📚 Guides Created
 
 #### 1. USER_GUIDE.md (Basic Role)
-**Size**: ~8,500 words | **Sections**: 10
+**Size**: ~7,000 words | **Sections**: 8
 **Access**: User App only (port 3001)
 
 **Features Documented**:
 - Getting Started & Navigation
 - Time Tracking (recording, viewing, editing, deleting)
 - Links & Resources
-- Bonus Windows (view-only)
 - Profile Management (password, settings)
 - Bug Reporting
 - FAQs and troubleshooting
@@ -28,7 +27,7 @@ All guides are in: `Documentation/UserGuides/`
 ---
 
 #### 2. QA_GUIDE.md (Quality Assurance)
-**Size**: ~14,000 words | **Sections**: 14
+**Size**: ~13,500 words | **Sections**: 13
 **Access**: User App + QA App (ports 3001-3002)
 
 **Includes USER features plus**:
@@ -45,7 +44,7 @@ All guides are in: `Documentation/UserGuides/`
 ---
 
 #### 3. CORE_GUIDE.md (Scoring & Review)
-**Size**: ~13,000 words | **Sections**: 13
+**Size**: ~12,900 words | **Sections**: 13
 **Access**: User App + QA App + Core App (ports 3001-3003)
 
 **Includes USER + QA features plus**:
@@ -128,12 +127,12 @@ Each guide includes:
 
 ## 📊 Statistics
 
-**Total Content**: ~54,500 words across all guides
-**Total Sections**: 52 major sections
-**Average Guide Length**: ~3,400 words per guide
+**Total Content**: ~50,300 words across all guides
+**Total Sections**: 48 major sections
+**Average Guide Length**: ~3,100 words per guide
 **Estimated Reading Time**:
-- USER: 35 minutes
-- QA: 55 minutes
+- USER: 28 minutes
+- QA: 54 minutes
 - CORE: 50 minutes
 - FLEET: 65 minutes
 
@@ -206,9 +205,9 @@ Guides reference:
 ### USER Guide Highlights
 
 - Comprehensive time tracking tutorial
-- Clear explanation of bonus windows (view-only context)
 - Profile management security tips
 - Effective bug reporting guidelines
+- Links & resources organization
 
 ### QA Guide Highlights
 
@@ -364,5 +363,5 @@ All role-specific user guides have been created, reviewed, and integrated into t
 
 **Created**: February 2026
 **Total Guides**: 4 (USER, QA, CORE, FLEET)
-**Total Words**: ~54,500
+**Total Words**: ~50,300
 **Total Files**: 6 (5 guides + 1 index)

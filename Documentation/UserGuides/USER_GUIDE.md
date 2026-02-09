@@ -13,9 +13,8 @@ As a USER, you have access to the **User App** at:
 1. [Getting Started](#getting-started)
 2. [Time Tracking](#time-tracking)
 3. [Links & Resources](#links--resources)
-4. [Bonus Windows (View Only)](#bonus-windows-view-only)
-5. [Profile Management](#profile-management)
-6. [Bug Reporting](#bug-reporting)
+4. [Profile Management](#profile-management)
+5. [Bug Reporting](#bug-reporting)
 
 ---
 
@@ -34,7 +33,6 @@ The User App sidebar shows:
 - **Dashboard** - Your home page
 - **Time Tracking** - Record your work hours
 - **Links** - Quick access to external resources
-- **Bonus Windows** - View current bonus performance (read-only)
 
 ---
 
@@ -114,59 +112,6 @@ If you need a link added:
 1. Contact your manager or administrator
 2. Provide the URL and suggested category
 3. Administrator will add it to the Links page
-
----
-
-## Bonus Windows (View Only)
-
-View information about current bonus performance windows.
-
-### What are Bonus Windows?
-
-Bonus windows are time-bounded periods where team performance is tracked for potential bonuses. Your USER role allows you to **view** these windows but not manage them.
-
-### Viewing Current Windows
-
-1. Navigate to **Bonus Windows** from the sidebar
-2. See list of active and upcoming windows:
-   - **Window Name**: Description of the bonus period
-   - **Start Date**: When the window begins
-   - **End Date**: When the window closes
-   - **Target**: Performance goal to achieve bonus
-   - **Current Progress**: How the team is tracking (if visible)
-
-### Understanding Window Status
-
-**Active Windows**:
-- Currently in progress
-- Performance is being tracked
-- Progress bar shows current status vs. target
-
-**Upcoming Windows**:
-- Scheduled to start in the future
-- No progress yet
-- Review targets and criteria
-
-**Completed Windows**:
-- Finished and closed
-- Final results may be visible
-- Shows whether target was achieved
-
-### What You Can See
-
-- Window dates and descriptions
-- Target performance metrics
-- Current progress (if you're part of the tracked group)
-- Your individual contributions (if tracked separately)
-
-### What You Cannot Do
-
-❌ Create new bonus windows
-❌ Edit existing windows
-❌ Close or delete windows
-❌ Manage bonus window settings
-
-> **Note**: For bonus window management, contact your Fleet manager.
 
 ---
 

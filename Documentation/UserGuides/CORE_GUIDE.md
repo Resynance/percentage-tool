@@ -31,7 +31,6 @@ As a CORE team member, you have access to **three applications**:
 **Available in User App (port 3001)**:
 - ⏱️ **Time Tracking** - Record work hours
 - 🔗 **Links & Resources** - Access external documentation
-- 💰 **Bonus Windows** - View performance windows (read-only)
 - 👤 **Profile Management** - Update password and preferences
 - 🐛 **Bug Reporting** - Report issues
 

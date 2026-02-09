@@ -14,8 +14,7 @@ As a QA team member, you have access to **two applications**:
 ### User App Features (Inherited)
 1. [Time Tracking](#time-tracking)
 2. [Links & Resources](#links--resources)
-3. [Bonus Windows (View)](#bonus-windows-view-only)
-4. [Profile Management](#profile-management)
+3. [Profile Management](#profile-management)
 
 ### QA App Features (Your Primary Tools)
 5. [Records Management](#records-management)
@@ -51,15 +50,6 @@ Access external documentation and tools.
 - Navigate to User App → **Links**
 - Browse categorized resources
 - Click links to open in new tabs
-
-### Bonus Windows (View Only)
-
-View current bonus performance windows and progress.
-
-- Navigate to User App → **Bonus Windows**
-- See active, upcoming, and completed windows
-- View targets and current progress
-- Track your contributions
 
 ### Profile Management
 
