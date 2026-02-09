@@ -6,8 +6,8 @@
 
 As a QA team member, you have access to **two applications**:
 
-1. **User App** (port 3001) - Basic features shared with all users
-2. **QA App** (port 3002) - Quality assurance and analysis tools ⭐
+1. **User App** - Basic features shared with all users
+2. **QA App** - Quality assurance and analysis tools ⭐
 
 ## 📋 Table of Contents
 
@@ -27,7 +27,7 @@ As a QA team member, you have access to **two applications**:
 
 ## USER APP FEATURES
 
-> 💡 **Tip**: You inherit all USER role features. These are available in the User App (port 3001).
+> 💡 **Tip**: You inherit all USER role features. These are available in the User App.
 
 ### Time Tracking
 
@@ -64,7 +64,7 @@ Manage your account settings.
 
 ## QA APP FEATURES
 
-> ⭐ **Your Primary Workspace**: The QA App (port 3002) contains your main quality assurance tools.
+> ⭐ **Your Primary Workspace**: The QA App contains your main quality assurance tools.
 
 ## Records Management
 
@@ -72,7 +72,7 @@ View, search, and analyze task and feedback records across all projects.
 
 ### Accessing Records
 
-1. Navigate to **QA App** (port 3002)
+1. Navigate to **QA App**
 2. Click **Records** in the sidebar
 3. You'll see the Records Management dashboard
 

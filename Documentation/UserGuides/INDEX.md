@@ -6,7 +6,7 @@ Role-specific user guides for Operations Tools. Each guide covers all features a
 
 ### 🔰 [USER Role Guide](./USER_GUIDE.md)
 **For**: All users with USER role
-**Access**: User App only (port 3001)
+**Access**: User App only
 
 **Features Covered**:
 - ⏱️ Time Tracking - Record work hours

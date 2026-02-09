@@ -314,10 +314,17 @@ Guides reference:
 ```
 Documentation/UserGuides/
 ├── INDEX.md                    # User guides index (3,000 words)
-├── USER_GUIDE.md              # USER role guide (8,500 words)
-├── QA_GUIDE.md                # QA role guide (14,000 words)
-├── CORE_GUIDE.md              # CORE role guide (13,000 words)
-└── FLEET_GUIDE.md             # FLEET role guide (16,000 words)
+├── USER_GUIDE.md              # USER role guide (7,000 words)
+├── QA_GUIDE.md                # QA role guide (13,500 words)
+├── CORE_GUIDE.md              # CORE role guide (12,900 words)
+├── FLEET_GUIDE.md             # FLEET role guide (16,000 words)
+└── PDFs/                      # Professional PDF versions (2.7MB)
+    ├── README.md              # PDF distribution guide
+    ├── USER_GUIDE.pdf         # 349KB
+    ├── QA_GUIDE.pdf           # 616KB
+    ├── CORE_GUIDE.pdf         # 651KB
+    ├── FLEET_GUIDE.pdf        # 654KB
+    └── INDEX.pdf              # 483KB
 ```
 
 ### Updated Files
@@ -330,7 +337,16 @@ Documentation/INDEX.md          # Added UserGuides section
 
 ```
 USER_GUIDES_SUMMARY.md         # This file
+PDF_GENERATION_SUMMARY.md      # PDF generation details
 ```
+
+### Generator Scripts
+
+```
+scripts/generate-guide-pdfs.mjs  # Automated PDF generation
+```
+
+**Regenerate PDFs**: `npm run guides:pdf`
 
 ---
 
@@ -350,6 +366,38 @@ USER_GUIDES_SUMMARY.md         # This file
 - [x] Workflow recommendations provided
 - [x] Professional tone throughout
 - [x] Version numbers and dates included
+
+---
+
+## 📄 PDF Versions
+
+Professional PDF versions of all guides have been generated for easy distribution:
+
+**Location**: `Documentation/UserGuides/PDFs/`
+
+**Files**:
+- `USER_GUIDE.pdf` (349KB) - Portable reference for USER role
+- `QA_GUIDE.pdf` (616KB) - Complete QA tools documentation
+- `CORE_GUIDE.pdf` (651KB) - Scoring and review guide
+- `FLEET_GUIDE.pdf` (654KB) - Comprehensive fleet management
+- `INDEX.pdf` (483KB) - Navigation overview
+
+**Features**:
+- Professional styling with branded colors
+- Page numbers and clickable links
+- Print-friendly A4 format
+- Searchable text content
+- Offline access
+
+**Usage**:
+- Email attachments for onboarding
+- Training session handouts
+- Knowledge base uploads
+- Offline reference materials
+
+**Regeneration**: `npm run guides:pdf`
+
+See [PDF_GENERATION_SUMMARY.md](../PDF_GENERATION_SUMMARY.md) for full details.
 
 ---
 

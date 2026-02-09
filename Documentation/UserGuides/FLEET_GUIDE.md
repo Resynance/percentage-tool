@@ -6,10 +6,10 @@
 
 As a FLEET team member, you have access to **four applications**:
 
-1. **User App** (port 3001) - Basic features
-2. **QA App** (port 3002) - Quality assurance tools
-3. **Core App** (port 3003) - Scoring and review tools
-4. **Fleet App** (port 3004) - Fleet management and operations ⭐
+1. **User App** - Basic features
+2. **QA App** - Quality assurance tools
+3. **Core App** - Scoring and review tools
+4. **Fleet App** - Fleet management and operations ⭐
 
 ## 📋 Table of Contents
 
@@ -31,7 +31,7 @@ As a FLEET team member, you have access to **four applications**:
 
 As a FLEET manager, you have full access to all lower-tier features:
 
-### User App (port 3001)
+### User App
 ✅ Time Tracking - Record your work hours
 ✅ Links & Resources - Access documentation
 ✅ Bonus Windows (View) - See performance data
@@ -39,7 +39,7 @@ As a FLEET manager, you have full access to all lower-tier features:
 
 **See**: [USER_GUIDE.md](./USER_GUIDE.md)
 
-### QA App (port 3002)
+### QA App
 ✅ Records Management - View and analyze records
 ✅ Similarity Search - Find related content
 ✅ Top/Bottom 10 Review - Quality analysis
@@ -48,7 +48,7 @@ As a FLEET manager, you have full access to all lower-tier features:
 
 **See**: [QA_GUIDE.md](./QA_GUIDE.md)
 
-### Core App (port 3003)
+### Core App
 ✅ Likert Scoring - Rate records on dimensions
 ✅ Candidate Review - Evaluate submissions
 ✅ My Assignments - Manage assigned work
@@ -60,7 +60,7 @@ As a FLEET manager, you have full access to all lower-tier features:
 
 ## FLEET APP FEATURES
 
-> ⭐ **Your Primary Workspace**: The Fleet App (port 3004) is your main management hub.
+> ⭐ **Your Primary Workspace**: The Fleet App is your main management hub.
 
 ## Data Ingestion
 
@@ -77,7 +77,7 @@ Data Ingestion is the process of loading external data (prompts, feedback, evalu
 
 ### Accessing Ingestion
 
-1. Navigate to **Fleet App** (port 3004)
+1. Navigate to **Fleet App**
 2. Click **Ingest** in the sidebar
 3. Choose ingestion method: CSV Upload or API Sync
 

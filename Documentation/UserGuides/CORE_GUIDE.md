@@ -6,9 +6,9 @@
 
 As a CORE team member, you have access to **three applications**:
 
-1. **User App** (port 3001) - Basic features
-2. **QA App** (port 3002) - Quality assurance tools
-3. **Core App** (port 3003) - Scoring and review tools ⭐
+1. **User App** - Basic features
+2. **QA App** - Quality assurance tools
+3. **Core App** - Scoring and review tools ⭐
 
 ## 📋 Table of Contents
 
@@ -28,7 +28,7 @@ As a CORE team member, you have access to **three applications**:
 
 > 💡 **Quick Summary**: You inherit all USER features. See [USER_GUIDE.md](./USER_GUIDE.md) for details.
 
-**Available in User App (port 3001)**:
+**Available in User App**:
 - ⏱️ **Time Tracking** - Record work hours
 - 🔗 **Links & Resources** - Access external documentation
 - 👤 **Profile Management** - Update password and preferences
@@ -40,7 +40,7 @@ As a CORE team member, you have access to **three applications**:
 
 > 💡 **Quick Summary**: You inherit all QA features. See [QA_GUIDE.md](./QA_GUIDE.md) for details.
 
-**Available in QA App (port 3002)**:
+**Available in QA App**:
 - 📊 **Records Management** - View and filter records
 - 🔍 **Similarity Search** - Find semantically similar records
 - 📈 **Top/Bottom 10 Review** - Quality assurance analysis
@@ -51,7 +51,7 @@ As a CORE team member, you have access to **three applications**:
 
 ## CORE APP FEATURES
 
-> ⭐ **Your Primary Workspace**: The Core App (port 3003) contains your scoring and review tools.
+> ⭐ **Your Primary Workspace**: The Core App contains your scoring and review tools.
 
 ## Likert Scoring
 
@@ -70,7 +70,7 @@ Likert scoring is a standardized rating method where you evaluate records on spe
 
 ### Accessing Likert Scoring
 
-1. Navigate to **Core App** (port 3003)
+1. Navigate to **Core App**
 2. Click **Likert Scoring** in the sidebar
 3. You'll see the scoring dashboard
 
