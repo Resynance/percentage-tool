@@ -82,24 +82,40 @@ export function hasAppAccess(userRole: UserRole, appName: AppName): boolean {
 
 /**
  * Get the URL for a specific app (production or local)
+ *
+ * IMPORTANT: Uses static property access for Next.js bundler compatibility.
+ * The bundler replaces process.env.NEXT_PUBLIC_* at build time.
  */
 export function getAppUrl(appName: AppName): string {
-  const appConfig = APP_CONFIGS.find(config => config.name === appName);
-  if (!appConfig) return '/';
+  // Static lookup map for Next.js bundler to properly replace env vars
+  const prodUrls: Record<AppName, string | undefined> = {
+    user: process.env.NEXT_PUBLIC_USER_APP_URL,
+    qa: process.env.NEXT_PUBLIC_QA_APP_URL,
+    core: process.env.NEXT_PUBLIC_CORE_APP_URL,
+    fleet: process.env.NEXT_PUBLIC_FLEET_APP_URL,
+    admin: process.env.NEXT_PUBLIC_ADMIN_APP_URL,
+  };
 
-  // Check environment variable first, fallback to local URL
-  if (typeof process !== 'undefined' && process.env) {
-    const prodUrl = process.env[appConfig.urlEnvVar];
-    if (prodUrl) return prodUrl;
-  }
+  const localUrls: Record<AppName, string> = {
+    user: 'http://localhost:3001',
+    qa: 'http://localhost:3002',
+    core: 'http://localhost:3003',
+    fleet: 'http://localhost:3004',
+    admin: 'http://localhost:3005',
+  };
 
-  return appConfig.localUrl;
+  return prodUrls[appName] || localUrls[appName] || '/';
 }
 
 /**
  * Get the highest-privilege app that a user has access to
  */
 export function getDefaultAppForRole(userRole: UserRole): AppName {
+  // PENDING users have no app access - they should see a pending approval page
+  if (userRole === 'PENDING') {
+    return 'user'; // User app should show a "pending approval" message
+  }
+
   const userWeight = ROLE_WEIGHTS[userRole] ?? 0;
 
   // Find the highest-privilege app the user can access
@@ -115,7 +131,7 @@ export function getDefaultAppForRole(userRole: UserRole): AppName {
     }
   }
 
-  // Default to user app for any authenticated user
+  // Fallback to user app (should not reach here for valid roles)
   return 'user';
 }
 

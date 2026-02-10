@@ -1,6 +1,9 @@
--- Enable RLS on all public tables
+-- Enable RLS on Prisma-managed tables
 -- This is required by Supabase best practices even though we use Prisma for data access
 -- These tables are accessed server-side via Prisma, not via Supabase PostgREST
+--
+-- Note: Other tables (bonus_windows, audit_logs, bug_reports, likert_scores, cross_encoder_cache)
+-- already have RLS enabled with appropriate policies from previous migrations
 
 -- Enable RLS on all tables
 ALTER TABLE public.system_settings ENABLE ROW LEVEL SECURITY;
