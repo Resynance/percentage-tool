@@ -36,7 +36,29 @@ export default function LoginPage() {
                 return;
             }
 
-            // Redirect to home page
+            // Check if user has access to Fleet app
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('role')
+                    .eq('id', user.id)
+                    .single();
+
+                const userRole = profile?.role || 'USER';
+
+                // Import the redirect utility dynamically (client-side only)
+                const { getRedirectUrlIfNeeded } = await import('@repo/auth');
+                const redirectUrl = getRedirectUrlIfNeeded(userRole, 'fleet');
+
+                if (redirectUrl) {
+                    // User doesn't have access to Fleet app, redirect to appropriate app
+                    window.location.href = redirectUrl;
+                    return;
+                }
+            }
+
+            // User has access, redirect to home page
             router.push('/');
             router.refresh();
         } catch (err) {
@@ -164,17 +186,19 @@ export default function LoginPage() {
                     </button>
                 </form>
 
-                <div style={{
-                    marginTop: '24px',
-                    paddingTop: '24px',
-                    borderTop: '1px solid var(--border)',
-                    textAlign: 'center',
-                    fontSize: '0.85rem',
-                    color: 'rgba(255, 255, 255, 0.5)'
-                }}>
-                    Test accounts: user@test.com, qa@test.com, core@test.com, fleet@test.com, admin@test.com<br />
-                    Password: test
-                </div>
+                {process.env.NODE_ENV !== 'production' && (
+                    <div style={{
+                        marginTop: '24px',
+                        paddingTop: '24px',
+                        borderTop: '1px solid var(--border)',
+                        textAlign: 'center',
+                        fontSize: '0.85rem',
+                        color: 'rgba(255, 255, 255, 0.5)'
+                    }}>
+                        Test accounts: user@test.com, qa@test.com, core@test.com, fleet@test.com, admin@test.com<br />
+                        Password: test
+                    </div>
+                )}
             </div>
         </div>
     );
