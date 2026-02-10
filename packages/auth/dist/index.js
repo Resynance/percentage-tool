@@ -1,6 +1,10 @@
-// Re-export server-side auth functions
-export { createClient as createServerClient, createAdminClient } from './server';
+// Main entry point - CLIENT-SAFE EXPORTS ONLY
+// For server-side imports, use @repo/auth/server
 // Re-export client-side auth functions
 export { createClient as createBrowserClient } from './client';
-// Re-export auth utilities
-export { getUserRole, getUserProfile, hasRole } from './utils';
+// Re-export app access control (client-safe utility functions)
+export { hasAppAccess, getAppUrl, getDefaultAppForRole, getRedirectUrlIfNeeded } from './app-access';
+// Note: Server-side functions are available via @repo/auth/server
+// - createClient (server)
+// - createAdminClient
+// - getUserRole, getUserProfile, hasRole

@@ -1,4 +1,3 @@
-export { createClient as createServerClient, createAdminClient } from './server';
 export { createClient as createBrowserClient } from './client';
-export { getUserRole, getUserProfile, hasRole } from './utils';
+export { hasAppAccess, getAppUrl, getDefaultAppForRole, getRedirectUrlIfNeeded, type AppName, type UserRole } from './app-access';
 //# sourceMappingURL=index.d.ts.map
