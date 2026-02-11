@@ -87,7 +87,7 @@ describe('GET /api/full-similarity-check', () => {
         const data = await response.json();
 
         expect(response.status).toBe(400);
-        expect(data.error).toBe('Project ID is required');
+        expect(data.error).toBe('projectId is required');
     });
 
     it('should return tasks with embeddings for valid request', async () => {

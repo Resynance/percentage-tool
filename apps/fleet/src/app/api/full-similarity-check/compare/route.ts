@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@repo/database';
 import { createClient } from '@repo/auth/server';
 import { Prisma } from '@prisma/client';
+import { cosineSimilarity } from '@repo/core/ai';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,28 +27,6 @@ function parseVector(embedding: any): number[] | null {
     }
 
     return null;
-}
-
-// Calculate cosine similarity between two vectors
-function cosineSimilarity(a: number[], b: number[]): number {
-    if (!a || !b || a.length !== b.length) return 0;
-
-    let dotProduct = 0;
-    let magnitudeA = 0;
-    let magnitudeB = 0;
-
-    for (let i = 0; i < a.length; i++) {
-        dotProduct += a[i] * b[i];
-        magnitudeA += a[i] * a[i];
-        magnitudeB += b[i] * b[i];
-    }
-
-    magnitudeA = Math.sqrt(magnitudeA);
-    magnitudeB = Math.sqrt(magnitudeB);
-
-    if (magnitudeA === 0 || magnitudeB === 0) return 0;
-
-    return dotProduct / (magnitudeA * magnitudeB);
 }
 
 export async function POST(req: NextRequest) {
@@ -204,6 +183,9 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ results });
     } catch (error: any) {
         console.error('Error comparing prompts:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({
+            error: 'Internal server error',
+            details: error.message
+        }, { status: 500 });
     }
 }

@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { redirect } from 'next/navigation';
 
 interface Task {
   id: string;
@@ -1097,7 +1096,7 @@ export default function FullSimilarityCheckPage() {
                   color: 'rgba(255, 255, 255, 0.8)',
                   fontSize: '0.875rem'
                 }}>
-                  {result.sourceContent.substring(0, 150)}...
+                  {result.sourceContent.substring(0, 150)}{result.sourceContent.length > 150 ? '...' : ''}
                 </div>
 
                 {result.matches.length > 0 ? (
@@ -1180,7 +1179,7 @@ export default function FullSimilarityCheckPage() {
                             color: 'rgba(255, 255, 255, 0.7)',
                             lineHeight: '1.4'
                           }}>
-                            {match.content.substring(0, 200)}...
+                            {match.content.substring(0, 200)}{match.content.length > 200 ? '...' : ''}
                           </div>
                           <div style={{
                             fontSize: '0.75rem',
