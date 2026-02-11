@@ -38,6 +38,14 @@ const APPS = {
         description: 'Administration'
     }
 };
+// Production URLs - MUST be accessed by exact name for Next.js to inline them at build time
+const APP_URLS = {
+    user: process.env.NEXT_PUBLIC_USER_APP_URL,
+    qa: process.env.NEXT_PUBLIC_QA_APP_URL,
+    core: process.env.NEXT_PUBLIC_CORE_APP_URL,
+    fleet: process.env.NEXT_PUBLIC_FLEET_APP_URL,
+    admin: process.env.NEXT_PUBLIC_ADMIN_APP_URL
+};
 export function AppSwitcher({ currentApp, userRole }) {
     const [isOpen, setIsOpen] = useState(false);
     const accessibleApps = Object.values(APPS).filter(app => userRole && app.roles.includes(userRole));
@@ -89,7 +97,31 @@ export function AppSwitcher({ currentApp, userRole }) {
                     boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
                 }, children: accessibleApps.map(app => {
                     const isCurrent = app.name === currentApp;
-                    const url = `http://localhost:${app.port}`;
+                    // Generate environment-appropriate URL
+                    const getAppUrl = (appName, port) => {
+                        // In browser, check if we're on localhost
+                        if (typeof window !== 'undefined') {
+                            const isDevelopment = window.location.hostname === 'localhost' ||
+                                window.location.hostname === '127.0.0.1';
+                            if (isDevelopment) {
+                                return `http://localhost:${port}`;
+                            }
+                            // Production: Use environment variables from APP_URLS
+                            const envUrl = APP_URLS[appName];
+                            if (envUrl) {
+                                return envUrl;
+                            }
+                            // WARNING: No environment variable set!
+                            console.error(`AppSwitcher: NEXT_PUBLIC_${appName.toUpperCase()}_APP_URL not set. ` +
+                                `Cross-app navigation will not work correctly. ` +
+                                `Set this environment variable in Vercel with the production URL for the ${appName} app.`);
+                            // Return empty string to make the link obvious broken
+                            return '#missing-env-var';
+                        }
+                        // Server-side fallback
+                        return `http://localhost:${port}`;
+                    };
+                    const url = getAppUrl(app.name, app.port);
                     return (_jsxs("a", { href: url, style: {
                             display: 'block',
                             padding: '12px 16px',
