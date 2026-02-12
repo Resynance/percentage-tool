@@ -1,14 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@repo/database';
-
-// Valid time entry categories
-const VALID_CATEGORIES = [
-  'Writing New Tasks',
-  'Updating Tasks Based on Feedback',
-  'Time Spent on Instructions or Slack',
-  'Platform Downtime',
-  'Time Spent on QA',
-];
+import { VALID_CATEGORIES } from '@/lib/time-tracking-constants';
 
 /**
  * POST /api/time-entries/record
@@ -129,16 +121,25 @@ export async function POST(request: NextRequest) {
     // Parse date (default to today if not provided)
     let dateObj: Date;
     if (date) {
-      const parsedDate = new Date(date);
-      if (isNaN(parsedDate.getTime())) {
+      // Validate YYYY-MM-DD format
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
         return NextResponse.json(
           { error: 'Invalid date format. Use YYYY-MM-DD' },
           { status: 400 }
         );
       }
+
       // Parse date without timezone ambiguity
       const [year, month, day] = date.split('-').map(Number);
       dateObj = new Date(year, month - 1, day);
+
+      // Verify the date is valid (catches invalid dates like 2026-02-30)
+      if (isNaN(dateObj.getTime())) {
+        return NextResponse.json(
+          { error: 'Invalid date. Please check the day is valid for the month.' },
+          { status: 400 }
+        );
+      }
     } else {
       // Use current date
       const now = new Date();

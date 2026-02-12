@@ -1,15 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@repo/database';
+import { prisma, Prisma } from '@repo/database';
 import { createClient } from '@repo/auth/server';
-
-// Valid time entry categories
-const VALID_CATEGORIES = [
-  'Writing New Tasks',
-  'Updating Tasks Based on Feedback',
-  'Time Spent on Instructions or Slack',
-  'Platform Downtime',
-  'Time Spent on QA',
-];
+import { VALID_CATEGORIES } from '@/lib/time-tracking-constants';
 
 // PATCH /api/time-entries/[id] - Update a time entry
 export async function PATCH(
@@ -42,21 +34,32 @@ export async function PATCH(
     }
 
     // Build update data with validation
-    const updateData: any = {};
+    const updateData: Prisma.TimeEntryUpdateInput = {};
     let finalHours = existingEntry.hours;
     let finalMinutes = existingEntry.minutes;
 
     if (date !== undefined) {
-      const parsedDate = new Date(date);
-      if (isNaN(parsedDate.getTime())) {
+      // Validate YYYY-MM-DD format
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
         return NextResponse.json(
-          { error: 'Invalid date format' },
+          { error: 'Invalid date format. Use YYYY-MM-DD' },
           { status: 400 }
         );
       }
+
       // Parse date without timezone ambiguity
       const [year, month, day] = date.split('-').map(Number);
-      updateData.date = new Date(year, month - 1, day);
+      const parsedDate = new Date(year, month - 1, day);
+
+      // Verify the date is valid
+      if (isNaN(parsedDate.getTime())) {
+        return NextResponse.json(
+          { error: 'Invalid date. Please check the day is valid for the month.' },
+          { status: 400 }
+        );
+      }
+
+      updateData.date = parsedDate;
     }
 
     if (hours !== undefined) {

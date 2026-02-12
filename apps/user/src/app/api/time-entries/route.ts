@@ -1,15 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@repo/database';
+import { prisma, Prisma } from '@repo/database';
 import { createClient } from '@repo/auth/server';
-
-// Valid time entry categories
-const VALID_CATEGORIES = [
-  'Writing New Tasks',
-  'Updating Tasks Based on Feedback',
-  'Time Spent on Instructions or Slack',
-  'Platform Downtime',
-  'Time Spent on QA',
-];
+import { VALID_CATEGORIES } from '@/lib/time-tracking-constants';
 
 // GET /api/time-entries - List time entries for current user
 export async function GET(request: NextRequest) {
@@ -28,7 +20,7 @@ export async function GET(request: NextRequest) {
     const category = searchParams.get('category');
 
     // Build where clause
-    const where: any = {
+    const where: Prisma.TimeEntryWhereInput = {
       userId: user.id,
     };
 
@@ -139,11 +131,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate date format
-    const parsedDate = new Date(date);
-    if (isNaN(parsedDate.getTime())) {
+    // Validate YYYY-MM-DD format
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       return NextResponse.json(
-        { error: 'Invalid date format' },
+        { error: 'Invalid date format. Use YYYY-MM-DD' },
         { status: 400 }
       );
     }
@@ -151,6 +142,14 @@ export async function POST(request: NextRequest) {
     // Parse date without timezone ambiguity
     const [year, month, day] = date.split('-').map(Number);
     const dateObj = new Date(year, month - 1, day);
+
+    // Verify the date is valid
+    if (isNaN(dateObj.getTime())) {
+      return NextResponse.json(
+        { error: 'Invalid date. Please check the day is valid for the month.' },
+        { status: 400 }
+      );
+    }
 
     const entry = await prisma.timeEntry.create({
       data: {
