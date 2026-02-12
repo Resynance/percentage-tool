@@ -60,9 +60,9 @@ function CompareContent() {
                     <p style={{ opacity: 0.6, marginBottom: '32px' }}>
                         The Compare page requires a record ID to analyze. Please select a record from the Records page.
                     </p>
-                    <Link href="/records" className="btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                    <Link href="/alignment-scoring" className="btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
                         <ArrowLeft size={18} />
-                        Go to Records
+                        Back to Records
                     </Link>
                 </div>
             </div>
@@ -78,8 +78,8 @@ function CompareContent() {
                     </h1>
                     <p style={{ color: 'rgba(255,255,255,0.6)' }}>Comparison against project guidelines</p>
                 </div>
-                <Link href="/" className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <LayoutDashboard size={18} /> Dashboard
+                <Link href="/alignment-scoring" className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <ArrowLeft size={18} /> Back to Records
                 </Link>
             </header>
 
@@ -177,8 +177,8 @@ function CompareContent() {
                     </div>
 
                     <div style={{ display: 'flex', justifyContent: 'center' }}>
-                        <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '8px', opacity: 0.6, transition: 'opacity 0.2s' }} className="hover-opacity">
-                            <ArrowLeft size={16} /> Return to Dashboard
+                        <Link href="/alignment-scoring" style={{ display: 'flex', alignItems: 'center', gap: '8px', opacity: 0.6, transition: 'opacity 0.2s' }} className="hover-opacity">
+                            <ArrowLeft size={16} /> Back to Records
                         </Link>
                     </div>
                 </div>

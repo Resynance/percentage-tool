@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-    LayoutDashboard,
     Database,
     FileText,
     Sparkles,
@@ -49,12 +48,6 @@ export default function Sidebar({ userRole }: { userRole?: string }) {
     const [collapsed, setCollapsed] = useState(false);
 
     const sections: NavSection[] = [
-        {
-            title: 'Overview',
-            items: [
-                { label: 'Dashboard', href: '/', icon: LayoutDashboard },
-            ]
-        },
         {
             title: 'Fleet Management',
             role: ['FLEET', 'ADMIN'],

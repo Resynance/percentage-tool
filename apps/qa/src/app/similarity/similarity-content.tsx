@@ -38,6 +38,7 @@ export default function PromptSimilarityPage() {
 
   const [allPrompts, setAllPrompts] = useState<Prompt[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [userSearch, setUserSearch] = useState<string>("");
   const [selectedUserId, setSelectedUserId] = useState<string>("");
   const [selectedPrompt, setSelectedPrompt] = useState<Prompt | null>(null);
   const [similarPrompts, setSimilarPrompts] = useState<SimilarPrompt[]>([]);
@@ -73,6 +74,14 @@ export default function PromptSimilarityPage() {
 
     fetchPrompts();
   }, [selectedProjectId]);
+
+  const filteredUsers = useMemo(() => {
+    if (!userSearch) return users;
+    const searchLower = userSearch.toLowerCase();
+    return users.filter(user =>
+      user.name.toLowerCase().includes(searchLower)
+    );
+  }, [users, userSearch]);
 
   const filteredPrompts = useMemo(() => {
     if (selectedUserId) {
@@ -356,6 +365,23 @@ export default function PromptSimilarityPage() {
             >
               Filter by User:
             </label>
+            <input
+              type="text"
+              placeholder="Search users..."
+              value={userSearch}
+              onChange={(e) => setUserSearch(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "10px 12px",
+                borderRadius: "8px",
+                border: "1px solid var(--border)",
+                fontSize: "14px",
+                background: "rgba(0, 0, 0, 0.3)",
+                color: "rgba(255,255,255,0.95)",
+                marginBottom: "8px",
+                fontWeight: 500,
+              }}
+            />
             <select
               value={selectedUserId}
               onChange={(e) => {
@@ -379,9 +405,9 @@ export default function PromptSimilarityPage() {
                 value=""
                 style={{ background: "#1a1a1a", color: "white" }}
               >
-                All Users ({users.length})
+                All Users ({filteredUsers.length}{userSearch ? ` of ${users.length}` : ''})
               </option>
-              {users.map((user) => (
+              {filteredUsers.map((user) => (
                 <option
                   key={user.id}
                   value={user.id}

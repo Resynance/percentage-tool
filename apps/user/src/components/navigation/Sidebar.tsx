@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-    LayoutDashboard,
     Link as LinkIcon,
     ChevronLeft,
     ChevronRight,
@@ -32,16 +31,15 @@ export default function Sidebar({ userRole }: { userRole?: string }) {
 
     const sections: NavSection[] = [
         {
-            title: 'Overview',
-            items: [
-                { label: 'Dashboard', href: '/', icon: LayoutDashboard },
-                { label: 'Links', href: '/links', icon: LinkIcon },
-            ]
-        },
-        {
             title: 'Time Tracking',
             items: [
                 { label: 'Time Tracking', href: '/time-tracking', icon: Clock },
+            ]
+        },
+        {
+            title: 'Resources',
+            items: [
+                { label: 'Links', href: '/links', icon: LinkIcon },
             ]
         }
     ];

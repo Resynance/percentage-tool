@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { ChevronLeft, ChevronRight, LayoutDashboard, AlertCircle, Inbox } from 'lucide-react';
+import { ChevronLeft, ChevronRight, LayoutDashboard, AlertCircle, Inbox, FileCheck, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { useProjects } from '@/hooks/useProjects';
 
@@ -12,18 +12,26 @@ interface Record {
     type: string;
     category: string;
     metadata: any;
+    alignmentAnalysis?: string | null;
     createdAt: string;
 }
 
-export default function ListView() {
+const extractAlignmentScore = (analysis: string | null | undefined): string | null => {
+    if (!analysis) return null;
+    const regex = /(?:Alignment Score \(0-100\)|Score)[:\s\n]*(\d+)/i;
+    const match = analysis.match(regex);
+    return match ? match[1] : null;
+};
+
+export default function AlignmentScoring() {
     return (
         <Suspense fallback={<div>Loading...</div>}>
-            <ListContent />
+            <AlignmentContent />
         </Suspense>
     );
 }
 
-function ListContent() {
+function AlignmentContent() {
     const searchParams = useSearchParams();
     const {
         projects,
@@ -265,6 +273,52 @@ function ListContent() {
                                                 {record.metadata.environment_name || record.metadata.env_key}
                                             </div>
                                         )}
+
+                                        {record.alignmentAnalysis ? (
+                                            <Link
+                                                href={`/alignment-scoring/compare?id=${record.id}`}
+                                                style={{
+                                                    fontSize: '0.7rem',
+                                                    background: 'rgba(0, 112, 243, 0.1)',
+                                                    color: 'var(--accent)',
+                                                    fontWeight: 700,
+                                                    padding: '4px 10px',
+                                                    borderRadius: '20px',
+                                                    border: '1px solid rgba(0, 112, 243, 0.2)',
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '6px',
+                                                    textDecoration: 'none',
+                                                    transition: 'all 0.2s'
+                                                }}
+                                                className="hover-bright"
+                                            >
+                                                <Sparkles size={10} />
+                                                Alignment: {extractAlignmentScore(record.alignmentAnalysis)}%
+                                            </Link>
+                                        ) : (
+                                            <Link
+                                                href={`/alignment-scoring/compare?id=${record.id}`}
+                                                style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '6px',
+                                                    fontSize: '0.7rem',
+                                                    color: 'var(--accent)',
+                                                    fontWeight: 600,
+                                                    padding: '4px 10px',
+                                                    borderRadius: '20px',
+                                                    background: 'rgba(0, 112, 243, 0.05)',
+                                                    border: '1px solid rgba(0, 112, 243, 0.1)',
+                                                    transition: 'all 0.2s',
+                                                    textDecoration: 'none'
+                                                }}
+                                                className="hover-bright"
+                                            >
+                                                <FileCheck size={12} /> Generate Alignment Score
+                                            </Link>
+                                        )}
+
                                         <span style={{ fontSize: '0.75rem', opacity: 0.4, marginLeft: '8px' }}>{new Date(record.createdAt).toLocaleDateString()}</span>
                                     </div>
                                 </div>

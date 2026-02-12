@@ -43,6 +43,8 @@ model Project {
 model Profile {
   id                String    @id @db.Uuid
   email             String    @unique
+  firstName         String?   @map("firstName")
+  lastName          String?   @map("lastName")
   role              UserRole  @default(USER)
   mustResetPassword Boolean   @default(false) @map("mustResetPassword")
   createdAt         DateTime  @default(now()) @map("createdAt") @db.Timestamptz(6)

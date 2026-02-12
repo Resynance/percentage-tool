@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-    LayoutDashboard,
     Database,
     FileText,
     Sparkles,
@@ -24,8 +23,7 @@ import {
     Target,
     BarChart3,
     TrendingUp,
-    Bug,
-    GitCompare
+    Bug
 } from 'lucide-react';
 import { useState } from 'react';
 import { AppSwitcher } from '@repo/ui/components';
@@ -49,16 +47,9 @@ export default function Sidebar({ userRole }: { userRole?: string }) {
 
     const sections: NavSection[] = [
         {
-            title: 'Overview',
-            items: [
-                { label: 'Dashboard', href: '/', icon: LayoutDashboard },
-            ]
-        },
-        {
             title: 'Analysis',
             role: ['QA', 'CORE', 'FLEET', 'ADMIN'],
             items: [
-                { label: 'Compare', href: '/compare', icon: GitCompare },
                 { label: 'Records', href: '/records', icon: FileText },
                 { label: 'Similarity Search', href: '/similarity', icon: Sparkles },
                 { label: 'Top Prompts', href: '/top-prompts', icon: ShieldAlert },

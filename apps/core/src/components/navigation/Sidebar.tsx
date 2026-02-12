@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-    LayoutDashboard,
     Database,
     FileText,
     Sparkles,
@@ -48,15 +47,10 @@ export default function Sidebar({ userRole }: { userRole?: string }) {
 
     const sections: NavSection[] = [
         {
-            title: 'Overview',
-            items: [
-                { label: 'Dashboard', href: '/', icon: LayoutDashboard },
-            ]
-        },
-        {
             title: 'Scoring',
             role: ['CORE', 'FLEET', 'ADMIN'],
             items: [
+                { label: 'Alignment Scoring', href: '/alignment-scoring', icon: Sparkles },
                 { label: 'Candidate Review', href: '/candidate-review', icon: MessageSquare },
                 { label: 'Likert Scoring', href: '/likert-scoring', icon: Star },
                 { label: 'My Assignments', href: '/my-assignments', icon: ClipboardList },
