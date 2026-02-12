@@ -43,7 +43,7 @@ model Project {
 model Profile {
   id                String    @id @db.Uuid
   email             String    @unique
-  role              UserRole  @default(PENDING)
+  role              UserRole  @default(USER)
   mustResetPassword Boolean   @default(false) @map("mustResetPassword")
   createdAt         DateTime  @default(now()) @map("createdAt") @db.Timestamptz(6)
   updatedAt         DateTime  @default(now()) @updatedAt @map("updatedAt") @db.Timestamptz(6)
@@ -724,7 +724,6 @@ model TimeEntry {
 }
 
 enum UserRole {
-  PENDING
   USER
   QA
   CORE
