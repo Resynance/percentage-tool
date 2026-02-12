@@ -16,7 +16,7 @@ The `test.yml` workflow runs the complete test suite on every push and pull requ
 1. **Triggers** on push to main, fix/*, feat/* branches and all pull requests
 2. **Sets up environment**:
    - Node.js 20
-   - pnpm with caching for faster builds
+   - pnpm 9 with caching for faster builds
    - Supabase CLI and local instance
    - Playwright browsers
 3. **Runs tests** in CI environment with local Supabase
