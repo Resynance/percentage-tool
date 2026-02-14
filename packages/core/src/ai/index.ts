@@ -303,6 +303,9 @@ export async function generateCompletionWithUsage(prompt: string, systemPrompt?:
     };
 
     // Send email notification to configured admins (non-blocking, fire-and-forget)
+    // WARNING: This fires on EVERY AI call. During bulk operations (alignment analysis,
+    // ingestion with embeddings), this can generate hundreds of emails. Consider disabling
+    // AI_CALL_USED notifications in admin settings unless specifically needed for monitoring.
     notifyAICallUsed({
       operation: 'LLM Completion',
       model: config.llmModel,

@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@repo/database';
 import { createClient } from '@repo/auth/server';
 
+// Valid notification types - must match the types used throughout the application
+const VALID_NOTIFICATION_TYPES = [
+  'BUG_REPORT_CREATED',
+  'USER_CREATED',
+  'AI_CALL_USED'
+] as const;
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
@@ -66,6 +73,27 @@ export async function POST(request: NextRequest) {
         { error: 'Invalid request body' },
         { status: 400 }
       );
+    }
+
+    // Validate notification types
+    const invalidTypes = Object.keys(config).filter(
+      type => !VALID_NOTIFICATION_TYPES.includes(type as any)
+    );
+    if (invalidTypes.length > 0) {
+      return NextResponse.json(
+        { error: `Invalid notification types: ${invalidTypes.join(', ')}` },
+        { status: 400 }
+      );
+    }
+
+    // Validate config values are arrays of strings
+    for (const [key, value] of Object.entries(config)) {
+      if (!Array.isArray(value) || !value.every(v => typeof v === 'string')) {
+        return NextResponse.json(
+          { error: `Invalid config value for ${key}: expected array of user IDs` },
+          { status: 400 }
+        );
+      }
     }
 
     // Get all admin users

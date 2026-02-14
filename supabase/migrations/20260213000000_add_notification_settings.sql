@@ -39,6 +39,23 @@ CREATE POLICY "Users can delete their own notification settings"
   FOR DELETE
   USING (auth.uid() = user_id);
 
+-- Admins can manage all notification settings (for admin cross-user configuration)
+CREATE POLICY "Admins can manage all notification settings"
+  ON public.notification_settings
+  FOR ALL
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE id = auth.uid() AND role = 'ADMIN'
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE id = auth.uid() AND role = 'ADMIN'
+    )
+  );
+
 -- Create function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_notification_settings_updated_at()
 RETURNS TRIGGER AS $$

@@ -1,6 +1,18 @@
 import { Resend } from 'resend';
 import { prisma } from '@repo/database';
 
+/**
+ * Escapes HTML special characters to prevent XSS in email templates
+ */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 // Lazy initialize Resend to avoid build-time errors when env var is not available
 let resend: Resend | null = null;
 function getResendClient(): Resend {
@@ -13,7 +25,9 @@ function getResendClient(): Resend {
   return resend;
 }
 
-const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'notifications@yourdomain.com';
+function getFromEmail(): string {
+  return process.env.RESEND_FROM_EMAIL || 'notifications@yourdomain.com';
+}
 
 interface NotificationRecipient {
   email: string;
@@ -69,7 +83,7 @@ async function sendEmail(
   try {
     const client = getResendClient();
     const { data, error } = await client.emails.send({
-      from: FROM_EMAIL,
+      from: getFromEmail(),
       to,
       subject,
       html
@@ -104,19 +118,19 @@ export async function notifyBugReportCreated(bugReport: {
     return { success: false, error: 'No recipients configured' };
   }
 
-  const subject = `New Bug Report #${bugReport.number}: ${bugReport.title}`;
+  const subject = `New Bug Report #${bugReport.number}: ${escapeHtml(bugReport.title)}`;
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <h2 style="color: #333;">New Bug Report Submitted</h2>
 
       <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
         <p style="margin: 0 0 10px 0;"><strong>Report #${bugReport.number}</strong></p>
-        <h3 style="margin: 0 0 15px 0; color: #555;">${bugReport.title}</h3>
-        <p style="color: #666; line-height: 1.6;">${bugReport.description}</p>
+        <h3 style="margin: 0 0 15px 0; color: #555;">${escapeHtml(bugReport.title)}</h3>
+        <p style="color: #666; line-height: 1.6;">${escapeHtml(bugReport.description)}</p>
       </div>
 
       <p style="color: #666;">
-        <strong>Reported by:</strong> ${bugReport.createdByName || bugReport.createdByEmail}
+        <strong>Reported by:</strong> ${escapeHtml(bugReport.createdByName || bugReport.createdByEmail)}
       </p>
 
       <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd;">
@@ -153,7 +167,7 @@ export async function notifyUserCreated(user: {
     ? `${user.firstName} ${user.lastName}`
     : user.firstName || user.lastName || user.email;
 
-  const subject = `New User Created: ${userName}`;
+  const subject = `New User Created: ${escapeHtml(userName)}`;
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <h2 style="color: #333;">New User Account Created</h2>
@@ -161,9 +175,9 @@ export async function notifyUserCreated(user: {
       <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
         <p style="margin: 0 0 10px 0;"><strong>User Details</strong></p>
         <p style="color: #666; line-height: 1.8; margin: 0;">
-          <strong>Name:</strong> ${userName}<br>
-          <strong>Email:</strong> ${user.email}<br>
-          <strong>Role:</strong> ${user.role}
+          <strong>Name:</strong> ${escapeHtml(userName)}<br>
+          <strong>Email:</strong> ${escapeHtml(user.email)}<br>
+          <strong>Role:</strong> ${escapeHtml(user.role)}
         </p>
       </div>
 
@@ -202,7 +216,7 @@ export async function notifyAICallUsed(aiCall: {
     return { success: false, error: 'No recipients configured' };
   }
 
-  const subject = `AI Call: ${aiCall.operation}`;
+  const subject = `AI Call: ${escapeHtml(aiCall.operation)}`;
   const costInfo = aiCall.cost ? `$${aiCall.cost.toFixed(4)}` : 'Free (local)';
 
   const html = `
@@ -212,10 +226,10 @@ export async function notifyAICallUsed(aiCall: {
       <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
         <p style="margin: 0 0 10px 0;"><strong>Operation Details</strong></p>
         <p style="color: #666; line-height: 1.8; margin: 0;">
-          <strong>Operation:</strong> ${aiCall.operation}<br>
-          <strong>Model:</strong> ${aiCall.model}<br>
-          <strong>Cost:</strong> ${costInfo}
-          ${aiCall.userEmail ? `<br><strong>User:</strong> ${aiCall.userEmail}` : ''}
+          <strong>Operation:</strong> ${escapeHtml(aiCall.operation)}<br>
+          <strong>Model:</strong> ${escapeHtml(aiCall.model)}<br>
+          <strong>Cost:</strong> ${escapeHtml(costInfo)}
+          ${aiCall.userEmail ? `<br><strong>User:</strong> ${escapeHtml(aiCall.userEmail)}` : ''}
         </p>
       </div>
 
