@@ -3,6 +3,7 @@ import { createClient, createAdminClient } from '@repo/auth/server'
 import { prisma } from '@repo/database'
 import { NextResponse } from 'next/server'
 import { logAudit, checkAuditResult } from '@repo/core/audit'
+import { notifyUserCreated } from '@repo/core'
 
 export async function GET() {
     const supabase = await createClient()
@@ -173,6 +174,17 @@ export async function POST(req: Request) {
             entityId: authData.user.id,
             userId: adminUser.id
         })
+
+        // Send email notification to configured admins (non-blocking)
+        notifyUserCreated({
+            email,
+            firstName: firstName || null,
+            lastName: lastName || null,
+            role
+        }).catch(error => {
+            console.error('Failed to send user creation notification:', error);
+            // Don't fail the request if notification fails
+        });
 
         return NextResponse.json(updatedProfile)
     } catch (error: any) {

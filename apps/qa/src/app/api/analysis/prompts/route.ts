@@ -35,6 +35,7 @@ export async function GET(req: NextRequest) {
                 id: true,
                 content: true,
                 category: true,
+                metadata: true,
                 createdById: true,
                 createdByEmail: true,
                 createdByName: true,
