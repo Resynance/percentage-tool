@@ -106,4 +106,3 @@ CREATE TRIGGER worker_flags_updated_at
 
 -- Grant permissions
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.worker_flags TO authenticated;
-GRANT SELECT ON public.worker_flags TO anon;

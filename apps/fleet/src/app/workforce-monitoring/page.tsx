@@ -478,7 +478,13 @@ export default function WorkforceMonitoringPage() {
                                 value={flag.status}
                                 onChange={(e) => {
                                   e.stopPropagation()
-                                  updateStatus(flag.id, e.target.value)
+                                  const newStatus = e.target.value
+                                  if (newStatus === 'RESOLVED') {
+                                    setSelectedFlag(flag)
+                                    setShowResolveModal(true)
+                                  } else {
+                                    updateStatus(flag.id, newStatus)
+                                  }
                                 }}
                                 onClick={(e) => e.stopPropagation()}
                               >
