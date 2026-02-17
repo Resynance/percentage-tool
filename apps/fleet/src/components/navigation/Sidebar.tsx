@@ -26,7 +26,8 @@ import {
     TrendingUp,
     Bug,
     Clock,
-    ScanSearch
+    ScanSearch,
+    AlertTriangle
 } from 'lucide-react';
 import { useState } from 'react';
 import { AppSwitcher } from '@repo/ui/components';
@@ -75,6 +76,14 @@ export default function Sidebar({ userRole }: { userRole?: string }) {
             items: [
                 { label: 'Assignments', href: '/assignments', icon: ClipboardList },
                 { label: 'Rater Groups', href: '/rater-groups', icon: Users },
+            ]
+        },
+        {
+            title: 'Workforce Monitoring',
+            role: ['FLEET', 'ADMIN'],
+            items: [
+                { label: 'Worker Flags', href: '/workforce-monitoring', icon: AlertTriangle },
+                { label: 'Workforce Analytics', href: '/workforce-analytics', icon: BarChart3 },
             ]
         }
     ];

@@ -270,6 +270,40 @@ model BugReport {
   @@schema("public")
 }
 
+/// *
+///  * WORKER FLAG: Global worker flagging system for tracking performance issues.
+///  * Captures flag type, status, reason, and resolution workflow.
+model WorkerFlag {
+  id              String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workerId        String?    @map("worker_id") @db.Uuid
+  workerEmail     String     @map("worker_email")
+  flagType        FlagType   @map("flag_type")
+  status          FlagStatus @default(ACTIVE)
+  reason          String     @db.Text
+  detailedNotes   String?    @map("detailed_notes") @db.Text
+  flaggedById     String     @map("flagged_by_id") @db.Uuid
+  flaggedByEmail  String     @map("flagged_by_email")
+  resolutionNotes String?    @map("resolution_notes") @db.Text
+  resolvedById    String?    @map("resolved_by_id") @db.Uuid
+  resolvedByEmail String?    @map("resolved_by_email")
+  resolvedAt      DateTime?  @map("resolved_at") @db.Timestamptz(6)
+  createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations with users table
+  worker     users?  @relation("worker_flags_worker", fields: [workerId], references: [id], onDelete: Cascade)
+  flaggedBy  users   @relation("worker_flags_flagged_by", fields: [flaggedById], references: [id])
+  resolvedBy users?  @relation("worker_flags_resolved_by", fields: [resolvedById], references: [id])
+
+  @@index([workerId])
+  @@index([flaggedById])
+  @@index([status])
+  @@index([flagType])
+  @@index([createdAt(sort: Desc)])
+  @@map("worker_flags")
+  @@schema("public")
+}
+
 /**
  * LIKERT SCORE: User or LLM ratings for prompts on Realism and Quality scales (1-7).
  * Each user can rate a prompt only once.
@@ -697,6 +731,9 @@ model users {
   bug_reports_bug_reports_user_idTousers     BugReport[]            @relation("bug_reports_user_idTousers")
   profiles                                   Profile?
   time_entries                               TimeEntry[]
+  worker_flags_worker                        WorkerFlag[]           @relation("worker_flags_worker")
+  worker_flags_flagged_by                    WorkerFlag[]           @relation("worker_flags_flagged_by")
+  worker_flags_resolved_by                   WorkerFlag[]           @relation("worker_flags_resolved_by")
 
   @@index([instance_id])
   @@index([is_anonymous])
@@ -767,6 +804,26 @@ enum RecordCategory {
   TOP_10
   BOTTOM_10
   STANDARD
+
+  @@schema("public")
+}
+
+enum FlagType {
+  QUALITY_ISSUE
+  POLICY_VIOLATION
+  ATTENDANCE
+  COMMUNICATION
+  PERFORMANCE
+  OTHER
+
+  @@schema("public")
+}
+
+enum FlagStatus {
+  ACTIVE
+  UNDER_REVIEW
+  RESOLVED
+  APPEALED
 
   @@schema("public")
 }
