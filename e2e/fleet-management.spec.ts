@@ -189,6 +189,50 @@ test.describe('Fleet Management - Sidebar Navigation', () => {
     }
   });
 
+  test('FLEET role should see Workforce Monitoring section in sidebar', async ({ page }) => {
+    const fleetUser = await createTestUser('fleet-workforce@test.com', 'FLEET');
+
+    try {
+      // Login
+      await page.goto('/auth/login');
+      await page.fill('input[type="email"]', 'fleet-workforce@test.com');
+      await page.fill('input[type="password"]', 'testpassword123');
+      await page.click('button[type="submit"]');
+      await page.waitForURL('/');
+
+      // Should see Workforce Monitoring section with Worker Flags, Workforce Analytics, and Activity Over Time
+      await expect(page.locator('text=Workforce Monitoring').first()).toBeVisible();
+      await expect(page.locator('a[href="/workforce-monitoring"]')).toBeVisible();
+      await expect(page.locator('a[href="/workforce-analytics"]')).toBeVisible();
+      await expect(page.locator('a[href="/activity-over-time"]')).toBeVisible();
+    } finally {
+      await cleanupTestUser(fleetUser.id);
+    }
+  });
+
+  test('FLEET role should NOT see Operations section in sidebar', async ({ page }) => {
+    const fleetUser = await createTestUser('fleet-no-ops@test.com', 'FLEET');
+
+    try {
+      // Login
+      await page.goto('/auth/login');
+      await page.fill('input[type="email"]', 'fleet-no-ops@test.com');
+      await page.fill('input[type="password"]', 'testpassword123');
+      await page.click('button[type="submit"]');
+      await page.waitForURL('/');
+
+      // Should NOT see Operations section (removed)
+      const operationsSection = page.locator('text=Operations').first();
+      await expect(operationsSection).not.toBeVisible();
+
+      // Should NOT see Time Analytics link (deleted)
+      const timeAnalyticsLink = page.locator('a[href="/time-analytics"]');
+      await expect(timeAnalyticsLink).not.toBeVisible();
+    } finally {
+      await cleanupTestUser(fleetUser.id);
+    }
+  });
+
   test('QA role should NOT see Management section in sidebar', async ({ page }) => {
     const qaUser = await createTestUser('qa-nav@test.com', 'QA');
 
@@ -203,6 +247,25 @@ test.describe('Fleet Management - Sidebar Navigation', () => {
       // Should NOT see Management section
       const managementSection = page.locator('text=Management').first();
       await expect(managementSection).not.toBeVisible();
+    } finally {
+      await cleanupTestUser(qaUser.id);
+    }
+  });
+
+  test('QA role should NOT see Workforce Monitoring section in sidebar', async ({ page }) => {
+    const qaUser = await createTestUser('qa-no-workforce@test.com', 'QA');
+
+    try {
+      // Login
+      await page.goto('/auth/login');
+      await page.fill('input[type="email"]', 'qa-no-workforce@test.com');
+      await page.fill('input[type="password"]', 'testpassword123');
+      await page.click('button[type="submit"]');
+      await page.waitForURL('/');
+
+      // Should NOT see Workforce Monitoring section
+      const workforceSection = page.locator('text=Workforce Monitoring').first();
+      await expect(workforceSection).not.toBeVisible();
     } finally {
       await cleanupTestUser(qaUser.id);
     }

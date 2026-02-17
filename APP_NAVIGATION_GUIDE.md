@@ -28,15 +28,18 @@
 ### 🚀 Fleet App (Port 3004)
 **For**: FLEET role and above
 - **Fleet Management** ⭐
+  - Analytics Dashboard
+  - Bonus Windows (manage)
+  - Full Similarity Check
   - Data Ingestion
   - Project Management
-  - Analytics Dashboard
-- **Operations**
-  - Bonus Windows (manage)
+- **Management**
+  - Assignments
+  - Rater Groups
+- **Workforce Monitoring** ⭐
   - Activity Over Time
-  - Time Analytics
-  - Waiting Approval Queue
-  - Bug Reports
+  - Worker Flags
+  - Workforce Analytics
 
 ### 🔧 Admin App (Port 3005)
 **For**: ADMIN role only

@@ -23,10 +23,9 @@ import {
     ClipboardList,
     Target,
     BarChart3,
-    TrendingUp,
     Bug,
-    Clock,
-    ScanSearch
+    ScanSearch,
+    AlertTriangle
 } from 'lucide-react';
 import { useState } from 'react';
 import { AppSwitcher } from '@repo/ui/components';
@@ -55,18 +54,10 @@ export default function Sidebar({ userRole }: { userRole?: string }) {
             role: ['FLEET', 'ADMIN'],
             items: [
                 { label: 'Analytics', href: '/analytics', icon: BarChart3 },
+                { label: 'Bonus Windows', href: '/bonus-windows', icon: Target },
+                { label: 'Full Similarity Check', href: '/full-similarity-check', icon: ScanSearch },
                 { label: 'Ingest Data', href: '/ingest', icon: Database },
                 { label: 'Project Management', href: '/manage', icon: Settings },
-                { label: 'Full Similarity Check', href: '/full-similarity-check', icon: ScanSearch },
-            ]
-        },
-        {
-            title: 'Operations',
-            role: ['FLEET', 'ADMIN'],
-            items: [
-                { label: 'Activity Over Time', href: '/activity-over-time', icon: BarChart3 },
-                { label: 'Bonus Windows', href: '/bonus-windows', icon: Target },
-                { label: 'Time Analytics', href: '/time-analytics', icon: TrendingUp },
             ]
         },
         {
@@ -75,6 +66,15 @@ export default function Sidebar({ userRole }: { userRole?: string }) {
             items: [
                 { label: 'Assignments', href: '/assignments', icon: ClipboardList },
                 { label: 'Rater Groups', href: '/rater-groups', icon: Users },
+            ]
+        },
+        {
+            title: 'Workforce Monitoring',
+            role: ['FLEET', 'ADMIN'],
+            items: [
+                { label: 'Activity Over Time', href: '/activity-over-time', icon: Activity },
+                { label: 'Worker Flags', href: '/workforce-monitoring', icon: AlertTriangle },
+                { label: 'Workforce Analytics', href: '/workforce-analytics', icon: BarChart3 },
             ]
         }
     ];

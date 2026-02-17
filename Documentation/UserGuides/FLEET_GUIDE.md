@@ -21,8 +21,8 @@ As a FLEET team member, you have access to **four applications**:
 3. [Project Management](#project-management)
 4. [Analytics Dashboard](#analytics-dashboard)
 5. [Bonus Windows Management](#bonus-windows-management)
-6. [Activity Over Time](#activity-over-time)
-7. [Time Analytics](#time-analytics)
+6. [Workforce Monitoring](#workforce-monitoring)
+7. [Activity Over Time](#activity-over-time)
 8. [Bug Reports Management](#bug-reports-management)
 
 ---
@@ -513,9 +513,11 @@ Visualize data creation trends with interactive line charts showing daily activi
 
 Interactive visualization showing how many tasks and feedback records are created each day, helping identify trends, patterns, and anomalies.
 
+**Note**: This feature has been moved to the Workforce Monitoring category for better organization.
+
 ### Accessing Activity Over Time
 
-Navigate to Fleet App → **Activity Over Time**
+Navigate to Fleet App → **Workforce Monitoring** → **Activity Over Time**
 
 ### Using the Visualization
 
@@ -571,26 +573,78 @@ Navigate to Fleet App → **Activity Over Time**
 
 ---
 
-## Time Analytics
+## Workforce Monitoring
 
-Advanced time tracking analytics for team performance and resource planning (Under Construction).
+Track workforce performance, flag issues, and analyze worker metrics across all projects.
 
-### What is Time Analytics?
+### What is Workforce Monitoring?
 
-Deep dive into time tracking data with advanced metrics and visualizations.
+Comprehensive system for tracking worker performance, identifying issues, and maintaining workforce quality standards.
 
-**Planned Features**:
-- Time spent per project
-- Utilization rates per team member
-- Billable vs. non-billable time
-- Efficiency metrics
-- Forecasting and capacity planning
+**Features**:
+- **Worker Flags**: Flag workers for quality issues, policy violations, attendance, communication, or performance concerns
+- **Workforce Analytics**: View aggregate metrics for all workers with drill-down details
+- **Activity Tracking**: Monitor worker activity by environment and over time
+- **Resolution Workflow**: Track flag status from ACTIVE → UNDER_REVIEW → APPEALED → RESOLVED
 
-### Current Status
+### Accessing Workforce Monitoring
 
-⚠️ **Under Construction**: This feature is being developed.
+Navigate to Fleet App → **Workforce Monitoring** section
 
-Check back for updates or contact your administrator for timeline.
+### Worker Flags
+
+**Creating Flags**:
+1. Click "Flag Worker"
+2. Select worker from dropdown (populated from data records)
+3. Choose flag type:
+   - Quality Issue
+   - Policy Violation
+   - Attendance
+   - Communication
+   - Performance
+   - Other
+4. Enter reason (required)
+5. Add detailed notes (optional)
+6. Submit flag
+
+**Managing Flags**:
+- View all flags with filtering by status and type
+- Update status via dropdown (ACTIVE, UNDER_REVIEW, APPEALED)
+- Resolve flags with resolution notes
+- Expand rows to view full details and history
+- Track who flagged and who resolved each issue
+
+**Resolution Process**:
+1. Click "Resolve Flag" button
+2. Enter resolution notes explaining how issue was addressed
+3. Submit resolution
+4. Flag status changes to RESOLVED with timestamp and resolver info
+
+### Workforce Analytics
+
+**Overview Metrics**:
+- Total workers
+- Total records (tasks + feedback)
+- Total flags (all time)
+- Active flags (current issues)
+- Average records per worker
+
+**Worker Table**:
+- Sortable by total records, active flags, or last activity
+- Search by worker name or email
+- Click row to view detailed drill-down
+
+**Worker Detail Panel**:
+- Summary: Total records, task count, feedback count
+- By Environment: Breakdown of records per environment
+- Recent Activity: Last 30 days of activity
+- Flags: History of all flags for this worker
+
+### Activity Over Time
+
+Interactive visualization showing daily activity patterns (moved from Operations category).
+
+**See**: [Activity Over Time section](#activity-over-time) below
 
 ---
 
