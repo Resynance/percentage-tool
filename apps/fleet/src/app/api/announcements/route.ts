@@ -30,9 +30,9 @@ export async function GET(request: NextRequest) {
     const canSeeQaAndAbove = ['QA', 'CORE', 'FLEET', 'MANAGER', 'ADMIN'].includes(userRole)
 
     // Build visibility filter based on user role
-    const visibilityFilter = canSeeQaAndAbove
+    const visibilityFilter: Prisma.AnnouncementWhereInput = canSeeQaAndAbove
       ? {} // QA and above can see all visibility levels
-      : { visibility: 'ALL_USERS' } // Regular users only see ALL_USERS
+      : { visibility: 'ALL_USERS' as const } // Regular users only see ALL_USERS
 
     // Fetch announcements with visibility filtering
     const announcements = await prisma.announcement.findMany({
