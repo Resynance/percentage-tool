@@ -33,7 +33,7 @@ test.describe('Announcements - FLEET Management', () => {
 
   test('FLEET user should be able to create announcement', async ({ page }) => {
     // Create and login as FLEET user
-    const fleet = await createTestUser('fleet@example.com', 'FLEET');
+    await createTestUser('fleet@example.com', 'FLEET');
     await loginAsUser(page, 'fleet@example.com', 'testpassword');
 
     // Navigate to Fleet app announcements page
@@ -75,7 +75,7 @@ test.describe('Announcements - FLEET Management', () => {
   });
 
   test('FLEET user should be able to edit announcement', async ({ page }) => {
-    const fleet = await createTestUser('fleet@example.com', 'FLEET');
+    await createTestUser('fleet@example.com', 'FLEET');
     await loginAsUser(page, 'fleet@example.com', 'testpassword');
 
     // Create announcement first
@@ -107,7 +107,7 @@ test.describe('Announcements - FLEET Management', () => {
   });
 
   test('FLEET user should be able to delete announcement', async ({ page }) => {
-    const fleet = await createTestUser('fleet@example.com', 'FLEET');
+    await createTestUser('fleet@example.com', 'FLEET');
     await loginAsUser(page, 'fleet@example.com', 'testpassword');
 
     // Create announcement first
@@ -133,7 +133,7 @@ test.describe('Announcements - FLEET Management', () => {
   });
 
   test('FLEET user should be able to create QA_AND_ABOVE announcement', async ({ page }) => {
-    const fleet = await createTestUser('fleet@example.com', 'FLEET');
+    await createTestUser('fleet@example.com', 'FLEET');
     await loginAsUser(page, 'fleet@example.com', 'testpassword');
 
     await page.goto('http://localhost:3004/announcements');
@@ -156,7 +156,7 @@ test.describe('Announcements - FLEET Management', () => {
   });
 
   test('FLEET user should be able to create draft announcement', async ({ page }) => {
-    const fleet = await createTestUser('fleet@example.com', 'FLEET');
+    await createTestUser('fleet@example.com', 'FLEET');
     await loginAsUser(page, 'fleet@example.com', 'testpassword');
 
     await page.goto('http://localhost:3004/announcements');
@@ -179,7 +179,7 @@ test.describe('Announcements - FLEET Management', () => {
   });
 
   test('Regular USER should not be able to access announcements management', async ({ page }) => {
-    const user = await createTestUser('user@example.com', 'USER');
+    await createTestUser('user@example.com', 'USER');
     await loginAsUser(page, 'user@example.com', 'testpassword');
 
     // Try to navigate to announcements management page
@@ -208,7 +208,7 @@ test.describe('Announcements - Banner and Read Tracking', () => {
 
   test('Published announcement should appear in banner for regular user', async ({ page, context }) => {
     // Create FLEET user and announcement
-    const fleet = await createTestUser('fleet@example.com', 'FLEET');
+    await createTestUser('fleet@example.com', 'FLEET');
     const fleetPage = await context.newPage();
     await loginAsUser(fleetPage, 'fleet@example.com', 'testpassword');
     await fleetPage.goto('http://localhost:3004/announcements');
@@ -220,7 +220,7 @@ test.describe('Announcements - Banner and Read Tracking', () => {
     await fleetPage.close();
 
     // Create regular user and check banner
-    const user = await createTestUser('user@example.com', 'USER');
+    await createTestUser('user@example.com', 'USER');
     await loginAsUser(page, 'user@example.com', 'testpassword');
 
     // Navigate to User app (different app from where announcement was created)
@@ -239,7 +239,7 @@ test.describe('Announcements - Banner and Read Tracking', () => {
 
   test('User should be able to mark announcement as read', async ({ page, context }) => {
     // Create announcement as FLEET
-    const fleet = await createTestUser('fleet@example.com', 'FLEET');
+    await createTestUser('fleet@example.com', 'FLEET');
     const fleetPage = await context.newPage();
     await loginAsUser(fleetPage, 'fleet@example.com', 'testpassword');
     await fleetPage.goto('http://localhost:3004/announcements');
@@ -251,7 +251,7 @@ test.describe('Announcements - Banner and Read Tracking', () => {
     await fleetPage.close();
 
     // Login as regular user
-    const user = await createTestUser('user@example.com', 'USER');
+    await createTestUser('user@example.com', 'USER');
     await loginAsUser(page, 'user@example.com', 'testpassword');
     await page.goto('http://localhost:3001/');
 
@@ -278,7 +278,7 @@ test.describe('Announcements - Banner and Read Tracking', () => {
 
   test('Read status should persist across different apps', async ({ page, context }) => {
     // Create announcement as FLEET
-    const fleet = await createTestUser('fleet@example.com', 'FLEET');
+    await createTestUser('fleet@example.com', 'FLEET');
     const fleetPage = await context.newPage();
     await loginAsUser(fleetPage, 'fleet@example.com', 'testpassword');
     await fleetPage.goto('http://localhost:3004/announcements');
@@ -290,7 +290,7 @@ test.describe('Announcements - Banner and Read Tracking', () => {
     await fleetPage.close();
 
     // Login as user and mark as read in User app
-    const user = await createTestUser('user@example.com', 'USER');
+    await createTestUser('user@example.com', 'USER');
     await loginAsUser(page, 'user@example.com', 'testpassword');
     await page.goto('http://localhost:3001/');
 
@@ -317,7 +317,7 @@ test.describe('Announcements - Banner and Read Tracking', () => {
 
   test('Draft announcement should NOT appear in banner', async ({ page, context }) => {
     // Create draft announcement as FLEET
-    const fleet = await createTestUser('fleet@example.com', 'FLEET');
+    await createTestUser('fleet@example.com', 'FLEET');
     const fleetPage = await context.newPage();
     await loginAsUser(fleetPage, 'fleet@example.com', 'testpassword');
     await fleetPage.goto('http://localhost:3004/announcements');
@@ -330,7 +330,7 @@ test.describe('Announcements - Banner and Read Tracking', () => {
     await fleetPage.close();
 
     // Login as regular user
-    const user = await createTestUser('user@example.com', 'USER');
+    await createTestUser('user@example.com', 'USER');
     await loginAsUser(page, 'user@example.com', 'testpassword');
     await page.goto('http://localhost:3001/');
 
@@ -359,7 +359,7 @@ test.describe('Announcements - Visibility Filtering', () => {
 
   test('QA_AND_ABOVE announcement should NOT be visible to regular USER', async ({ page, context }) => {
     // Create QA_AND_ABOVE announcement as FLEET
-    const fleet = await createTestUser('fleet@example.com', 'FLEET');
+    await createTestUser('fleet@example.com', 'FLEET');
     const fleetPage = await context.newPage();
     await loginAsUser(fleetPage, 'fleet@example.com', 'testpassword');
     await fleetPage.goto('http://localhost:3004/announcements');
@@ -372,7 +372,7 @@ test.describe('Announcements - Visibility Filtering', () => {
     await fleetPage.close();
 
     // Login as regular USER
-    const user = await createTestUser('user@example.com', 'USER');
+    await createTestUser('user@example.com', 'USER');
     await loginAsUser(page, 'user@example.com', 'testpassword');
     await page.goto('http://localhost:3001/');
 
@@ -387,7 +387,7 @@ test.describe('Announcements - Visibility Filtering', () => {
 
   test('QA_AND_ABOVE announcement SHOULD be visible to QA user', async ({ page, context }) => {
     // Create QA_AND_ABOVE announcement as FLEET
-    const fleet = await createTestUser('fleet@example.com', 'FLEET');
+    await createTestUser('fleet@example.com', 'FLEET');
     const fleetPage = await context.newPage();
     await loginAsUser(fleetPage, 'fleet@example.com', 'testpassword');
     await fleetPage.goto('http://localhost:3004/announcements');
@@ -416,7 +416,7 @@ test.describe('Announcements - Visibility Filtering', () => {
 
   test('ALL_USERS announcement should be visible to everyone', async ({ page, context }) => {
     // Create ALL_USERS announcement as FLEET
-    const fleet = await createTestUser('fleet@example.com', 'FLEET');
+    await createTestUser('fleet@example.com', 'FLEET');
     const fleetPage = await context.newPage();
     await loginAsUser(fleetPage, 'fleet@example.com', 'testpassword');
     await fleetPage.goto('http://localhost:3004/announcements');
@@ -444,7 +444,7 @@ test.describe('Announcements - Visibility Filtering', () => {
 
   test('Changing visibility from ALL_USERS to QA_AND_ABOVE should hide from regular users', async ({ page, context }) => {
     // Create ALL_USERS announcement as FLEET
-    const fleet = await createTestUser('fleet@example.com', 'FLEET');
+    await createTestUser('fleet@example.com', 'FLEET');
     const fleetPage = await context.newPage();
     await loginAsUser(fleetPage, 'fleet@example.com', 'testpassword');
     await fleetPage.goto('http://localhost:3004/announcements');
@@ -455,7 +455,7 @@ test.describe('Announcements - Visibility Filtering', () => {
     await fleetPage.waitForTimeout(1000);
 
     // Verify USER can see it first
-    const user = await createTestUser('user@example.com', 'USER');
+    await createTestUser('user@example.com', 'USER');
     await loginAsUser(page, 'user@example.com', 'testpassword');
     await page.goto('http://localhost:3001/');
 
@@ -498,7 +498,7 @@ test.describe('Announcements - Multiple Announcements', () => {
 
   test('Banner should show correct count with multiple unread announcements', async ({ page, context }) => {
     // Create 3 announcements as FLEET
-    const fleet = await createTestUser('fleet@example.com', 'FLEET');
+    await createTestUser('fleet@example.com', 'FLEET');
     const fleetPage = await context.newPage();
     await loginAsUser(fleetPage, 'fleet@example.com', 'testpassword');
     await fleetPage.goto('http://localhost:3004/announcements');
@@ -513,7 +513,7 @@ test.describe('Announcements - Multiple Announcements', () => {
     await fleetPage.close();
 
     // Login as user
-    const user = await createTestUser('user@example.com', 'USER');
+    await createTestUser('user@example.com', 'USER');
     await loginAsUser(page, 'user@example.com', 'testpassword');
     await page.goto('http://localhost:3001/');
 
