@@ -10,6 +10,7 @@ import Sidebar from "@/components/navigation/Sidebar";
 import BugReportButton from "@/components/BugReportButton";
 import { createClient } from '@repo/auth/server'
 import { ProjectProvider } from "@/context/ProjectContext";
+import { AnnouncementsBanner } from '@repo/ui/components';
 
 const inter = Inter({
   subsets: ["latin"],
@@ -47,6 +48,7 @@ export default async function RootLayout({
             {user && <Sidebar userRole={role} />}
             <div className="main-content">
               <Header />
+              {user && <AnnouncementsBanner />}
               <main className="content-area">
                 {children}
               </main>

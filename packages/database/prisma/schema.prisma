@@ -697,6 +697,8 @@ model users {
   bug_reports_bug_reports_user_idTousers     BugReport[]            @relation("bug_reports_user_idTousers")
   profiles                                   Profile?
   time_entries                               TimeEntry[]
+  announcements                              Announcement[]
+  announcement_reads                         AnnouncementRead[]
 
   @@index([instance_id])
   @@index([is_anonymous])
@@ -1066,5 +1068,65 @@ model AssignmentRecord {
   @@index([assignedToUserId])
   @@index([status])
   @@map("assignment_records")
+  @@schema("public")
+}
+
+// ============================================
+// ANNOUNCEMENTS
+// ============================================
+
+/**
+ * ANNOUNCEMENT: System-wide announcements with role-based visibility.
+ * Manageable by FLEET and ADMIN roles from the Fleet app.
+ */
+model Announcement {
+  id         String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title      String
+  content    String               @db.Text
+  published  Boolean              @default(true)
+  visibility AnnouncementVisibility @default(ALL_USERS)
+
+  createdById String   @map("created_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  createdBy users              @relation(fields: [createdById], references: [id])
+  reads     AnnouncementRead[]
+
+  @@index([published])
+  @@index([visibility])
+  @@index([createdAt(sort: Desc)])
+  @@map("announcements")
+  @@schema("public")
+}
+
+enum AnnouncementVisibility {
+  ALL_USERS    // Visible to all authenticated users
+  QA_AND_ABOVE // Visible to QA, CORE, FLEET, MANAGER, ADMIN roles
+
+  @@map("announcement_visibility")
+  @@schema("public")
+}
+
+/**
+ * ANNOUNCEMENT_READ: Tracks which users have read which announcements.
+ * Used to show unread counts in the announcements banner.
+ */
+model AnnouncementRead {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  userId         String   @map("user_id") @db.Uuid
+  announcementId String   @map("announcement_id") @db.Uuid
+  readAt         DateTime @default(now()) @map("read_at") @db.Timestamptz(6)
+
+  // Relations
+  user         users        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  announcement Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, announcementId])
+  @@index([userId])
+  @@index([announcementId])
+  @@map("announcement_reads")
   @@schema("public")
 }
