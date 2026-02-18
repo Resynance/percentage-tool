@@ -27,7 +27,8 @@ Documentation/
 │   ├── User Guide                 → ./USER_GUIDE.md
 │   ├── User Role Reference        → ./USER_ROLE_REFERENCE.md
 │   ├── User Management            → ./USER_MANAGEMENT.md
-│   └── Bug Reports                → ./BUG_REPORTS.md
+│   ├── Bug Reports                → ./BUG_REPORTS.md
+│   └── Announcements              → ./ANNOUNCEMENTS.md
 │
 ├── Development/
 │   ├── Local Development          → ./LOCAL_DEVELOPMENT.md
@@ -75,6 +76,7 @@ Documentation/
 → [User Role Reference](./USER_ROLE_REFERENCE.md) (for USER role)
 → [User Management](./USER_MANAGEMENT.md)
 → [Bug Reports](./BUG_REPORTS.md)
+→ [Announcements](./ANNOUNCEMENTS.md)
 
 #### **Develop Features**
 → [Local Development](./LOCAL_DEVELOPMENT.md)
