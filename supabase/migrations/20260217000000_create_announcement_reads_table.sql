@@ -42,5 +42,8 @@ CREATE POLICY "Fleet and Admin can view all announcement reads"
         )
     );
 
+-- Grant permissions to authenticated role
+GRANT SELECT, INSERT ON public.announcement_reads TO authenticated;
+
 -- Add comment
 COMMENT ON TABLE public.announcement_reads IS 'Tracks which users have read which announcements for unread badge counts';

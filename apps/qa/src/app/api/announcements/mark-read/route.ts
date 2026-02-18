@@ -1,10 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@repo/auth/server'
 
 /**
  * Proxy endpoint to Fleet app's mark-read endpoint
  * This avoids CORS issues when marking announcements as read from other apps
  */
 export async function POST(request: NextRequest) {
+  // Verify authentication before proxying
+  const supabase = await createClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   const fleetUrl = process.env.NEXT_PUBLIC_FLEET_APP_URL || 'http://localhost:3004'
 
   try {

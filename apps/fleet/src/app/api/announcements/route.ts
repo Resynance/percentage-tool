@@ -1,21 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@repo/auth/server'
-import { prisma } from '@repo/database'
-
-// CORS headers for cross-app communication
-const corsHeaders = {
-  'Access-Control-Allow-Origin': process.env.NODE_ENV === 'production'
-    ? process.env.NEXT_PUBLIC_FLEET_APP_URL || '*'
-    : '*', // Allow all origins in development
-  'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  'Access-Control-Allow-Credentials': 'true',
-}
-
-// Handle OPTIONS request for CORS preflight
-export async function OPTIONS(request: NextRequest) {
-  return NextResponse.json({}, { headers: corsHeaders })
-}
+import { prisma, Prisma } from '@repo/database'
 
 /**
  * GET /api/announcements
@@ -65,37 +50,41 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' }
     })
 
-    // Get profile data for names and read status
-    const announcementsWithNames = await Promise.all(
-      announcements.map(async (announcement) => {
-        const profile = await prisma.profile.findUnique({
-          where: { id: announcement.createdById },
-          select: { firstName: true, lastName: true, email: true }
-        })
+    // Batch fetch profile data for all unique creator IDs
+    const uniqueCreatorIds = [...new Set(announcements.map(a => a.createdById))]
+    const profiles = await prisma.profile.findMany({
+      where: { id: { in: uniqueCreatorIds } },
+      select: { id: true, firstName: true, lastName: true, email: true }
+    })
+    const profileMap = new Map(profiles.map(p => [p.id, p]))
 
-        // Check if current user has read this announcement
-        const hasRead = await prisma.announcementRead.findUnique({
-          where: {
-            userId_announcementId: {
-              userId: user.id,
-              announcementId: announcement.id
-            }
-          }
-        })
+    // Batch fetch read status for all announcements for current user
+    const announcementIds = announcements.map(a => a.id)
+    const readStatuses = await prisma.announcementRead.findMany({
+      where: {
+        userId: user.id,
+        announcementId: { in: announcementIds }
+      },
+      select: { announcementId: true }
+    })
+    const readSet = new Set(readStatuses.map(r => r.announcementId))
 
-        return {
-          ...announcement,
-          createdBy: {
-            email: profile?.email || announcement.createdBy.email || '',
-            firstName: profile?.firstName || null,
-            lastName: profile?.lastName || null
-          },
-          isRead: !!hasRead
-        }
-      })
-    )
+    // Map data to announcements
+    const announcementsWithNames = announcements.map((announcement) => {
+      const profile = profileMap.get(announcement.createdById)
 
-    return NextResponse.json({ announcements: announcementsWithNames }, { headers: corsHeaders })
+      return {
+        ...announcement,
+        createdBy: {
+          email: profile?.email || announcement.createdBy.email || '',
+          firstName: profile?.firstName || null,
+          lastName: profile?.lastName || null
+        },
+        isRead: readSet.has(announcement.id)
+      }
+    })
+
+    return NextResponse.json({ announcements: announcementsWithNames })
   } catch (error) {
     console.error('Error fetching announcements:', error)
     return NextResponse.json(
@@ -249,7 +238,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Build update data
-    const updateData: any = {}
+    const updateData: Prisma.AnnouncementUpdateInput = {}
     if (title !== undefined) updateData.title = title
     if (content !== undefined) updateData.content = content
     if (published !== undefined) updateData.published = published
@@ -283,7 +272,7 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ announcement: announcementWithName }, { headers: corsHeaders })
+    return NextResponse.json({ announcement: announcementWithName })
   } catch (error) {
     console.error('Error updating announcement:', error)
     return NextResponse.json(
@@ -339,7 +328,7 @@ export async function DELETE(request: NextRequest) {
       where: { id }
     })
 
-    return NextResponse.json({ success: true }, { headers: corsHeaders })
+    return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Error deleting announcement:', error)
     return NextResponse.json(

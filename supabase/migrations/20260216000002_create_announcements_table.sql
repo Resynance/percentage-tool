@@ -87,5 +87,4 @@ CREATE TRIGGER announcements_updated_at
   EXECUTE FUNCTION update_announcements_updated_at();
 
 -- Grant permissions
-GRANT SELECT ON public.announcements TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.announcements TO authenticated;

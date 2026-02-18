@@ -42,10 +42,6 @@ export default function AnnouncementsPage() {
   })
   const [saving, setSaving] = useState(false)
 
-  useEffect(() => {
-    fetchAnnouncements()
-  }, [])
-
   const fetchAnnouncements = async () => {
     try {
       setLoading(true)
@@ -63,6 +59,11 @@ export default function AnnouncementsPage() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    fetchAnnouncements()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const createAnnouncement = async () => {
     if (!formData.title || !formData.content) {
@@ -90,6 +91,7 @@ export default function AnnouncementsPage() {
         title: '',
         content: '',
         published: true,
+        visibility: 'ALL_USERS'
       })
       setShowCreateModal(false)
 
@@ -134,6 +136,7 @@ export default function AnnouncementsPage() {
         title: '',
         content: '',
         published: true,
+        visibility: 'ALL_USERS'
       })
       setSelectedAnnouncement(null)
       setShowEditModal(false)
