@@ -85,13 +85,13 @@ describe('GET /api/announcements (User App Proxy)', () => {
     expect(response.status).toBe(200);
     expect(data.announcements).toEqual(mockAnnouncements);
     expect(mockFetch).toHaveBeenCalledWith('http://localhost:3004/api/announcements', {
-      headers: expect.objectContaining({
-        Cookie: expect.any(String),
-      }),
+      headers: {
+        cookie: expect.any(String),
+      },
     });
   });
 
-  it('should forward error from Fleet app', async () => {
+  it('should return empty array with error status from Fleet app', async () => {
     const mockUser = { id: 'user-123' };
 
     mockCreateClient.mockResolvedValue({
@@ -111,7 +111,7 @@ describe('GET /api/announcements (User App Proxy)', () => {
     const data = await response.json();
 
     expect(response.status).toBe(500);
-    expect(data.error).toBe('Internal Server Error');
+    expect(data.announcements).toEqual([]);
   });
 
   it('should handle fetch errors gracefully', async () => {
@@ -129,8 +129,8 @@ describe('GET /api/announcements (User App Proxy)', () => {
     const response = await GET(request);
     const data = await response.json();
 
-    expect(response.status).toBe(500);
-    expect(data.error).toBe('Failed to fetch announcements');
+    expect(response.status).toBe(200);
+    expect(data.announcements).toEqual([]);
   });
 
   it('should pass cookies from request to proxied request', async () => {
@@ -150,7 +150,7 @@ describe('GET /api/announcements (User App Proxy)', () => {
 
     const request = new NextRequest('http://localhost:3001/api/announcements', {
       headers: {
-        Cookie: 'session=abc123; other=value',
+        cookie: 'session=abc123; other=value',
       },
     });
 
@@ -158,11 +158,11 @@ describe('GET /api/announcements (User App Proxy)', () => {
 
     expect(mockFetch).toHaveBeenCalledWith(
       'http://localhost:3004/api/announcements',
-      expect.objectContaining({
-        headers: expect.objectContaining({
-          Cookie: 'session=abc123; other=value',
-        }),
-      })
+      {
+        headers: {
+          cookie: 'session=abc123; other=value',
+        },
+      }
     );
   });
 

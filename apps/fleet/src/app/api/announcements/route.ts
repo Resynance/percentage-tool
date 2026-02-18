@@ -89,7 +89,7 @@ export async function GET(request: NextRequest) {
     console.error('Error fetching announcements:', error)
     return NextResponse.json(
       { error: 'Failed to fetch announcements' },
-      { status: 500, headers: corsHeaders }
+      { status: 500 }
     )
   }
 }
@@ -177,12 +177,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ announcement: announcementWithName }, { status: 201, headers: corsHeaders })
+    return NextResponse.json({ announcement: announcementWithName }, { status: 201 })
   } catch (error) {
     console.error('Error creating announcement:', error)
     return NextResponse.json(
       { error: 'Failed to create announcement' },
-      { status: 500, headers: corsHeaders }
+      { status: 500 }
     )
   }
 }
@@ -277,7 +277,7 @@ export async function PATCH(request: NextRequest) {
     console.error('Error updating announcement:', error)
     return NextResponse.json(
       { error: 'Failed to update announcement' },
-      { status: 500, headers: corsHeaders }
+      { status: 500 }
     )
   }
 }
@@ -333,7 +333,7 @@ export async function DELETE(request: NextRequest) {
     console.error('Error deleting announcement:', error)
     return NextResponse.json(
       { error: 'Failed to delete announcement' },
-      { status: 500, headers: corsHeaders }
+      { status: 500 }
     )
   }
 }
