@@ -61,6 +61,11 @@ model Profile {
   // Notification settings
   notificationSettings NotificationSetting[] @relation("NotificationSettings")
 
+  // Time reporting relations
+  createdMeetings      BillableMeeting[]
+  reviewedFlags        TimeAnalysisFlag[]
+  createdConfigs       TimeAnalysisConfig[]
+
   @@map("profiles")
   @@schema("public")
 }
@@ -1115,5 +1120,240 @@ model AssignmentRecord {
   @@index([assignedToUserId])
   @@index([status])
   @@map("assignment_records")
+  @@schema("public")
+}
+
+// ============================================
+// TIME REPORTING ANALYSIS
+// ============================================
+
+/**
+ * TIME REPORT RECORD: Daily time log entries from worker time tracking.
+ * Parsed from CSV imports containing hours worked and activity notes.
+ */
+model TimeReportRecord {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()::text"))
+  workerName         String    @map("worker_name")
+  workerEmail        String    @map("worker_email")
+  workDate           DateTime  @map("work_date") @db.Date
+  hoursWorked        Decimal   @map("hours_worked") @db.Decimal(10, 5)
+  notes              String?   @db.Text
+  status             String? // Approved, Rejected, Contacting, etc.
+  role               String? // expert role
+  groupName          String?   @map("group_name")
+  totalTasksCreated  Int       @default(0) @map("total_tasks_created")
+  totalTasksQaed     Int       @default(0) @map("total_tasks_qaed")
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  importBatchId      String?   @map("import_batch_id")
+
+  // Relations
+  timeEstimates TimeEstimate[]
+  meetingClaims MeetingClaim[]
+  qualityScores QualityScore[]
+  flags         TimeAnalysisFlag[]
+
+  @@unique([workerEmail, workDate])
+  @@index([workerEmail])
+  @@index([workDate])
+  @@index([importBatchId])
+  @@map("time_report_records")
+  @@schema("public")
+}
+
+/**
+ * BILLABLE MEETING: Database of all billable meetings with attendees.
+ * Used to verify worker meeting claims from time logs.
+ */
+model BillableMeeting {
+  id              String   @id @default(dbgenerated("gen_random_uuid()::text"))
+  title           String
+  description     String?  @db.Text
+  meetingDate     DateTime @map("meeting_date") @db.Date
+  startTime       DateTime @map("start_time") @db.Timestamptz(6)
+  endTime         DateTime @map("end_time") @db.Timestamptz(6)
+  durationMinutes Int      @map("duration_minutes")
+  attendees       Json     @default("[]") // Array of email addresses
+  meetingType     String?  @map("meeting_type")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdById     String?  @map("created_by_id") @db.Uuid
+
+  // Relations
+  createdBy     Profile?       @relation(fields: [createdById], references: [id])
+  meetingClaims MeetingClaim[]
+
+  @@index([meetingDate])
+  @@index([meetingType])
+  @@map("billable_meetings")
+  @@schema("public")
+}
+
+/**
+ * TIME ESTIMATE: LLM-generated time estimates for tasks and QA work.
+ * Used to compare expected vs actual time spent.
+ */
+model TimeEstimate {
+  id                String   @id @default(dbgenerated("gen_random_uuid()::text"))
+  timeReportId      String   @map("time_report_id")
+  workType          String   @map("work_type") // TASK or QA
+  workDescription   String   @map("work_description") @db.Text
+  estimatedMinutes  Int      @map("estimated_minutes")
+  confidenceScore   Decimal? @map("confidence_score") @db.Decimal(3, 2)
+  reasoning         String?  @db.Text
+  llmModel          String?  @map("llm_model")
+  llmProvider       String?  @map("llm_provider")
+  llmCost           Decimal? @map("llm_cost") @db.Decimal(10, 6)
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  // Relations
+  timeReport TimeReportRecord @relation(fields: [timeReportId], references: [id], onDelete: Cascade)
+
+  @@index([timeReportId])
+  @@index([workType])
+  @@map("time_estimates")
+  @@schema("public")
+}
+
+/**
+ * MEETING CLAIM: LLM-extracted meeting claims from worker notes.
+ * Includes verification against the billable meetings database.
+ */
+model MeetingClaim {
+  id                     String    @id @default(dbgenerated("gen_random_uuid()::text"))
+  timeReportId           String    @map("time_report_id")
+  claimedMeetingName     String    @map("claimed_meeting_name")
+  claimedDurationMinutes Int?      @map("claimed_duration_minutes")
+  extractionConfidence   Decimal?  @map("extraction_confidence") @db.Decimal(3, 2)
+  verified               Boolean   @default(false)
+  matchedMeetingId       String?   @map("matched_meeting_id")
+  verificationNotes      String?   @map("verification_notes") @db.Text
+  llmModel               String?   @map("llm_model")
+  llmProvider            String?   @map("llm_provider")
+  llmCost                Decimal?  @map("llm_cost") @db.Decimal(10, 6)
+  createdAt              DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  verifiedAt             DateTime? @map("verified_at") @db.Timestamptz(6)
+
+  // Relations
+  timeReport     TimeReportRecord @relation(fields: [timeReportId], references: [id], onDelete: Cascade)
+  matchedMeeting BillableMeeting? @relation(fields: [matchedMeetingId], references: [id])
+
+  @@index([timeReportId])
+  @@index([verified])
+  @@index([matchedMeetingId])
+  @@map("meeting_claims")
+  @@schema("public")
+}
+
+/**
+ * QUALITY SCORE: LLM-generated quality assessments for work.
+ * Used in combination with time analysis for better flagging decisions.
+ */
+model QualityScore {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()::text"))
+  timeReportId       String   @map("time_report_id")
+  workType           String   @map("work_type") // TASK or QA
+  workDescription    String   @map("work_description") @db.Text
+  qualityScore       Decimal  @map("quality_score") @db.Decimal(3, 1)
+  qualityReasoning   String?  @map("quality_reasoning") @db.Text
+  completenessScore  Decimal? @map("completeness_score") @db.Decimal(3, 1)
+  accuracyScore      Decimal? @map("accuracy_score") @db.Decimal(3, 1)
+  clarityScore       Decimal? @map("clarity_score") @db.Decimal(3, 1)
+  llmModel           String?  @map("llm_model")
+  llmProvider        String?  @map("llm_provider")
+  llmCost            Decimal? @map("llm_cost") @db.Decimal(10, 6)
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  // Relations
+  timeReport TimeReportRecord @relation(fields: [timeReportId], references: [id], onDelete: Cascade)
+
+  @@index([timeReportId])
+  @@index([workType])
+  @@index([qualityScore])
+  @@map("quality_scores")
+  @@schema("public")
+}
+
+/**
+ * TIME ANALYSIS FLAG: Workers flagged for time discrepancies or quality issues.
+ * Requires manual review by Fleet/Admin.
+ */
+model TimeAnalysisFlag {
+  id                     String    @id @default(dbgenerated("gen_random_uuid()::text"))
+  timeReportId           String    @map("time_report_id")
+  workerName             String    @map("worker_name")
+  workerEmail            String    @map("worker_email")
+  workDate               DateTime  @map("work_date") @db.Date
+  flagType               String    @map("flag_type") // TIME_DISCREPANCY, LOW_QUALITY, etc.
+  severity               FlagSeverity
+  status                 FlagStatus   @default(PENDING)
+  expectedHours          Decimal?  @map("expected_hours") @db.Decimal(10, 5)
+  actualHours            Decimal?  @map("actual_hours") @db.Decimal(10, 5)
+  discrepancyPercentage  Decimal?  @map("discrepancy_percentage") @db.Decimal(5, 2)
+  meetingHoursClaimed    Decimal?  @map("meeting_hours_claimed") @db.Decimal(10, 5)
+  meetingHoursVerified   Decimal?  @map("meeting_hours_verified") @db.Decimal(10, 5)
+  averageQualityScore    Decimal?  @map("average_quality_score") @db.Decimal(3, 1)
+  flagReason             String    @map("flag_reason") @db.Text
+  analysisThreshold      Decimal?  @map("analysis_threshold") @db.Decimal(5, 2)
+  reviewedById           String?   @map("reviewed_by_id") @db.Uuid
+  reviewedAt             DateTime? @map("reviewed_at") @db.Timestamptz(6)
+  resolutionNotes        String?   @map("resolution_notes") @db.Text
+  createdAt              DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  timeReport TimeReportRecord @relation(fields: [timeReportId], references: [id], onDelete: Cascade)
+  reviewedBy Profile?         @relation(fields: [reviewedById], references: [id])
+
+  @@index([workerEmail])
+  @@index([status])
+  @@index([severity])
+  @@index([workDate])
+  @@index([flagType])
+  @@map("time_analysis_flags")
+  @@schema("public")
+}
+
+/**
+ * TIME ANALYSIS CONFIG: Configurable thresholds and settings for analysis.
+ * Only one configuration can be active at a time.
+ */
+model TimeAnalysisConfig {
+  id                        String   @id @default(dbgenerated("gen_random_uuid()::text"))
+  configName                String   @unique @map("config_name")
+  timeDiscrepancyThreshold  Decimal  @default(15.00) @map("time_discrepancy_threshold") @db.Decimal(5, 2)
+  taskTimeMin               Int      @default(45) @map("task_time_min")
+  taskTimeMax               Int      @default(60) @map("task_time_max")
+  qaTimeMin                 Int      @default(5) @map("qa_time_min")
+  qaTimeMax                 Int      @default(20) @map("qa_time_max")
+  minAcceptableQuality      Decimal? @default(6.0) @map("min_acceptable_quality") @db.Decimal(3, 1)
+  isActive                  Boolean  @default(false) @map("is_active")
+  createdAt                 DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                 DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdById               String?  @map("created_by_id") @db.Uuid
+
+  // Relations
+  createdBy Profile? @relation(fields: [createdById], references: [id])
+
+  @@map("time_analysis_configs")
+  @@schema("public")
+}
+
+// Enums for time analysis
+enum FlagSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+
+  @@schema("public")
+}
+
+enum FlagStatus {
+  PENDING
+  UNDER_REVIEW
+  RESOLVED
+  DISMISSED
+
   @@schema("public")
 }

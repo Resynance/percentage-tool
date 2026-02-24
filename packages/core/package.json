@@ -12,7 +12,8 @@
     "./analytics": "./dist/analytics/index.js",
     "./audit": "./dist/audit/index.js",
     "./similarity": "./dist/similarity/index.js",
-    "./utils": "./dist/utils/index.js"
+    "./utils": "./dist/utils/index.js",
+    "./time-reporting": "./dist/time-reporting/index.js"
   },
   "scripts": {
     "build": "tsc",
