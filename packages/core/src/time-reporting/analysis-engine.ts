@@ -286,6 +286,7 @@ export async function analyzeAllTimeReports(
   const reports = await prisma.timeReportRecord.findMany({
     where,
     orderBy: { workDate: 'asc' },
+    take: 100, // Limit to 100 reports to prevent timeout
   });
 
   return analyzeBatchTimeReports(

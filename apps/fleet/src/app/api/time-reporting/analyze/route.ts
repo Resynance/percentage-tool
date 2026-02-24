@@ -46,7 +46,9 @@ export async function POST(request: NextRequest) {
       analyzed: results.length,
       flagged: results.filter(r => r.shouldFlag).length,
       results,
-      message: `Analyzed ${results.length} time reports`,
+      message: results.length >= 100
+        ? `Analyzed first 100 time reports (limit reached). Use a smaller date range for more targeted analysis.`
+        : `Analyzed ${results.length} time reports`,
     });
   } catch (error: any) {
     console.error('Analysis error:', error);
