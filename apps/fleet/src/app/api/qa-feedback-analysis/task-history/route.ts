@@ -131,25 +131,12 @@ export async function GET(req: Request) {
         // Get related tasks from the same worker within 7 days
         const relatedTasks: RelatedTask[] = []
 
-        console.log('[Task History API] Task details:', {
-            taskId: task.id,
-            type: task.type,
-            createdByEmail: task.createdByEmail,
-            createdByName: task.createdByName,
-            hasEmail: !!task.createdByEmail
-        })
-
         if (task.createdByEmail) {
             const sevenDaysAgo = new Date(task.createdAt)
             sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
 
             const sevenDaysAhead = new Date(task.createdAt)
             sevenDaysAhead.setDate(sevenDaysAhead.getDate() + 7)
-
-            console.log('[Task History API] Searching for related tasks:', {
-                createdByEmail: task.createdByEmail,
-                dateRange: { from: sevenDaysAgo, to: sevenDaysAhead }
-            })
 
             const related = await prisma.dataRecord.findMany({
                 where: {
@@ -173,8 +160,6 @@ export async function GET(req: Request) {
                 take: 10, // Limit to 10 related tasks
             })
 
-            console.log('[Task History API] Found related tasks:', related.length)
-
             relatedTasks.push(...related.map(r => {
                 const relMetadata = r.metadata as any
                 const fullContent = relMetadata?.task_prompt || r.content
@@ -185,8 +170,6 @@ export async function GET(req: Request) {
                     createdAt: r.createdAt,
                 }
             }))
-        } else {
-            console.log('[Task History API] No createdByEmail found for task')
         }
 
         // Get all feedbacks for this task (using task_key from metadata)
@@ -194,9 +177,14 @@ export async function GET(req: Request) {
         const allFeedbacks: FeedbackWithRating[] = []
 
         if (taskKey) {
-            const feedbacks = await prisma.dataRecord.findMany({
+            // Use Prisma JSON filtering to query at database level (avoid full table scan)
+            const matchingFeedbacks = await prisma.dataRecord.findMany({
                 where: {
                     type: 'FEEDBACK',
+                    metadata: {
+                        path: ['task_key'],
+                        equals: taskKey
+                    }
                 },
                 select: {
                     id: true,
@@ -208,30 +196,33 @@ export async function GET(req: Request) {
                 }
             })
 
-            // Filter feedbacks by task_key in metadata
-            const matchingFeedbacks = feedbacks.filter(f => {
-                const fMeta = f.metadata as any
-                return fMeta?.task_key === taskKey
+            // Batch rating lookups (avoid N+1)
+            const feedbackKeys = matchingFeedbacks.map(f => {
+                const fMetadata = f.metadata as any
+                return fMetadata?.feedback_key || f.id
             })
 
-            // For each feedback, get its rating (if any)
+            const ratings = await prisma.qAFeedbackRating.findMany({
+                where: {
+                    feedbackId: { in: feedbackKeys }
+                },
+                select: {
+                    feedbackId: true,
+                    ratingId: true,
+                    isHelpful: true,
+                    isDispute: true,
+                    ratedAt: true,
+                    raterEmail: true,
+                }
+            })
+
+            const ratingMap = new Map(ratings.map(r => [r.feedbackId, r]))
+
+            // Build feedback list with ratings
             for (const feedback of matchingFeedbacks) {
                 const fMetadata = feedback.metadata as any
                 const feedbackKey = fMetadata?.feedback_key || feedback.id
-
-                // Find rating by feedback_id
-                const rating = await prisma.qAFeedbackRating.findFirst({
-                    where: {
-                        feedbackId: feedbackKey
-                    },
-                    select: {
-                        ratingId: true,
-                        isHelpful: true,
-                        isDispute: true,
-                        ratedAt: true,
-                        raterEmail: true,
-                    }
-                })
+                const rating = ratingMap.get(feedbackKey)
 
                 allFeedbacks.push({
                     feedbackId: feedback.id,

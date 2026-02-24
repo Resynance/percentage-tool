@@ -52,6 +52,28 @@ export async function POST(req: Request) {
         let notFound = 0
         const errors: string[] = []
 
+        // Fetch all tasks once and build a lookup map by rating_id
+        console.log('[Link Ratings API] Building task lookup map...')
+        const allTasks = await prisma.dataRecord.findMany({
+            where: {
+                type: 'TASK',
+            },
+            select: {
+                id: true,
+                metadata: true,
+            }
+        })
+
+        const tasksByRatingId = new Map<string, string>()
+        for (const task of allTasks) {
+            const metadata = task.metadata as any
+            if (metadata?.rating_id) {
+                tasksByRatingId.set(metadata.rating_id, task.id)
+            }
+        }
+
+        console.log(`[Link Ratings API] Found ${tasksByRatingId.size} tasks with rating_id in metadata`)
+
         // Process in batches to avoid overwhelming the database
         const BATCH_SIZE = 100
         for (let i = 0; i < ratingsWithoutTask.length; i += BATCH_SIZE) {
@@ -59,23 +81,10 @@ export async function POST(req: Request) {
 
             for (const rating of batch) {
                 try {
-                    // Find the task with matching rating_id in metadata
-                    const tasks = await prisma.dataRecord.findMany({
-                        where: {
-                            type: 'TASK',
-                        },
-                        select: {
-                            id: true,
-                            metadata: true,
-                        }
-                    })
+                    // Look up task from the pre-built map
+                    const taskId = tasksByRatingId.get(rating.ratingId)
 
-                    const matchingTask = tasks.find(t => {
-                        const metadata = t.metadata as any
-                        return metadata?.rating_id === rating.ratingId
-                    })
-
-                    if (!matchingTask) {
+                    if (!taskId) {
                         notFound++
                         continue
                     }
@@ -83,7 +92,7 @@ export async function POST(req: Request) {
                     // Update the rating to link to the task
                     await prisma.qAFeedbackRating.update({
                         where: { id: rating.id },
-                        data: { evalTaskId: matchingTask.id }
+                        data: { evalTaskId: taskId }
                     })
 
                     linked++

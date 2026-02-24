@@ -177,14 +177,23 @@ export async function GET(req: Request) {
         // Calculate stats for each worker and get their total feedback count
         const workers: WorkerStats[] = []
 
+        // Batch query for feedback counts (avoid N+1)
+        const qaEmails = Array.from(workerMap.keys())
+        const feedbackCounts = await prisma.dataRecord.groupBy({
+            by: ['createdByEmail'],
+            where: {
+                type: 'FEEDBACK',
+                createdByEmail: { in: qaEmails }
+            },
+            _count: { _all: true }
+        })
+        const feedbackCountMap = new Map(
+            feedbackCounts.map(fc => [fc.createdByEmail, fc._count._all])
+        )
+
         for (const [qaEmail, stats] of workerMap.entries()) {
-            // Count total feedbacks created by this QA worker
-            const totalFeedbacks = await prisma.dataRecord.count({
-                where: {
-                    type: 'FEEDBACK',
-                    createdByEmail: qaEmail,
-                }
-            })
+            // Look up feedback count from pre-built map
+            const totalFeedbacks = feedbackCountMap.get(qaEmail) || 0
 
             const negativePercent = stats.totalRatings > 0
                 ? (stats.negativeRatings / stats.totalRatings) * 100

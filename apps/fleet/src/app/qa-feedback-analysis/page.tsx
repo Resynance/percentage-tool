@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronDown, ChevronUp, Filter, TrendingDown, AlertTriangle, Users, Search } from 'lucide-react'
+import { ChevronDown, ChevronUp, Filter, TrendingDown, AlertTriangle, Users, Search, X } from 'lucide-react'
 
 interface WorkerStats {
     qaEmail: string;

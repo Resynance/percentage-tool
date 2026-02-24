@@ -13,6 +13,17 @@ export async function GET(req: Request) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Check if user is FLEET or ADMIN
+    const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+
+    if (profileError || !profile || !['FLEET', 'ADMIN'].includes(profile.role)) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     try {
         // Count total ratings
         const totalRatings = await prisma.qAFeedbackRating.count()
