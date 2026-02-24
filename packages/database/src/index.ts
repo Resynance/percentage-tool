@@ -61,7 +61,6 @@ export type {
   IngestJob,
   AnalyticsJob,
   SystemSetting,
-  NotificationSetting,
   BonusWindow,
   AssignmentBatch,
   AssignmentRecord,

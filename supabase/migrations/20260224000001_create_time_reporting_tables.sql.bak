@@ -30,9 +30,9 @@ CREATE TABLE IF NOT EXISTS public.time_report_records (
 );
 
 -- Indexes for fast queries
-CREATE INDEX IF NOT EXISTS idx_time_reports_worker_email ON public.time_report_records(worker_email);
-CREATE INDEX IF NOT EXISTS idx_time_reports_work_date ON public.time_report_records(work_date);
-CREATE INDEX IF NOT EXISTS idx_time_reports_import_batch ON public.time_report_records(import_batch_id);
+CREATE INDEX idx_time_reports_worker_email ON public.time_report_records(worker_email);
+CREATE INDEX idx_time_reports_work_date ON public.time_report_records(work_date);
+CREATE INDEX idx_time_reports_import_batch ON public.time_report_records(import_batch_id);
 
 COMMENT ON TABLE public.time_report_records IS 'Stores daily time log entries from worker time tracking CSV imports';
 
@@ -66,9 +66,9 @@ CREATE TABLE IF NOT EXISTS public.billable_meetings (
 );
 
 -- Indexes for fast queries
-CREATE INDEX IF NOT EXISTS idx_meetings_date ON public.billable_meetings(meeting_date);
-CREATE INDEX IF NOT EXISTS idx_meetings_attendees ON public.billable_meetings USING GIN(attendees);
-CREATE INDEX IF NOT EXISTS idx_meetings_type ON public.billable_meetings(meeting_type);
+CREATE INDEX idx_meetings_date ON public.billable_meetings(meeting_date);
+CREATE INDEX idx_meetings_attendees ON public.billable_meetings USING GIN(attendees);
+CREATE INDEX idx_meetings_type ON public.billable_meetings(meeting_type);
 
 COMMENT ON TABLE public.billable_meetings IS 'Database of all billable meetings with attendee lists for verification';
 
@@ -101,8 +101,8 @@ CREATE TABLE IF NOT EXISTS public.time_estimates (
 );
 
 -- Indexes
-CREATE INDEX IF NOT EXISTS idx_time_estimates_report ON public.time_estimates(time_report_id);
-CREATE INDEX IF NOT EXISTS idx_time_estimates_work_type ON public.time_estimates(work_type);
+CREATE INDEX idx_time_estimates_report ON public.time_estimates(time_report_id);
+CREATE INDEX idx_time_estimates_work_type ON public.time_estimates(work_type);
 
 COMMENT ON TABLE public.time_estimates IS 'LLM-generated time estimates for tasks and QA work';
 
@@ -137,9 +137,9 @@ CREATE TABLE IF NOT EXISTS public.meeting_claims (
 );
 
 -- Indexes
-CREATE INDEX IF NOT EXISTS idx_meeting_claims_report ON public.meeting_claims(time_report_id);
-CREATE INDEX IF NOT EXISTS idx_meeting_claims_verified ON public.meeting_claims(verified);
-CREATE INDEX IF NOT EXISTS idx_meeting_claims_matched ON public.meeting_claims(matched_meeting_id);
+CREATE INDEX idx_meeting_claims_report ON public.meeting_claims(time_report_id);
+CREATE INDEX idx_meeting_claims_verified ON public.meeting_claims(verified);
+CREATE INDEX idx_meeting_claims_matched ON public.meeting_claims(matched_meeting_id);
 
 COMMENT ON TABLE public.meeting_claims IS 'LLM-extracted meeting claims from worker notes with verification status';
 
@@ -178,9 +178,9 @@ CREATE TABLE IF NOT EXISTS public.quality_scores (
 );
 
 -- Indexes
-CREATE INDEX IF NOT EXISTS idx_quality_scores_report ON public.quality_scores(time_report_id);
-CREATE INDEX IF NOT EXISTS idx_quality_scores_type ON public.quality_scores(work_type);
-CREATE INDEX IF NOT EXISTS idx_quality_scores_score ON public.quality_scores(quality_score);
+CREATE INDEX idx_quality_scores_report ON public.quality_scores(time_report_id);
+CREATE INDEX idx_quality_scores_type ON public.quality_scores(work_type);
+CREATE INDEX idx_quality_scores_score ON public.quality_scores(quality_score);
 
 COMMENT ON TABLE public.quality_scores IS 'LLM-generated quality assessments for tasks and QA work';
 
@@ -188,17 +188,8 @@ COMMENT ON TABLE public.quality_scores IS 'LLM-generated quality assessments for
 -- 6. TIME ANALYSIS FLAGS
 -- Workers flagged for time discrepancies
 -- =====================================================
-DO $$ BEGIN
-    CREATE TYPE flag_severity AS ENUM ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
-DO $$ BEGIN
-    CREATE TYPE flag_status AS ENUM ('PENDING', 'UNDER_REVIEW', 'RESOLVED', 'DISMISSED');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
+CREATE TYPE flag_severity AS ENUM ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL');
+CREATE TYPE flag_status AS ENUM ('PENDING', 'UNDER_REVIEW', 'RESOLVED', 'DISMISSED');
 
 CREATE TABLE IF NOT EXISTS public.time_analysis_flags (
     id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
@@ -236,11 +227,11 @@ CREATE TABLE IF NOT EXISTS public.time_analysis_flags (
 );
 
 -- Indexes
-CREATE INDEX IF NOT EXISTS idx_flags_worker_email ON public.time_analysis_flags(worker_email);
-CREATE INDEX IF NOT EXISTS idx_flags_status ON public.time_analysis_flags(status);
-CREATE INDEX IF NOT EXISTS idx_flags_severity ON public.time_analysis_flags(severity);
-CREATE INDEX IF NOT EXISTS idx_flags_work_date ON public.time_analysis_flags(work_date);
-CREATE INDEX IF NOT EXISTS idx_flags_type ON public.time_analysis_flags(flag_type);
+CREATE INDEX idx_flags_worker_email ON public.time_analysis_flags(worker_email);
+CREATE INDEX idx_flags_status ON public.time_analysis_flags(status);
+CREATE INDEX idx_flags_severity ON public.time_analysis_flags(severity);
+CREATE INDEX idx_flags_work_date ON public.time_analysis_flags(work_date);
+CREATE INDEX idx_flags_type ON public.time_analysis_flags(flag_type);
 
 COMMENT ON TABLE public.time_analysis_flags IS 'Workers flagged for manual review due to time discrepancies or quality issues';
 
@@ -274,7 +265,7 @@ CREATE TABLE IF NOT EXISTS public.time_analysis_configs (
 );
 
 -- Ensure only one active config at a time
-CREATE UNIQUE INDEX IF NOT EXISTS idx_one_active_config ON public.time_analysis_configs(is_active) WHERE is_active = TRUE;
+CREATE UNIQUE INDEX idx_one_active_config ON public.time_analysis_configs(is_active) WHERE is_active = TRUE;
 
 COMMENT ON TABLE public.time_analysis_configs IS 'Configurable thresholds and settings for time analysis';
 
@@ -291,8 +282,8 @@ ON CONFLICT (config_name) DO NOTHING;
 -- Time report records
 ALTER TABLE public.time_report_records ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "time_reports_fleet_admin_select" ON public.time_report_records;
-CREATE POLICY "time_reports_fleet_admin_select" ON public.time_report_records FOR SELECT
+CREATE POLICY "time_reports_fleet_admin_select"
+    ON public.time_report_records FOR SELECT
     USING (
         EXISTS (
             SELECT 1 FROM public.profiles
@@ -301,8 +292,8 @@ CREATE POLICY "time_reports_fleet_admin_select" ON public.time_report_records FO
         )
     );
 
-DROP POLICY IF EXISTS "time_reports_fleet_admin_insert" ON public.time_report_records;
-CREATE POLICY "time_reports_fleet_admin_insert" ON public.time_report_records FOR INSERT
+CREATE POLICY "time_reports_fleet_admin_insert"
+    ON public.time_report_records FOR INSERT
     WITH CHECK (
         EXISTS (
             SELECT 1 FROM public.profiles
@@ -311,8 +302,8 @@ CREATE POLICY "time_reports_fleet_admin_insert" ON public.time_report_records FO
         )
     );
 
-DROP POLICY IF EXISTS "time_reports_fleet_admin_update" ON public.time_report_records;
-CREATE POLICY "time_reports_fleet_admin_update" ON public.time_report_records FOR UPDATE
+CREATE POLICY "time_reports_fleet_admin_update"
+    ON public.time_report_records FOR UPDATE
     USING (
         EXISTS (
             SELECT 1 FROM public.profiles
@@ -321,8 +312,8 @@ CREATE POLICY "time_reports_fleet_admin_update" ON public.time_report_records FO
         )
     );
 
-DROP POLICY IF EXISTS "time_reports_fleet_admin_delete" ON public.time_report_records;
-CREATE POLICY "time_reports_fleet_admin_delete" ON public.time_report_records FOR DELETE
+CREATE POLICY "time_reports_fleet_admin_delete"
+    ON public.time_report_records FOR DELETE
     USING (
         EXISTS (
             SELECT 1 FROM public.profiles
@@ -334,8 +325,8 @@ CREATE POLICY "time_reports_fleet_admin_delete" ON public.time_report_records FO
 -- Billable meetings
 ALTER TABLE public.billable_meetings ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "meetings_fleet_admin_all" ON public.billable_meetings;
-CREATE POLICY "meetings_fleet_admin_all" ON public.billable_meetings FOR ALL
+CREATE POLICY "meetings_fleet_admin_all"
+    ON public.billable_meetings FOR ALL
     USING (
         EXISTS (
             SELECT 1 FROM public.profiles
@@ -347,8 +338,8 @@ CREATE POLICY "meetings_fleet_admin_all" ON public.billable_meetings FOR ALL
 -- Time estimates
 ALTER TABLE public.time_estimates ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "estimates_fleet_admin_all" ON public.time_estimates;
-CREATE POLICY "estimates_fleet_admin_all" ON public.time_estimates FOR ALL
+CREATE POLICY "estimates_fleet_admin_all"
+    ON public.time_estimates FOR ALL
     USING (
         EXISTS (
             SELECT 1 FROM public.profiles
@@ -360,8 +351,8 @@ CREATE POLICY "estimates_fleet_admin_all" ON public.time_estimates FOR ALL
 -- Meeting claims
 ALTER TABLE public.meeting_claims ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "claims_fleet_admin_all" ON public.meeting_claims;
-CREATE POLICY "claims_fleet_admin_all" ON public.meeting_claims FOR ALL
+CREATE POLICY "claims_fleet_admin_all"
+    ON public.meeting_claims FOR ALL
     USING (
         EXISTS (
             SELECT 1 FROM public.profiles
@@ -373,8 +364,8 @@ CREATE POLICY "claims_fleet_admin_all" ON public.meeting_claims FOR ALL
 -- Quality scores
 ALTER TABLE public.quality_scores ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "quality_fleet_admin_all" ON public.quality_scores;
-CREATE POLICY "quality_fleet_admin_all" ON public.quality_scores FOR ALL
+CREATE POLICY "quality_fleet_admin_all"
+    ON public.quality_scores FOR ALL
     USING (
         EXISTS (
             SELECT 1 FROM public.profiles
@@ -386,8 +377,8 @@ CREATE POLICY "quality_fleet_admin_all" ON public.quality_scores FOR ALL
 -- Time analysis flags
 ALTER TABLE public.time_analysis_flags ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "flags_fleet_admin_all" ON public.time_analysis_flags;
-CREATE POLICY "flags_fleet_admin_all" ON public.time_analysis_flags FOR ALL
+CREATE POLICY "flags_fleet_admin_all"
+    ON public.time_analysis_flags FOR ALL
     USING (
         EXISTS (
             SELECT 1 FROM public.profiles
@@ -399,8 +390,8 @@ CREATE POLICY "flags_fleet_admin_all" ON public.time_analysis_flags FOR ALL
 -- Analysis configs
 ALTER TABLE public.time_analysis_configs ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "configs_fleet_admin_all" ON public.time_analysis_configs;
-CREATE POLICY "configs_fleet_admin_all" ON public.time_analysis_configs FOR ALL
+CREATE POLICY "configs_fleet_admin_all"
+    ON public.time_analysis_configs FOR ALL
     USING (
         EXISTS (
             SELECT 1 FROM public.profiles
@@ -422,22 +413,22 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Apply to all tables with updated_at
-DROP TRIGGER IF EXISTS time_reports_updated_at ON public.time_report_records;
-CREATE TRIGGER time_reports_updated_at BEFORE UPDATE ON public.time_report_records
+CREATE TRIGGER time_reports_updated_at
+    BEFORE UPDATE ON public.time_report_records
     FOR EACH ROW
     EXECUTE FUNCTION update_time_reporting_updated_at();
 
-DROP TRIGGER IF EXISTS meetings_updated_at ON public.billable_meetings;
-CREATE TRIGGER meetings_updated_at BEFORE UPDATE ON public.billable_meetings
+CREATE TRIGGER meetings_updated_at
+    BEFORE UPDATE ON public.billable_meetings
     FOR EACH ROW
     EXECUTE FUNCTION update_time_reporting_updated_at();
 
-DROP TRIGGER IF EXISTS flags_updated_at ON public.time_analysis_flags;
-CREATE TRIGGER flags_updated_at BEFORE UPDATE ON public.time_analysis_flags
+CREATE TRIGGER flags_updated_at
+    BEFORE UPDATE ON public.time_analysis_flags
     FOR EACH ROW
     EXECUTE FUNCTION update_time_reporting_updated_at();
 
-DROP TRIGGER IF EXISTS configs_updated_at ON public.time_analysis_configs;
-CREATE TRIGGER configs_updated_at BEFORE UPDATE ON public.time_analysis_configs
+CREATE TRIGGER configs_updated_at
+    BEFORE UPDATE ON public.time_analysis_configs
     FOR EACH ROW
     EXECUTE FUNCTION update_time_reporting_updated_at();

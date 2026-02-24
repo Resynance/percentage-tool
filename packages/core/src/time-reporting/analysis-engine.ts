@@ -328,11 +328,11 @@ export async function getAnalysisSummary(options?: {
   }, {} as Record<string, number>);
 
   const avgDiscrepancy = flags.length > 0
-    ? flags.reduce((sum, f) => sum + Number(f.discrepancyPercentage || 0), 0) / flags.length
+    ? flags.reduce((sum: number, f) => sum + Number(f.discrepancyPercentage || 0), 0) / flags.length
     : 0;
 
   const avgQuality = flags.length > 0
-    ? flags.reduce((sum, f) => sum + Number(f.averageQualityScore || 0), 0) / flags.length
+    ? flags.reduce((sum: number, f) => sum + Number(f.averageQualityScore || 0), 0) / flags.length
     : 0;
 
   return {
