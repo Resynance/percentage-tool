@@ -67,6 +67,7 @@ export default function Sidebar({ userRole }: { userRole?: string }) {
                 { label: 'Activity Over Time', href: '/activity-over-time', icon: BarChart3 },
                 { label: 'Bonus Windows', href: '/bonus-windows', icon: Target },
                 { label: 'Time Analytics', href: '/time-analytics', icon: TrendingUp },
+                { label: 'QA Feedback Analysis', href: '/qa-feedback-analysis', icon: MessageSquare },
             ]
         },
         {

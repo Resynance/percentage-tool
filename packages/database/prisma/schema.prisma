@@ -110,6 +110,7 @@ model DataRecord {
   project           Project                @relation(fields: [projectId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   likertScores      LikertScore[]
   assignments       AssignmentRecord[]
+  qaFeedbackRatings QAFeedbackRating[]
   /// Cross-encoder cache relations: lists of cache entries where this record is source/target
   ceAsSource        CrossEncoderCache[]    @relation("ce_source")
   ceAsTarget        CrossEncoderCache[]    @relation("ce_target")
@@ -292,6 +293,54 @@ model LikertScore {
   @@index([userId], map: "idx_likert_scores_user")
   @@index([llmModel], map: "idx_likert_scores_llm_model")
   @@map("likert_scores")
+  @@schema("public")
+}
+
+/**
+ * QA FEEDBACK RATING: Stores ratings of QA worker feedback from external rating system.
+ * Used for QA performance analysis and quality monitoring.
+ * Links to DataRecord via eval_task_id when the rated feedback can be matched to a task.
+ */
+model QAFeedbackRating {
+  id String @id @default(dbgenerated("gen_random_uuid()::text"))
+
+  // Core identifiers
+  ratingId   String  @unique @map("rating_id") // Unique ID from CSV
+  feedbackId String  @map("feedback_id") // ID of the feedback being rated
+  evalTaskId String? @map("eval_task_id") // FK to data_records (nullable)
+
+  // Rating information
+  isHelpful     Boolean @map("is_helpful") // true = positive, false = negative
+  isDispute     Boolean @default(false) @map("is_dispute")
+  disputeStatus String? @map("dispute_status")
+  disputeReason String? @map("dispute_reason")
+
+  // People involved
+  raterName  String? @map("rater_name")
+  raterEmail String  @map("rater_email")
+  qaName     String? @map("qa_name")
+  qaEmail    String  @map("qa_email")
+
+  // Timestamps
+  ratedAt    DateTime  @map("rated_at") @db.Timestamptz(6)
+  resolvedAt DateTime? @map("resolved_at") @db.Timestamptz(6)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Resolution information
+  resolvedByName   String? @map("resolved_by_name")
+  resolutionReason String? @map("resolution_reason")
+
+  // Relations
+  evalTask DataRecord? @relation(fields: [evalTaskId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@index([qaEmail], map: "idx_qa_feedback_ratings_qa_email")
+  @@index([isHelpful], map: "idx_qa_feedback_ratings_is_helpful")
+  @@index([ratedAt(sort: Desc)], map: "idx_qa_feedback_ratings_rated_at")
+  @@index([evalTaskId], map: "idx_qa_feedback_ratings_eval_task_id")
+  @@index([qaEmail, ratedAt(sort: Desc)], map: "idx_qa_feedback_ratings_composite")
+  @@index([raterEmail], map: "idx_qa_feedback_ratings_rater_email")
+  @@map("qa_feedback_ratings")
   @@schema("public")
 }
 
