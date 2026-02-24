@@ -236,7 +236,7 @@ export default function TimeReportingAnalysisPage() {
                 Avg Discrepancy
               </div>
               <div style={{ fontSize: '32px', fontWeight: 600 }}>
-                {summary.averageDiscrepancy.toFixed(1)}%
+                {Number(summary.averageDiscrepancy).toFixed(1)}%
               </div>
             </div>
 
@@ -245,7 +245,7 @@ export default function TimeReportingAnalysisPage() {
                 Avg Quality
               </div>
               <div style={{ fontSize: '32px', fontWeight: 600 }}>
-                {summary.averageQuality.toFixed(1)}/10
+                {Number(summary.averageQuality).toFixed(1)}/10
               </div>
             </div>
 
@@ -425,10 +425,10 @@ export default function TimeReportingAnalysisPage() {
                         </span>
                       </td>
                       <td style={{ padding: '12px', fontFamily: 'monospace' }}>
-                        {flag.discrepancyPercentage.toFixed(1)}%
+                        {Number(flag.discrepancyPercentage).toFixed(1)}%
                       </td>
                       <td style={{ padding: '12px', fontFamily: 'monospace' }}>
-                        {flag.averageQualityScore.toFixed(1)}/10
+                        {Number(flag.averageQualityScore).toFixed(1)}/10
                       </td>
                       <td style={{ padding: '12px', fontSize: '14px' }}>{flag.flagReason}</td>
                       <td style={{ padding: '12px' }}>
@@ -539,10 +539,10 @@ export default function TimeReportingAnalysisPage() {
                           Hours Worked
                         </div>
                         <div style={{ fontSize: '24px', fontWeight: 600 }}>
-                          {workerDetails.summary.totalHoursWorked.toFixed(1)}h
+                          {Number(workerDetails.summary.totalHoursWorked).toFixed(1)}h
                         </div>
                         <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
-                          Est: {workerDetails.summary.totalEstimatedHours.toFixed(1)}h
+                          Est: {Number(workerDetails.summary.totalEstimatedHours).toFixed(1)}h
                         </div>
                       </div>
 
@@ -551,7 +551,7 @@ export default function TimeReportingAnalysisPage() {
                           Avg Quality
                         </div>
                         <div style={{ fontSize: '24px', fontWeight: 600 }}>
-                          {workerDetails.summary.averageQualityScore.toFixed(1)}/10
+                          {Number(workerDetails.summary.averageQualityScore).toFixed(1)}/10
                         </div>
                       </div>
 
@@ -575,7 +575,7 @@ export default function TimeReportingAnalysisPage() {
                           Claimed Hours
                         </div>
                         <div style={{ fontSize: '20px', fontWeight: 600 }}>
-                          {workerDetails.summary.totalMeetingHoursClaimed.toFixed(1)}h
+                          {Number(workerDetails.summary.totalMeetingHoursClaimed).toFixed(1)}h
                         </div>
                       </div>
 
@@ -584,7 +584,7 @@ export default function TimeReportingAnalysisPage() {
                           Verified Hours
                         </div>
                         <div style={{ fontSize: '20px', fontWeight: 600, color: '#00ff88' }}>
-                          {workerDetails.summary.totalMeetingHoursVerified.toFixed(1)}h
+                          {Number(workerDetails.summary.totalMeetingHoursVerified).toFixed(1)}h
                         </div>
                       </div>
 
@@ -651,16 +651,16 @@ export default function TimeReportingAnalysisPage() {
                                 {Number(report.hoursWorked).toFixed(1)}h
                               </td>
                               <td style={{ padding: '12px', fontFamily: 'monospace' }}>
-                                {report.estimatedHours.toFixed(1)}h
+                                {Number(report.estimatedHours).toFixed(1)}h
                               </td>
                               <td style={{ padding: '12px', fontFamily: 'monospace' }}>
-                                <div>{report.meetingHoursClaimed.toFixed(1)}h claimed</div>
+                                <div>{Number(report.meetingHoursClaimed).toFixed(1)}h claimed</div>
                                 <div style={{ fontSize: '11px', color: '#00ff88' }}>
-                                  {report.meetingHoursVerified.toFixed(1)}h verified
+                                  {Number(report.meetingHoursVerified).toFixed(1)}h verified
                                 </div>
                               </td>
                               <td style={{ padding: '12px', fontFamily: 'monospace' }}>
-                                {report.averageQualityScore > 0 ? report.averageQualityScore.toFixed(1) : 'N/A'}/10
+                                {report.averageQualityScore > 0 ? Number(report.averageQualityScore).toFixed(1) : 'N/A'}/10
                               </td>
                               <td style={{ padding: '12px' }}>
                                 {report.flags.length > 0 ? (
