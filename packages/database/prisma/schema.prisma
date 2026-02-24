@@ -1346,6 +1346,7 @@ enum FlagSeverity {
   HIGH
   CRITICAL
 
+  @@map("flag_severity")
   @@schema("public")
 }
 
@@ -1355,5 +1356,6 @@ enum FlagStatus {
   RESOLVED
   DISMISSED
 
+  @@map("flag_status")
   @@schema("public")
 }
