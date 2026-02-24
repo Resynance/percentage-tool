@@ -192,7 +192,7 @@ export default function TimeReportingAnalysisPage() {
         padding: '40px',
       }}
     >
-      <AppSwitcher currentAppName="fleet" />
+      <AppSwitcher currentApp="fleet" />
 
       <div style={{ maxWidth: '1600px', margin: '0 auto' }}>
         <div style={{ marginBottom: '40px' }}>

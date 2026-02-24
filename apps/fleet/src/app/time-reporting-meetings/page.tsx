@@ -194,7 +194,7 @@ export default function TimeReportingMeetingsPage() {
         padding: '40px',
       }}
     >
-      <AppSwitcher currentAppName="fleet" />
+      <AppSwitcher currentApp="fleet" />
 
       <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
         {/* Header */}

@@ -131,7 +131,7 @@ export default function TimeReportingImportPage() {
         padding: '40px',
       }}
     >
-      <AppSwitcher currentAppName="fleet" />
+      <AppSwitcher currentApp="fleet" />
 
       <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
         {/* Header */}
