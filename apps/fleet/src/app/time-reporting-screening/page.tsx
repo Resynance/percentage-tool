@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { AppSwitcher } from '@repo/ui/components/AppSwitcher';
+import { AppSwitcher } from '@repo/ui';
 import Link from 'next/link';
 
 interface WorkerMetrics {
@@ -56,6 +56,7 @@ export default function TimeReportingScreeningPage() {
   const [endDate, setEndDate] = useState('');
   const [experienceFilter, setExperienceFilter] = useState('all');
   const [flagFilter, setFlagFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Sorting
   const [sortColumn, setSortColumn] = useState<keyof WorkerMetrics>('avgHoursPerTask');
@@ -95,7 +96,18 @@ export default function TimeReportingScreeningPage() {
     }
   };
 
-  const sortedWorkers = [...workers].sort((a, b) => {
+  // Filter by search query
+  const searchFilteredWorkers = workers.filter(worker => {
+    if (!searchQuery.trim()) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      worker.workerName.toLowerCase().includes(query) ||
+      worker.workerEmail.toLowerCase().includes(query)
+    );
+  });
+
+  // Sort filtered workers
+  const sortedWorkers = [...searchFilteredWorkers].sort((a, b) => {
     const aVal = a[sortColumn];
     const bVal = b[sortColumn];
 
@@ -121,7 +133,8 @@ export default function TimeReportingScreeningPage() {
   };
 
   const selectAllFlagged = () => {
-    const flagged = workers.filter(w => w.flagStatus !== 'NORMAL').map(w => w.workerEmail);
+    // Select flagged workers from current search/filter results
+    const flagged = sortedWorkers.filter(w => w.flagStatus !== 'NORMAL').map(w => w.workerEmail);
     setSelectedWorkers(new Set(flagged));
   };
 
@@ -256,6 +269,26 @@ export default function TimeReportingScreeningPage() {
               <option value="INCONSISTENT">Inconsistent</option>
             </select>
           </div>
+
+          <div>
+            <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', color: 'var(--text-secondary)' }}>
+              Search Worker
+            </label>
+            <input
+              type="text"
+              placeholder="Search by name or email..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                borderRadius: '6px',
+                border: '1px solid var(--border-primary)',
+                backgroundColor: 'var(--bg-secondary)',
+                color: 'var(--text-primary)',
+              }}
+            />
+          </div>
         </div>
 
         <div style={{ marginTop: '16px', display: 'flex', gap: '12px' }}>
@@ -268,6 +301,7 @@ export default function TimeReportingScreeningPage() {
               setEndDate('');
               setExperienceFilter('all');
               setFlagFilter('all');
+              setSearchQuery('');
             }}
             className="btn-secondary"
           >
@@ -349,9 +383,22 @@ export default function TimeReportingScreeningPage() {
         </div>
       )}
 
-      {/* Selection Actions */}
+      {/* Selection Actions - Sticky Banner */}
       {selectedWorkers.size > 0 && (
-        <div className="glass-card" style={{ padding: '16px', marginBottom: '24px', backgroundColor: 'var(--accent)22' }}>
+        <div
+          className="glass-card"
+          style={{
+            padding: '16px',
+            marginBottom: '24px',
+            backgroundColor: 'var(--accent)22',
+            border: '1px solid var(--accent)44',
+            position: 'sticky',
+            top: '0',
+            zIndex: 100,
+            backdropFilter: 'blur(20px)',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+          }}
+        >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ fontSize: '14px', fontWeight: 600 }}>
               {selectedWorkers.size} worker{selectedWorkers.size !== 1 ? 's' : ''} selected
@@ -371,9 +418,16 @@ export default function TimeReportingScreeningPage() {
       {/* Workers Table */}
       <div className="glass-card" style={{ padding: '24px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <h3 style={{ fontSize: '18px', fontWeight: 600 }}>
-            Worker Metrics {loading && '(Loading...)'}
-          </h3>
+          <div>
+            <h3 style={{ fontSize: '18px', fontWeight: 600 }}>
+              Worker Metrics {loading && '(Loading...)'}
+            </h3>
+            {searchQuery && (
+              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                Showing {sortedWorkers.length} of {workers.length} workers
+              </p>
+            )}
+          </div>
           <button onClick={selectAllFlagged} className="btn-secondary" style={{ fontSize: '13px' }}>
             Select All Flagged
           </button>
@@ -395,10 +449,10 @@ export default function TimeReportingScreeningPage() {
                   <th style={{ padding: '12px', width: '40px' }}>
                     <input
                       type="checkbox"
-                      checked={selectedWorkers.size === workers.length && workers.length > 0}
+                      checked={selectedWorkers.size === sortedWorkers.length && sortedWorkers.length > 0}
                       onChange={(e) => {
                         if (e.target.checked) {
-                          setSelectedWorkers(new Set(workers.map(w => w.workerEmail)));
+                          setSelectedWorkers(new Set(sortedWorkers.map(w => w.workerEmail)));
                         } else {
                           setSelectedWorkers(new Set());
                         }

@@ -70,7 +70,7 @@ function parseworkActivities(notes: string): string[] {
   return activities;
 }
 
-export async function analyzeTimeReport(reportId: string): Promise<TimeReportAnalysis> {
+export async function analyzeTimeReport(reportId: string, forceReanalyze: boolean = false): Promise<TimeReportAnalysis> {
   const report = await prisma.timeReportRecord.findUnique({
     where: { id: reportId },
   });
@@ -79,7 +79,54 @@ export async function analyzeTimeReport(reportId: string): Promise<TimeReportAna
     throw new Error(`Time report ${reportId} not found`);
   }
 
-  // Delete existing analysis records to ensure idempotency
+  // Check if analysis already exists
+  const existingEstimate = await prisma.timeEstimate.findFirst({
+    where: { timeReportId: reportId },
+  });
+
+  // If analysis exists and we're not forcing re-analysis, return existing results
+  if (existingEstimate && !forceReanalyze) {
+    const existingFlag = await prisma.timeAnalysisFlag.findFirst({
+      where: { timeReportId: reportId },
+    });
+
+    const estimates = await prisma.timeEstimate.findMany({
+      where: { timeReportId: reportId },
+    });
+
+    const qualityScores = await prisma.qualityScore.findMany({
+      where: { timeReportId: reportId },
+    });
+
+    const meetingClaims = await prisma.meetingClaim.findMany({
+      where: { timeReportId: reportId },
+    });
+
+    const totalEstimatedMinutes = estimates.reduce((sum, e) => sum + e.estimatedMinutes, 0);
+    const averageQualityScore = qualityScores.length > 0
+      ? qualityScores.reduce((sum, q) => sum + Number(q.qualityScore), 0) / qualityScores.length
+      : 0;
+    const totalMeetingClaimedMinutes = meetingClaims.reduce((sum, m) => sum + (m.claimedDurationMinutes || 0), 0);
+    const totalMeetingVerifiedMinutes = meetingClaims.filter(m => m.verified).reduce((sum, m) => sum + (m.claimedDurationMinutes || 0), 0);
+
+    return {
+      reportId,
+      workerName: report.workerName,
+      workerEmail: report.workerEmail,
+      workDate: report.workDate,
+      actualHours: Number(report.hoursWorked),
+      estimatedHours: totalEstimatedMinutes / 60,
+      meetingHoursClaimed: totalMeetingClaimedMinutes / 60,
+      meetingHoursVerified: totalMeetingVerifiedMinutes / 60,
+      averageQualityScore,
+      discrepancyPercentage: existingFlag ? Number(existingFlag.discrepancyPercentage || 0) : 0,
+      shouldFlag: existingFlag !== null,
+      flagReason: existingFlag?.flagReason || null,
+      flagSeverity: existingFlag?.severity || null,
+    };
+  }
+
+  // Delete existing analysis records before re-analyzing
   await prisma.timeEstimate.deleteMany({ where: { timeReportId: reportId } });
   await prisma.qualityScore.deleteMany({ where: { timeReportId: reportId } });
   await prisma.meetingClaim.deleteMany({ where: { timeReportId: reportId } });
@@ -173,9 +220,17 @@ export async function analyzeTimeReport(reportId: string): Promise<TimeReportAna
 
   const adjustedExpectedHours = estimatedHours + meetingHoursVerified;
   const discrepancy = actualHours - adjustedExpectedHours;
-  const discrepancyPercentage = adjustedExpectedHours > 0 
-    ? (Math.abs(discrepancy) / adjustedExpectedHours) * 100 
-    : 0;
+
+  // Calculate discrepancy percentage with safeguards against extreme values
+  let discrepancyPercentage = 0;
+  if (adjustedExpectedHours > 0.01) { // Minimum threshold to prevent division by tiny numbers
+    discrepancyPercentage = (Math.abs(discrepancy) / adjustedExpectedHours) * 100;
+    // Cap at 999% to fit database Decimal(5,2) constraint (max 999.99)
+    discrepancyPercentage = Math.min(discrepancyPercentage, 999);
+  } else if (actualHours > 0) {
+    // If expected hours is near zero but actual hours exist, treat as extreme overtime
+    discrepancyPercentage = 999;
+  }
 
   const shouldFlag = discrepancyPercentage > config.timeDiscrepancyThreshold;
   let flagReason: string | null = null;
@@ -242,14 +297,15 @@ export async function analyzeTimeReport(reportId: string): Promise<TimeReportAna
 export async function analyzeBatchTimeReports(
   reportIds: string[],
   onProgress?: (current: number, total: number) => void,
+  forceReanalyze: boolean = false,
 ): Promise<TimeReportAnalysis[]> {
   const results: TimeReportAnalysis[] = [];
-  
+
   for (let i = 0; i < reportIds.length; i++) {
     try {
-      const result = await analyzeTimeReport(reportIds[i]);
+      const result = await analyzeTimeReport(reportIds[i], forceReanalyze);
       results.push(result);
-      
+
       if (onProgress) {
         onProgress(i + 1, reportIds.length);
       }
@@ -257,7 +313,7 @@ export async function analyzeBatchTimeReports(
       console.error(`[Batch Analysis] Error analyzing report ${reportIds[i]}:`, error);
     }
   }
-  
+
   return results;
 }
 
@@ -268,6 +324,7 @@ export async function analyzeAllTimeReports(
     workerEmail?: string;
     workerEmails?: string[];
     onProgress?: (current: number, total: number) => void;
+    forceReanalyze?: boolean;
   },
 ): Promise<TimeReportAnalysis[]> {
   const where: any = {};
@@ -296,6 +353,7 @@ export async function analyzeAllTimeReports(
   return analyzeBatchTimeReports(
     reports.map(r => r.id),
     options?.onProgress,
+    options?.forceReanalyze || false,
   );
 }
 

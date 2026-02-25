@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@repo/auth/server';
 import { analyzeAllTimeReports, getAnalysisSummary } from '@repo/core/time-reporting';
+import { prisma } from '@repo/database';
 
 async function requireFleetAuth(request: NextRequest) {
   const supabase = await createClient();
@@ -45,16 +46,38 @@ export async function POST(request: NextRequest) {
       options.workerEmail = workerEmail;
     }
 
+    // Check if we should force re-analysis (default: preserve existing analysis)
+    const forceReanalyze = body.forceReanalyze === true;
+    options.forceReanalyze = forceReanalyze;
+
+    // Run analysis (will use cached results if they exist and forceReanalyze is false)
     const results = await analyzeAllTimeReports(options);
+
+    // Check if any reports were newly analyzed vs using cached results
+    const reportIds = results.map(r => r.reportId);
+    const existingAnalysis = await prisma.timeEstimate.findMany({
+      where: { timeReportId: { in: reportIds } },
+      select: { timeReportId: true, createdAt: true },
+      orderBy: { createdAt: 'desc' },
+      take: 1,
+    });
+
+    // If most recent analysis is older than 5 seconds, assume we used cache
+    const usedCache = existingAnalysis.length > 0 &&
+      !forceReanalyze &&
+      (Date.now() - existingAnalysis[0].createdAt.getTime()) > 5000;
 
     return NextResponse.json({
       success: true,
       analyzed: results.length,
       flagged: results.filter(r => r.shouldFlag).length,
       results,
-      message: results.length >= 100
+      message: usedCache
+        ? `Using existing analysis for ${results.length} time reports (already analyzed)`
+        : results.length >= 100
         ? `Analyzed first 100 time reports (limit reached). Use a smaller date range for more targeted analysis.`
         : `Analyzed ${results.length} time reports`,
+      usedCache,
     });
   } catch (error: any) {
     console.error('Analysis error:', error);

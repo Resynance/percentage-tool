@@ -16,6 +16,12 @@ interface Flag {
   discrepancyPercentage: number;
   averageQualityScore: number;
   meetingHoursVerified: number;
+  reviewedBy?: {
+    email: string;
+    id: string;
+  };
+  reviewedAt?: string;
+  resolutionNotes?: string;
 }
 
 interface Summary {
@@ -64,6 +70,12 @@ export default function TimeReportingAnalysisPage() {
   const [workerDetails, setWorkerDetails] = useState<WorkerDetails | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [selectedWorkerEmails, setSelectedWorkerEmails] = useState<string[]>([]);
+  const [forceReanalyze, setForceReanalyze] = useState(false);
+
+  // Notes modal state
+  const [showNotesModal, setShowNotesModal] = useState(false);
+  const [notesModalData, setNotesModalData] = useState<{ flagId: string; status: string; actionLabel: string } | null>(null);
+  const [resolutionNotes, setResolutionNotes] = useState('');
 
   const fetchFlags = useCallback(async () => {
     setLoading(true);
@@ -77,7 +89,39 @@ export default function TimeReportingAnalysisPage() {
       const response = await fetch(`/api/time-reporting/flags?${params}`);
       if (response.ok) {
         const data = await response.json();
-        setFlags(data.flags || []);
+        let flagsData = data.flags || [];
+
+        // Filter by selected workers if coming from Quick Screening
+        if (selectedWorkerEmails.length > 0) {
+          flagsData = flagsData.filter((flag: Flag) =>
+            selectedWorkerEmails.includes(flag.workerEmail)
+          );
+
+          // Calculate summary from filtered flags instead of fetching from server
+          const flagsBySeverity: Record<string, number> = {};
+          let totalDiscrepancy = 0;
+          let totalQuality = 0;
+          let qualityCount = 0;
+
+          flagsData.forEach((flag: Flag) => {
+            flagsBySeverity[flag.severity] = (flagsBySeverity[flag.severity] || 0) + 1;
+            totalDiscrepancy += flag.discrepancyPercentage || 0;
+            if (flag.averageQualityScore) {
+              totalQuality += flag.averageQualityScore;
+              qualityCount++;
+            }
+          });
+
+          setSummary({
+            totalReports: flagsData.length,
+            totalFlags: flagsData.length,
+            flagsBySeverity,
+            averageDiscrepancy: flagsData.length > 0 ? totalDiscrepancy / flagsData.length : 0,
+            averageQuality: qualityCount > 0 ? totalQuality / qualityCount : 0,
+          });
+        }
+
+        setFlags(flagsData);
       }
     } catch (error) {
       console.error('Error fetching flags:', error);
@@ -85,6 +129,8 @@ export default function TimeReportingAnalysisPage() {
       setLoading(false);
     }
   }, [startDate, endDate, statusFilter, severityFilter]);
+  // Note: selectedWorkerEmails intentionally not in deps to avoid infinite loop
+  // It's read directly from state inside the function
 
   const fetchSummary = useCallback(async () => {
     try {
@@ -102,18 +148,19 @@ export default function TimeReportingAnalysisPage() {
     }
   }, [startDate, endDate]);
 
+  // Read URL parameters once on mount
   useEffect(() => {
-    // Read URL parameters for pre-selected workers from screening page
     const params = new URLSearchParams(window.location.search);
     const workersParam = params.get('workers');
     if (workersParam) {
       const emails = workersParam.split(',').map(e => e.trim()).filter(Boolean);
       setSelectedWorkerEmails(emails);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
 
-    fetchFlags();
-    fetchSummary();
-  }, [fetchFlags, fetchSummary]);
+  // Don't fetch flags automatically - only after running analysis
+  // Flags will be fetched after runAnalysis completes
 
   const runAnalysis = async () => {
     if (!startDate || !endDate) {
@@ -125,7 +172,7 @@ export default function TimeReportingAnalysisPage() {
     setMessage(null);
 
     try {
-      const payload: any = { startDate, endDate };
+      const payload: any = { startDate, endDate, forceReanalyze };
 
       // Include selected workers if filtering from screening page
       if (selectedWorkerEmails.length > 0) {
@@ -141,12 +188,17 @@ export default function TimeReportingAnalysisPage() {
       const data = await response.json();
 
       if (response.ok) {
+        const uniqueWorkers = new Set(data.results.filter((r: any) => r.shouldFlag).map((r: any) => r.workerEmail));
+        const cacheMessage = data.usedCache ? ' (using existing analysis)' : '';
         setMessage({
           type: 'success',
-          text: `Analysis complete! Analyzed ${data.analyzed} reports, flagged ${data.flagged} workers`,
+          text: `Analysis complete! Analyzed ${data.analyzed} reports, flagged ${uniqueWorkers.size} worker${uniqueWorkers.size !== 1 ? 's' : ''}${cacheMessage}`,
         });
         fetchFlags();
-        fetchSummary();
+        // Only fetch full summary if no workers are selected (otherwise calculate from filtered flags)
+        if (selectedWorkerEmails.length === 0) {
+          fetchSummary();
+        }
       } else {
         setMessage({ type: 'error', text: data.error || 'Analysis failed' });
       }
@@ -157,26 +209,68 @@ export default function TimeReportingAnalysisPage() {
     }
   };
 
-  const updateFlagStatus = async (flagId: string, status: string) => {
+  const openNotesModal = (flagId: string, status: string, actionLabel: string) => {
+    setNotesModalData({ flagId, status, actionLabel });
+    setResolutionNotes('');
+    setShowNotesModal(true);
+  };
+
+  const closeNotesModal = () => {
+    setShowNotesModal(false);
+    setNotesModalData(null);
+    setResolutionNotes('');
+  };
+
+  const submitFlagUpdate = async () => {
+    if (!notesModalData) return;
+
+    await updateFlagStatus(notesModalData.flagId, notesModalData.status, resolutionNotes);
+    closeNotesModal();
+  };
+
+  const updateFlagStatus = async (flagId: string, status: string, notes?: string) => {
     try {
       const response = await fetch('/api/time-reporting/flags', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ flagId, status }),
+        body: JSON.stringify({ flagId, status, resolutionNotes: notes || null }),
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        // Success - refresh the flags list
+        // Success - show message and refresh the flags list
+        const statusLabels: Record<string, string> = {
+          UNDER_REVIEW: 'marked for review',
+          RESOLVED: 'resolved',
+          DISMISSED: 'dismissed',
+        };
+        const statusLabel = statusLabels[status] || 'updated';
+
+        setMessage({
+          type: 'success',
+          text: `Flag ${statusLabel} successfully`,
+        });
+
         fetchFlags();
+
+        // If worker details modal is open, refresh it to show updated flag status
+        if (selectedWorker) {
+          viewWorkerDetails(selectedWorker);
+        }
+
+        // Clear message after 3 seconds
+        setTimeout(() => setMessage(null), 3000);
       } else {
-        // Error - show alert with details
+        // Error - show message with details
         const errorMessage = response.status === 404
-          ? 'Flag not found. It may have been deleted. Refreshing list...'
+          ? 'Flag not found. It may have been deleted.'
           : `Failed to update flag: ${data.error || 'Unknown error'}`;
 
-        alert(errorMessage);
+        setMessage({
+          type: 'error',
+          text: errorMessage,
+        });
 
         // Refresh flags list to show current state
         fetchFlags();
@@ -188,21 +282,31 @@ export default function TimeReportingAnalysisPage() {
   };
 
   const viewWorkerDetails = async (workerEmail: string) => {
+    // Clear previous worker details before fetching new ones
+    setWorkerDetails(null);
     setSelectedWorker(workerEmail);
     setLoadingDetails(true);
+
     try {
       const params = new URLSearchParams();
       params.append('workerEmail', workerEmail);
       if (startDate) params.append('startDate', startDate);
       if (endDate) params.append('endDate', endDate);
+      params.append('_t', Date.now().toString()); // Cache busting
 
-      const response = await fetch(`/api/time-reporting/worker-details?${params}`);
+      const response = await fetch(`/api/time-reporting/worker-details?${params}`, {
+        cache: 'no-store',
+      });
       if (response.ok) {
         const data = await response.json();
         setWorkerDetails(data);
+      } else {
+        console.error('Failed to fetch worker details:', response.status);
+        setWorkerDetails(null);
       }
     } catch (error) {
       console.error('Error fetching worker details:', error);
+      setWorkerDetails(null);
     } finally {
       setLoadingDetails(false);
     }
@@ -212,6 +316,56 @@ export default function TimeReportingAnalysisPage() {
     setSelectedWorker(null);
     setWorkerDetails(null);
   };
+
+  // Aggregate flags by worker (one row per worker)
+  const aggregatedWorkers = flags.reduce((acc, flag) => {
+    const existing = acc.find(w => w.workerEmail === flag.workerEmail);
+
+    if (existing) {
+      existing.flagCount++;
+      existing.flags.push(flag);
+
+      // Track worst severity
+      const severityOrder: Record<string, number> = { CRITICAL: 4, HIGH: 3, MEDIUM: 2, LOW: 1 };
+      if ((severityOrder[flag.severity] || 0) > (severityOrder[existing.worstSeverity] || 0)) {
+        existing.worstSeverity = flag.severity;
+      }
+
+      // Track earliest and latest dates
+      const flagDate = new Date(flag.workDate);
+      if (flagDate < new Date(existing.earliestDate)) {
+        existing.earliestDate = flag.workDate;
+      }
+      if (flagDate > new Date(existing.latestDate)) {
+        existing.latestDate = flag.workDate;
+      }
+
+      // Count by status
+      existing.statusCounts[flag.status] = (existing.statusCounts[flag.status] || 0) + 1;
+    } else {
+      acc.push({
+        workerName: flag.workerName,
+        workerEmail: flag.workerEmail,
+        flagCount: 1,
+        worstSeverity: flag.severity,
+        earliestDate: flag.workDate,
+        latestDate: flag.workDate,
+        flags: [flag],
+        statusCounts: { [flag.status]: 1 },
+      });
+    }
+
+    return acc;
+  }, [] as Array<{
+    workerName: string;
+    workerEmail: string;
+    flagCount: number;
+    worstSeverity: string;
+    earliestDate: string;
+    latestDate: string;
+    flags: Flag[];
+    statusCounts: Record<string, number>;
+  }>);
 
   return (
     <div
@@ -376,7 +530,7 @@ export default function TimeReportingAnalysisPage() {
               />
             </div>
 
-            <div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <button
                 onClick={runAnalysis}
                 disabled={analyzing}
@@ -385,11 +539,45 @@ export default function TimeReportingAnalysisPage() {
               >
                 {analyzing ? 'Analyzing...' : '▶ Run Analysis'}
               </button>
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontSize: '12px',
+                  color: 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={forceReanalyze}
+                  onChange={(e) => setForceReanalyze(e.target.checked)}
+                  style={{ cursor: 'pointer' }}
+                />
+                Force re-analysis
+              </label>
             </div>
 
             <div>
               <button onClick={fetchFlags} disabled={loading} className="btn-secondary" style={{ padding: '12px' }}>
                 ⟳ Refresh
+              </button>
+            </div>
+
+            <div>
+              <button
+                onClick={() => {
+                  setFlags([]);
+                  setSummary(null);
+                  setMessage({ type: 'success', text: 'Results cleared' });
+                  setTimeout(() => setMessage(null), 2000);
+                }}
+                className="btn-secondary"
+                style={{ padding: '12px' }}
+              >
+                🗑️ Clear Results
               </button>
             </div>
           </div>
@@ -459,7 +647,9 @@ export default function TimeReportingAnalysisPage() {
             </p>
           ) : flags.length === 0 ? (
             <p style={{ textAlign: 'center', padding: '32px', color: 'var(--text-secondary)' }}>
-              No flags found. Run analysis to identify discrepancies.
+              {selectedWorkerEmails.length > 0
+                ? `Click "▶ Run Analysis" to analyze the ${selectedWorkerEmails.length} selected worker${selectedWorkerEmails.length !== 1 ? 's' : ''}.`
+                : 'No flags found. Run analysis to identify discrepancies.'}
             </p>
           ) : (
             <div style={{ overflowX: 'auto' }}>
@@ -467,23 +657,36 @@ export default function TimeReportingAnalysisPage() {
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--border-primary)', textAlign: 'left' }}>
                     <th style={{ padding: '12px', color: 'var(--text-secondary)' }}>Worker</th>
-                    <th style={{ padding: '12px', color: 'var(--text-secondary)' }}>Date</th>
-                    <th style={{ padding: '12px', color: 'var(--text-secondary)' }}>Severity</th>
-                    <th style={{ padding: '12px', color: 'var(--text-secondary)' }}>Discrepancy</th>
-                    <th style={{ padding: '12px', color: 'var(--text-secondary)' }}>Quality</th>
-                    <th style={{ padding: '12px', color: 'var(--text-secondary)' }}>Reason</th>
-                    <th style={{ padding: '12px', color: 'var(--text-secondary)' }}>Status</th>
-                    <th style={{ padding: '12px', color: 'var(--text-secondary)' }}>Actions</th>
+                    <th style={{ padding: '12px', color: 'var(--text-secondary)' }}>Total Flags</th>
+                    <th style={{ padding: '12px', color: 'var(--text-secondary)' }}>Worst Severity</th>
+                    <th style={{ padding: '12px', color: 'var(--text-secondary)' }}>Date Range</th>
+                    <th style={{ padding: '12px', color: 'var(--text-secondary)' }}>Status Summary</th>
+                    <th
+                      style={{
+                        padding: '12px',
+                        color: 'var(--text-secondary)',
+                        position: 'sticky',
+                        right: 0,
+                        backgroundColor: 'var(--bg-primary)',
+                        boxShadow: '-4px 0 8px rgba(0, 0, 0, 0.3)',
+                      }}
+                    >
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {flags.map((flag) => (
-                    <tr key={flag.id} style={{ borderBottom: '1px solid var(--border-secondary)' }}>
+                  {aggregatedWorkers.map((worker) => (
+                    <tr key={worker.workerEmail} style={{ borderBottom: '1px solid var(--border-secondary)' }}>
                       <td style={{ padding: '12px' }}>
-                        <div>{flag.workerName}</div>
-                        <div style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>{flag.workerEmail}</div>
+                        <div style={{ fontWeight: 600 }}>{worker.workerName}</div>
+                        <div style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>{worker.workerEmail}</div>
                       </td>
-                      <td style={{ padding: '12px' }}>{new Date(flag.workDate).toLocaleDateString()}</td>
+                      <td style={{ padding: '12px', textAlign: 'center' }}>
+                        <div style={{ fontSize: '20px', fontWeight: 600, color: 'var(--accent)' }}>
+                          {worker.flagCount}
+                        </div>
+                      </td>
                       <td style={{ padding: '12px' }}>
                         <span
                           style={{
@@ -491,76 +694,52 @@ export default function TimeReportingAnalysisPage() {
                             borderRadius: '4px',
                             fontSize: '13px',
                             fontWeight: 600,
-                            backgroundColor: `${SEVERITY_COLORS[flag.severity]}22`,
-                            color: SEVERITY_COLORS[flag.severity],
+                            backgroundColor: `${SEVERITY_COLORS[worker.worstSeverity as keyof typeof SEVERITY_COLORS]}22`,
+                            color: SEVERITY_COLORS[worker.worstSeverity as keyof typeof SEVERITY_COLORS],
                           }}
                         >
-                          {flag.severity}
+                          {worker.worstSeverity}
                         </span>
                       </td>
-                      <td style={{ padding: '12px', fontFamily: 'monospace' }}>
-                        {Number(flag.discrepancyPercentage).toFixed(1)}%
+                      <td style={{ padding: '12px', fontSize: '13px' }}>
+                        <div>{new Date(worker.earliestDate).toLocaleDateString()}</div>
+                        {worker.earliestDate !== worker.latestDate && (
+                          <div style={{ color: 'var(--text-tertiary)' }}>
+                            to {new Date(worker.latestDate).toLocaleDateString()}
+                          </div>
+                        )}
                       </td>
-                      <td style={{ padding: '12px', fontFamily: 'monospace' }}>
-                        {Number(flag.averageQualityScore).toFixed(1)}/10
+                      <td style={{ padding: '12px', fontSize: '13px' }}>
+                        {Object.entries(worker.statusCounts).map(([status, count]) => (
+                          <div key={status} style={{ marginBottom: '4px' }}>
+                            <span style={{ color: 'var(--text-secondary)' }}>
+                              {status.replace('_', ' ')}:
+                            </span>{' '}
+                            <span style={{ fontWeight: 600 }}>{count}</span>
+                          </div>
+                        ))}
                       </td>
-                      <td style={{ padding: '12px', fontSize: '14px' }}>{flag.flagReason}</td>
-                      <td style={{ padding: '12px' }}>
-                        <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                          {flag.status.replace('_', ' ')}
-                        </span>
-                      </td>
-                      <td style={{ padding: '12px' }}>
-                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                          <button
-                            onClick={() => viewWorkerDetails(flag.workerEmail)}
-                            className="btn-primary"
-                            style={{
-                              padding: '6px 12px',
-                              fontSize: '13px',
-                              fontWeight: 600,
-                              whiteSpace: 'nowrap'
-                            }}
-                          >
-                            View Details
-                          </button>
-                          {flag.status === 'PENDING' && (
-                            <button
-                              onClick={() => updateFlagStatus(flag.id, 'UNDER_REVIEW')}
-                              style={{
-                                padding: '6px 12px',
-                                fontSize: '13px',
-                                fontWeight: 600,
-                                backgroundColor: '#ffa500',
-                                color: '#000',
-                                border: 'none',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                whiteSpace: 'nowrap'
-                              }}
-                            >
-                              Review
-                            </button>
-                          )}
-                          {flag.status === 'UNDER_REVIEW' && (
-                            <button
-                              onClick={() => updateFlagStatus(flag.id, 'RESOLVED')}
-                              style={{
-                                padding: '6px 12px',
-                                fontSize: '13px',
-                                fontWeight: 600,
-                                backgroundColor: '#00ff88',
-                                color: '#000',
-                                border: 'none',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                whiteSpace: 'nowrap'
-                              }}
-                            >
-                              Resolve
-                            </button>
-                          )}
-                        </div>
+                      <td
+                        style={{
+                          padding: '12px',
+                          position: 'sticky',
+                          right: 0,
+                          backgroundColor: 'var(--bg-primary)',
+                          boxShadow: '-4px 0 8px rgba(0, 0, 0, 0.3)',
+                        }}
+                      >
+                        <button
+                          onClick={() => viewWorkerDetails(worker.workerEmail)}
+                          className="btn-primary"
+                          style={{
+                            padding: '6px 12px',
+                            fontSize: '13px',
+                            fontWeight: 600,
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          View Details
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -761,21 +940,63 @@ export default function TimeReportingAnalysisPage() {
                               </td>
                               <td style={{ padding: '12px' }}>
                                 {report.flags.length > 0 ? (
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                     {report.flags.map((flag: any) => (
-                                      <span
+                                      <div
                                         key={flag.id}
                                         style={{
-                                          padding: '2px 6px',
-                                          borderRadius: '3px',
-                                          fontSize: '11px',
-                                          fontWeight: 600,
-                                          backgroundColor: `${SEVERITY_COLORS[flag.severity as keyof typeof SEVERITY_COLORS]}22`,
-                                          color: SEVERITY_COLORS[flag.severity as keyof typeof SEVERITY_COLORS],
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '8px',
                                         }}
                                       >
-                                        {flag.severity}
-                                      </span>
+                                        <span
+                                          style={{
+                                            padding: '4px 8px',
+                                            borderRadius: '4px',
+                                            fontSize: '11px',
+                                            fontWeight: 600,
+                                            backgroundColor: `${SEVERITY_COLORS[flag.severity as keyof typeof SEVERITY_COLORS]}22`,
+                                            color: SEVERITY_COLORS[flag.severity as keyof typeof SEVERITY_COLORS],
+                                            whiteSpace: 'nowrap',
+                                          }}
+                                        >
+                                          {flag.severity}
+                                        </span>
+                                        <span
+                                          style={{
+                                            padding: '2px 6px',
+                                            borderRadius: '3px',
+                                            fontSize: '10px',
+                                            fontWeight: 500,
+                                            backgroundColor: 'var(--bg-secondary)',
+                                            color: 'var(--text-secondary)',
+                                            whiteSpace: 'nowrap',
+                                          }}
+                                        >
+                                          {flag.status.replace('_', ' ')}
+                                        </span>
+                                        {flag.status !== 'RESOLVED' && flag.status !== 'DISMISSED' && (
+                                          <button
+                                            onClick={() => openNotesModal(flag.id, 'RESOLVED', 'Review')}
+                                            style={{
+                                              padding: '4px 10px',
+                                              fontSize: '11px',
+                                              fontWeight: 600,
+                                              borderRadius: '4px',
+                                              border: 'none',
+                                              backgroundColor: '#00ff88',
+                                              color: '#000',
+                                              cursor: 'pointer',
+                                              whiteSpace: 'nowrap',
+                                            }}
+                                            onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#33ffaa')}
+                                            onMouseOut={(e) => (e.currentTarget.style.backgroundColor = '#00ff88')}
+                                          >
+                                            ✅ Review
+                                          </button>
+                                        )}
+                                      </div>
                                     ))}
                                   </div>
                                 ) : (
@@ -794,6 +1015,77 @@ export default function TimeReportingAnalysisPage() {
           </div>
         )}
       </div>
+
+      {/* Notes Modal */}
+      {showNotesModal && notesModalData && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 2000,
+            padding: '20px',
+          }}
+          onClick={closeNotesModal}
+        >
+          <div
+            className="glass-card"
+            style={{
+              maxWidth: '600px',
+              width: '100%',
+              padding: '32px',
+              maxHeight: '80vh',
+              overflowY: 'auto',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 style={{ fontSize: '24px', fontWeight: 600, marginBottom: '8px' }}>
+              Review & Resolve Flag
+            </h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '24px' }}>
+              Add notes about your review and mark this flag as resolved
+            </p>
+
+            <div style={{ marginBottom: '24px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 600 }}>
+                Review Notes (Optional)
+              </label>
+              <textarea
+                value={resolutionNotes}
+                onChange={(e) => setResolutionNotes(e.target.value)}
+                placeholder="Record your review notes (optional): What did you find? What action was taken? Any patterns or concerns?"
+                rows={6}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  borderRadius: '6px',
+                  border: '1px solid var(--border-primary)',
+                  backgroundColor: 'var(--bg-secondary)',
+                  color: 'var(--text-primary)',
+                  fontSize: '14px',
+                  fontFamily: 'inherit',
+                  resize: 'vertical',
+                }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button onClick={closeNotesModal} className="btn-secondary">
+                Cancel
+              </button>
+              <button onClick={submitFlagUpdate} className="btn-primary">
+                ✅ Mark as Resolved
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

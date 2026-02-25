@@ -62,12 +62,18 @@ export async function GET(request: NextRequest) {
 
     const flags = await prisma.timeAnalysisFlag.findMany({
       where,
-      orderBy: [{ severity: 'desc' }, { workDate: 'desc' }],
+      orderBy: [{ workDate: 'desc' }, { severity: 'desc' }],
       include: {
         timeReport: {
           select: {
             notes: true,
             hoursWorked: true,
+          },
+        },
+        reviewedBy: {
+          select: {
+            email: true,
+            id: true,
           },
         },
       },
