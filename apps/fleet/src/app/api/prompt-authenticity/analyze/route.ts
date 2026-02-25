@@ -4,6 +4,11 @@ import { prisma } from '@repo/database';
 import { analyzePromptAuthenticity } from '@repo/core';
 
 // ============================================================================
+// VERCEL CONFIGURATION - Increase timeout for long-running analysis jobs
+// ============================================================================
+export const maxDuration = 300; // 5 minutes (Pro plan max)
+
+// ============================================================================
 // HIERARCHICAL PERMISSION HELPER (inline for now, TODO: extract to shared package)
 // ============================================================================
 type UserRole = 'USER' | 'QA' | 'CORE' | 'FLEET' | 'MANAGER' | 'ADMIN';

@@ -4,5 +4,14 @@
   "outputDirectory": ".next",
   "github": {
     "silent": true
+  },
+  "functions": {
+    "app/api/prompt-authenticity/import/route.ts": {
+      "maxDuration": 300,
+      "memory": 3008
+    },
+    "app/api/prompt-authenticity/analyze/route.ts": {
+      "maxDuration": 300
+    }
   }
 }
