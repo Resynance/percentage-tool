@@ -8,6 +8,7 @@ export * from './ai';
 export * from './ingestion';
 export * from './notifications/email-service';
 export * from './time-reporting';
+export * from './prompt-analysis';
 
 // Export module namespaces for better organization
 export * as utils from './utils';
@@ -19,3 +20,4 @@ export * as ai from './ai';
 export * as ingestion from './ingestion';
 export * as notifications from './notifications/email-service';
 export * as timeReporting from './time-reporting';
+export * as promptAnalysis from './prompt-analysis';

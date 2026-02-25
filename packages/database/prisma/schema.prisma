@@ -1359,3 +1359,88 @@ enum FlagStatus {
   @@map("flag_status")
   @@schema("public")
 }
+
+/**
+ * PROMPT AUTHENTICITY RECORDS: Stores prompts and their analysis results.
+ * Used for detecting non-native speaker patterns and AI-generated content.
+ */
+model PromptAuthenticityRecord {
+  id                     String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  versionId              String    @unique @map("version_id")
+  taskKey                String    @map("task_key")
+  prompt                 String    @db.Text
+  versionNo              Int?      @map("version_no")
+  isActive               Boolean?  @map("is_active")
+  createdByName          String?   @map("created_by_name")
+  createdByEmail         String?   @map("created_by_email")
+  createdAt              DateTime? @map("created_at") @db.Timestamptz(6)
+  envKey                 String?   @map("env_key")
+  taskLifecycleStatus    String?   @map("task_lifecycle_status")
+  taskModality           String?   @map("task_modality")
+  scenarioTitle          String?   @map("scenario_title")
+  taskComplexityTier     String?   @map("task_complexity_tier")
+
+  // Analysis results
+  analysisStatus         String    @default("PENDING") @map("analysis_status")
+  isLikelyNonNative      Boolean?  @map("is_likely_non_native")
+  nonNativeConfidence    Decimal?  @map("non_native_confidence") @db.Decimal(5, 2)
+  nonNativeIndicators    Json?     @map("non_native_indicators")
+  isLikelyAIGenerated    Boolean?  @map("is_likely_ai_generated")
+  aiGeneratedConfidence  Decimal?  @map("ai_generated_confidence") @db.Decimal(5, 2)
+  aiGeneratedIndicators  Json?     @map("ai_generated_indicators")
+  overallAssessment      String?   @map("overall_assessment") @db.Text
+  recommendations        Json?
+
+  // Metadata
+  llmModel               String?   @map("llm_model")
+  llmProvider            String?   @map("llm_provider")
+  llmCost                Decimal?  @map("llm_cost") @db.Decimal(10, 6)
+  analyzedAt             DateTime? @map("analyzed_at") @db.Timestamptz(6)
+  errorMessage           String?   @map("error_message") @db.Text
+
+  // Timestamps
+  importedAt             DateTime  @default(now()) @map("imported_at") @db.Timestamptz(6)
+  updatedAt              DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([analysisStatus])
+  @@index([versionId])
+  @@index([taskKey])
+  @@index([createdByEmail])
+  @@index([isLikelyNonNative])
+  @@index([isLikelyAIGenerated])
+  @@map("prompt_authenticity_records")
+  @@schema("public")
+}
+
+/**
+ * PROMPT AUTHENTICITY JOBS: Background job tracking for batch analysis.
+ */
+model PromptAuthenticityJob {
+  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  status               String    @default("PENDING")
+  totalPrompts         Int       @default(0) @map("total_prompts")
+  analyzedPrompts      Int       @default(0) @map("analyzed_prompts")
+  failedPrompts        Int       @default(0) @map("failed_prompts")
+  flaggedNonNative     Int       @default(0) @map("flagged_non_native")
+  flaggedAIGenerated   Int       @default(0) @map("flagged_ai_generated")
+  totalCost            Decimal   @default(0) @map("total_cost") @db.Decimal(10, 6)
+
+  // Date range filters (optional)
+  filterStartDate      DateTime? @map("filter_start_date") @db.Timestamptz(6)
+  filterEndDate        DateTime? @map("filter_end_date") @db.Timestamptz(6)
+
+  // Job metadata
+  startedAt            DateTime? @map("started_at") @db.Timestamptz(6)
+  completedAt          DateTime? @map("completed_at") @db.Timestamptz(6)
+  pausedAt             DateTime? @map("paused_at") @db.Timestamptz(6)
+  cancelledAt          DateTime? @map("cancelled_at") @db.Timestamptz(6)
+  errorMessage         String?   @map("error_message") @db.Text
+
+  // Timestamps
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([status])
+  @@map("prompt_authenticity_jobs")
+  @@schema("public")
+}
