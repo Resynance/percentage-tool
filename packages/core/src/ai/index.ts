@@ -257,9 +257,20 @@ export async function getEmbeddings(texts: string[]): Promise<number[][]> {
 /**
  * Chat Completion with usage tracking.
  * Returns content along with token usage and cost information (when available from OpenRouter).
+ *
+ * @param prompt - The user prompt text
+ * @param systemPrompt - Optional system prompt
+ * @param options - Optional configuration
+ * @param options.silent - If true, suppresses AI call usage notifications (for bulk operations)
+ * @param options.timeoutMs - Request timeout in milliseconds (default: 120000 = 2 minutes)
  */
-export async function generateCompletionWithUsage(prompt: string, systemPrompt?: string): Promise<CompletionResult> {
+export async function generateCompletionWithUsage(
+  prompt: string,
+  systemPrompt?: string,
+  options?: { silent?: boolean; timeoutMs?: number }
+): Promise<CompletionResult> {
   const config = await getProviderConfig();
+  const { silent = false, timeoutMs = 120000 } = options || {};
 
   // TRUNCATION STRATEGY:
   // Large prompts (e.g., analyzing 500+ records) can exceed context limits.
@@ -268,6 +279,10 @@ export async function generateCompletionWithUsage(prompt: string, systemPrompt?:
   const truncatedPrompt = prompt.length > MAX_PROMPT_CHARS
     ? prompt.slice(0, MAX_PROMPT_CHARS) + "\n\n[...Truncated due to length...]"
     : prompt;
+
+  // Create AbortController for timeout
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const response = await fetch(`${config.baseUrl}/chat/completions`, {
@@ -281,7 +296,10 @@ export async function generateCompletionWithUsage(prompt: string, systemPrompt?:
         ],
         temperature: 0.7,
       }),
+      signal: controller.signal,
     });
+
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
@@ -303,19 +321,27 @@ export async function generateCompletionWithUsage(prompt: string, systemPrompt?:
     };
 
     // Send email notification to configured admins (non-blocking, fire-and-forget)
-    // WARNING: This fires on EVERY AI call. During bulk operations (alignment analysis,
-    // ingestion with embeddings), this can generate hundreds of emails. Consider disabling
-    // AI_CALL_USED notifications in admin settings unless specifically needed for monitoring.
-    notifyAICallUsed({
-      operation: 'LLM Completion',
-      model: config.llmModel,
-      cost: result.usage?.cost
-    }).catch(() => {
-      // Silently ignore notification failures to not impact AI operations
-    });
+    // Skip notifications in silent mode (for bulk operations)
+    if (!silent) {
+      notifyAICallUsed({
+        operation: 'LLM Completion',
+        model: config.llmModel,
+        cost: result.usage?.cost
+      }).catch(() => {
+        // Silently ignore notification failures to not impact AI operations
+      });
+    }
 
     return result;
   } catch (error: any) {
+    clearTimeout(timeoutId);
+
+    // Handle timeout errors
+    if (error.name === 'AbortError') {
+      console.error(`LLM request timeout after ${timeoutMs}ms (${config.provider})`);
+      throw new Error(`Request timeout after ${timeoutMs / 1000}s. The AI service may be overloaded or unresponsive.`);
+    }
+
     console.error(`Error in completion (${config.provider}):`, error);
 
     const errorMessage = config.provider === 'openrouter'

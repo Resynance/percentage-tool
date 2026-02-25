@@ -26,7 +26,8 @@ import {
     TrendingUp,
     Bug,
     Clock,
-    ScanSearch
+    ScanSearch,
+    SearchCheck
 } from 'lucide-react';
 import { useState } from 'react';
 import { AppSwitcher } from '@repo/ui/components';
@@ -66,8 +67,10 @@ export default function Sidebar({ userRole }: { userRole?: string }) {
             items: [
                 { label: 'Activity Over Time', href: '/activity-over-time', icon: BarChart3 },
                 { label: 'Bonus Windows', href: '/bonus-windows', icon: Target },
-                { label: 'Time Reporting Analysis', href: '/time-reporting-analysis', icon: Clock },
+                { label: 'Time Reporting - Quick Screen', href: '/time-reporting-screening', icon: Clock },
+                { label: 'Time Reporting - Deep Analysis', href: '/time-reporting-analysis', icon: Clock },
                 { label: 'QA Feedback Analysis', href: '/qa-feedback-analysis', icon: MessageSquare },
+                { label: 'Prompt Authenticity Checker', href: '/prompt-authenticity', icon: SearchCheck },
             ]
         },
         {
