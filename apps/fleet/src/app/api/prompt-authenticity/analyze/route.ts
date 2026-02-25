@@ -421,7 +421,7 @@ async function processAnalysisJob(jobId: string, batchSize: number) {
         let totalCostSum = 0;
 
         results.forEach((result) => {
-          if (result.status === 'fulfilled' && result.value.success) {
+          if (result.status === 'fulfilled' && result.value.success && result.value.result) {
             successCount++;
             if (result.value.result.isLikelyNonNative) flaggedNonNativeCount++;
             if (result.value.result.isLikelyAIGenerated) flaggedAIGeneratedCount++;
