@@ -45,13 +45,13 @@ export declare function processAndStore(records: any[], options: IngestOptions, 
 }>;
 export declare function cancelIngest(jobId: string): Promise<void>;
 export declare function getIngestStatus(jobId: string): Promise<{
-    id: string;
-    createdAt: Date;
     updatedAt: Date;
+    id: string;
     projectId: string;
-    error: string | null;
     status: string;
     totalRecords: number;
+    error: string | null;
+    createdAt: Date;
     type: import("@prisma/client").$Enums.RecordType;
     savedCount: number;
     skippedCount: number;

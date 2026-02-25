@@ -41,8 +41,17 @@ export declare function getEmbeddings(texts: string[]): Promise<number[][]>;
 /**
  * Chat Completion with usage tracking.
  * Returns content along with token usage and cost information (when available from OpenRouter).
+ *
+ * @param prompt - The user prompt text
+ * @param systemPrompt - Optional system prompt
+ * @param options - Optional configuration
+ * @param options.silent - If true, suppresses AI call usage notifications (for bulk operations)
+ * @param options.timeoutMs - Request timeout in milliseconds (default: 120000 = 2 minutes)
  */
-export declare function generateCompletionWithUsage(prompt: string, systemPrompt?: string): Promise<CompletionResult>;
+export declare function generateCompletionWithUsage(prompt: string, systemPrompt?: string, options?: {
+    silent?: boolean;
+    timeoutMs?: number;
+}): Promise<CompletionResult>;
 /**
  * Standard Chat Completion entry point.
  * Used for summarizing trends and performing guideline alignment checks.

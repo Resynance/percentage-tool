@@ -77,7 +77,8 @@ Required JSON format:
 
 export async function analyzePromptAuthenticity(
   promptId: string,
-  promptText: string
+  promptText: string,
+  options?: { silent?: boolean }
 ): Promise<PromptAuthenticityAnalysis> {
   if (!promptText || promptText.trim().length === 0) {
     throw new Error('Prompt text cannot be empty');
@@ -88,7 +89,8 @@ export async function analyzePromptAuthenticity(
   try {
     const response = await generateCompletionWithUsage(
       userMessage,
-      AUTHENTICITY_ANALYSIS_PROMPT
+      AUTHENTICITY_ANALYSIS_PROMPT,
+      { silent: options?.silent || false }
     );
 
     // Extract JSON from response (handles markdown code blocks and conversational text)

@@ -1424,6 +1424,7 @@ model PromptAuthenticityJob {
   flaggedNonNative     Int       @default(0) @map("flagged_non_native")
   flaggedAIGenerated   Int       @default(0) @map("flagged_ai_generated")
   totalCost            Decimal   @default(0) @map("total_cost") @db.Decimal(10, 6)
+  batchSize            Int       @default(200) @map("batch_size")
 
   // Date range filters (optional)
   filterStartDate      DateTime? @map("filter_start_date") @db.Timestamptz(6)
@@ -1434,6 +1435,7 @@ model PromptAuthenticityJob {
   completedAt          DateTime? @map("completed_at") @db.Timestamptz(6)
   pausedAt             DateTime? @map("paused_at") @db.Timestamptz(6)
   cancelledAt          DateTime? @map("cancelled_at") @db.Timestamptz(6)
+  lastHeartbeat        DateTime? @map("last_heartbeat") @db.Timestamptz(6)
   errorMessage         String?   @map("error_message") @db.Text
 
   // Timestamps
