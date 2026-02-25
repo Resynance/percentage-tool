@@ -266,20 +266,24 @@ export async function analyzeAllTimeReports(
     startDate?: Date;
     endDate?: Date;
     workerEmail?: string;
+    workerEmails?: string[];
     onProgress?: (current: number, total: number) => void;
   },
 ): Promise<TimeReportAnalysis[]> {
   const where: any = {};
-  
+
   if (options?.startDate) {
     where.workDate = { ...where.workDate, gte: options.startDate };
   }
-  
+
   if (options?.endDate) {
     where.workDate = { ...where.workDate, lte: options.endDate };
   }
-  
-  if (options?.workerEmail) {
+
+  // Support filtering by multiple worker emails or single email
+  if (options?.workerEmails && options.workerEmails.length > 0) {
+    where.workerEmail = { in: options.workerEmails };
+  } else if (options?.workerEmail) {
     where.workerEmail = options.workerEmail;
   }
 

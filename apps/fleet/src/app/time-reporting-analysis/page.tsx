@@ -63,6 +63,7 @@ export default function TimeReportingAnalysisPage() {
   const [selectedWorker, setSelectedWorker] = useState<string | null>(null);
   const [workerDetails, setWorkerDetails] = useState<WorkerDetails | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
+  const [selectedWorkerEmails, setSelectedWorkerEmails] = useState<string[]>([]);
 
   const fetchFlags = useCallback(async () => {
     setLoading(true);
@@ -102,6 +103,14 @@ export default function TimeReportingAnalysisPage() {
   }, [startDate, endDate]);
 
   useEffect(() => {
+    // Read URL parameters for pre-selected workers from screening page
+    const params = new URLSearchParams(window.location.search);
+    const workersParam = params.get('workers');
+    if (workersParam) {
+      const emails = workersParam.split(',').map(e => e.trim()).filter(Boolean);
+      setSelectedWorkerEmails(emails);
+    }
+
     fetchFlags();
     fetchSummary();
   }, [fetchFlags, fetchSummary]);
@@ -116,10 +125,17 @@ export default function TimeReportingAnalysisPage() {
     setMessage(null);
 
     try {
+      const payload: any = { startDate, endDate };
+
+      // Include selected workers if filtering from screening page
+      if (selectedWorkerEmails.length > 0) {
+        payload.workerEmails = selectedWorkerEmails;
+      }
+
       const response = await fetch('/api/time-reporting/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ startDate, endDate }),
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json();
@@ -149,11 +165,25 @@ export default function TimeReportingAnalysisPage() {
         body: JSON.stringify({ flagId, status }),
       });
 
+      const data = await response.json();
+
       if (response.ok) {
+        // Success - refresh the flags list
+        fetchFlags();
+      } else {
+        // Error - show alert with details
+        const errorMessage = response.status === 404
+          ? 'Flag not found. It may have been deleted. Refreshing list...'
+          : `Failed to update flag: ${data.error || 'Unknown error'}`;
+
+        alert(errorMessage);
+
+        // Refresh flags list to show current state
         fetchFlags();
       }
     } catch (error) {
       console.error('Error updating flag:', error);
+      alert('Network error: Failed to update flag. Please check your connection and try again.');
     }
   };
 
@@ -206,12 +236,56 @@ export default function TimeReportingAnalysisPage() {
               WebkitTextFillColor: 'transparent',
             }}
           >
-            Time Reporting Analysis
+            Time Reporting - Deep Analysis
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '16px' }}>
-            Analyze workforce time logs and identify discrepancies
+            Comprehensive LLM-based analysis of time reports with quality scoring and meeting verification.{' '}
+            <a href="/time-reporting-screening" style={{ color: 'var(--accent)', textDecoration: 'none' }}>
+              ← Back to Quick Screening
+            </a>
           </p>
         </div>
+
+        {/* Info banner for filtered workers */}
+        {selectedWorkerEmails.length > 0 && (
+          <div
+            className="glass-card"
+            style={{
+              padding: '16px',
+              marginBottom: '24px',
+              backgroundColor: 'var(--accent)22',
+              border: '1px solid var(--accent)44',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <span style={{ fontSize: '20px' }}>ℹ️</span>
+              <div>
+                <div style={{ fontWeight: 600, marginBottom: '4px' }}>
+                  Analyzing {selectedWorkerEmails.length} selected worker{selectedWorkerEmails.length !== 1 ? 's' : ''}
+                </div>
+                <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                  Deep analysis will run on workers selected from Quick Screening.{' '}
+                  <button
+                    onClick={() => {
+                      setSelectedWorkerEmails([]);
+                      window.history.replaceState({}, '', '/time-reporting-analysis');
+                    }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--accent)',
+                      textDecoration: 'underline',
+                      cursor: 'pointer',
+                      padding: 0,
+                    }}
+                  >
+                    Clear filter
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {summary && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '20px', marginBottom: '32px' }}>
@@ -440,16 +514,30 @@ export default function TimeReportingAnalysisPage() {
                         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                           <button
                             onClick={() => viewWorkerDetails(flag.workerEmail)}
-                            className="btn-secondary"
-                            style={{ padding: '4px 8px', fontSize: '13px' }}
+                            className="btn-primary"
+                            style={{
+                              padding: '6px 12px',
+                              fontSize: '13px',
+                              fontWeight: 600,
+                              whiteSpace: 'nowrap'
+                            }}
                           >
                             View Details
                           </button>
                           {flag.status === 'PENDING' && (
                             <button
                               onClick={() => updateFlagStatus(flag.id, 'UNDER_REVIEW')}
-                              className="btn-secondary"
-                              style={{ padding: '4px 8px', fontSize: '13px' }}
+                              style={{
+                                padding: '6px 12px',
+                                fontSize: '13px',
+                                fontWeight: 600,
+                                backgroundColor: '#ffa500',
+                                color: '#000',
+                                border: 'none',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                whiteSpace: 'nowrap'
+                              }}
                             >
                               Review
                             </button>
@@ -457,8 +545,17 @@ export default function TimeReportingAnalysisPage() {
                           {flag.status === 'UNDER_REVIEW' && (
                             <button
                               onClick={() => updateFlagStatus(flag.id, 'RESOLVED')}
-                              className="btn-primary"
-                              style={{ padding: '4px 8px', fontSize: '13px' }}
+                              style={{
+                                padding: '6px 12px',
+                                fontSize: '13px',
+                                fontWeight: 600,
+                                backgroundColor: '#00ff88',
+                                color: '#000',
+                                border: 'none',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                whiteSpace: 'nowrap'
+                              }}
                             >
                               Resolve
                             </button>

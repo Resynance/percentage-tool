@@ -110,6 +110,18 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
+    // Check if flag exists before updating
+    const existingFlag = await prisma.timeAnalysisFlag.findUnique({
+      where: { id: flagId },
+    });
+
+    if (!existingFlag) {
+      return NextResponse.json(
+        { error: 'Flag not found', details: 'The specified flag does not exist or has been deleted' },
+        { status: 404 },
+      );
+    }
+
     const flag = await prisma.timeAnalysisFlag.update({
       where: { id: flagId },
       data: {
@@ -127,6 +139,15 @@ export async function PATCH(request: NextRequest) {
     });
   } catch (error: any) {
     console.error('Error updating flag:', error);
+
+    // Handle specific Prisma errors
+    if (error.code === 'P2025') {
+      return NextResponse.json(
+        { error: 'Flag not found', details: 'The specified flag does not exist or has been deleted' },
+        { status: 404 },
+      );
+    }
+
     return NextResponse.json(
       { error: 'Failed to update flag', details: error.message },
       { status: 500 },

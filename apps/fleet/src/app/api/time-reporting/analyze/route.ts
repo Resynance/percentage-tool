@@ -32,12 +32,18 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { startDate, endDate, workerEmail } = body;
+    const { startDate, endDate, workerEmail, workerEmails } = body;
 
     const options: any = {};
     if (startDate) options.startDate = new Date(startDate);
     if (endDate) options.endDate = new Date(endDate);
-    if (workerEmail) options.workerEmail = workerEmail;
+
+    // Support both single workerEmail and multiple workerEmails array
+    if (workerEmails && Array.isArray(workerEmails) && workerEmails.length > 0) {
+      options.workerEmails = workerEmails;
+    } else if (workerEmail) {
+      options.workerEmail = workerEmail;
+    }
 
     const results = await analyzeAllTimeReports(options);
 
