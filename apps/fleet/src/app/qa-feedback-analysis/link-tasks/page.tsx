@@ -48,8 +48,8 @@ export default function LinkTasksPage() {
                     Back to QA Feedback Analysis
                 </button>
 
-                <h1 className="page-title">
-                    <span className="gradient-text">Link Ratings to Tasks</span>
+                <h1 style={{ fontSize: '2rem' }}>
+                    <span className="premium-gradient">Link Ratings to Tasks</span>
                 </h1>
                 <p className="text-[var(--text-secondary)] mt-2">
                     This will link existing QA feedback ratings to their corresponding tasks in the database.
@@ -72,10 +72,7 @@ export default function LinkTasksPage() {
                     onClick={handleLink}
                     disabled={isLinking}
                     className="btn-primary"
-                    style={{
-                        opacity: isLinking ? 0.6 : 1,
-                        cursor: isLinking ? 'not-allowed' : 'pointer',
-                    }}
+                    style={{ opacity: isLinking ? 0.6 : undefined, cursor: isLinking ? 'not-allowed' : undefined }}
                 >
                     {isLinking ? 'Linking...' : 'Start Linking Process'}
                 </button>
