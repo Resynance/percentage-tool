@@ -101,12 +101,22 @@ export default function WorkerDetailsPage() {
         fetchWorkerDetails()
     }, [qaEmail])
 
+    // Escape key to close modal
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && selectedTask) {
+                setSelectedTask(null)
+            }
+        }
+        document.addEventListener('keydown', handleKeyDown)
+        return () => document.removeEventListener('keydown', handleKeyDown)
+    }, [selectedTask])
+
     const fetchWorkerDetails = async () => {
         setIsLoading(true)
         try {
             const params = new URLSearchParams({ qaEmail })
 
-            // Get date range from URL params if available
             const startDate = searchParams.get('startDate')
             const endDate = searchParams.get('endDate')
             const environment = searchParams.get('environment')
@@ -158,6 +168,13 @@ export default function WorkerDetailsPage() {
         return true
     }) || []
 
+    const taskFilters: { label: string; value: typeof taskFilter }[] = [
+        { label: 'All', value: 'all' },
+        { label: 'Positive', value: 'positive' },
+        { label: 'Negative', value: 'negative' },
+        { label: 'Disputed', value: 'disputed' },
+    ]
+
     return (
         <div className="page-container">
             {/* Header */}
@@ -170,8 +187,8 @@ export default function WorkerDetailsPage() {
                     Back to QA Workers
                 </button>
 
-                <h1 className="page-title">
-                    <span className="gradient-text">
+                <h1 style={{ fontSize: '2rem' }}>
+                    <span className="premium-gradient">
                         {workerDetails?.worker.qaName || qaEmail}
                     </span>
                 </h1>
@@ -190,8 +207,8 @@ export default function WorkerDetailsPage() {
             {workerDetails && !isLoading && (
                 <>
                     {/* Worker Summary */}
-                    <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
-                        <div className="glass-card" style={{ flex: 1 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '24px' }}>
+                        <div className="glass-card">
                             <div className="text-sm text-[var(--text-secondary)] mb-1">Total Ratings</div>
                             <div className="text-2xl font-bold">{workerDetails.worker.totalRatings}</div>
                             <div className="mt-2 h-2 bg-[var(--bg-primary)] rounded-full overflow-hidden">
@@ -202,7 +219,7 @@ export default function WorkerDetailsPage() {
                             </div>
                         </div>
 
-                        <div className="glass-card" style={{ flex: 1 }}>
+                        <div className="glass-card">
                             <div className="text-sm text-[var(--text-secondary)] mb-1">Negative %</div>
                             <div className={`text-2xl font-bold ${workerDetails.worker.negativePercent > 25 ? 'text-red-500' : workerDetails.worker.negativePercent > 15 ? 'text-orange-500' : 'text-green-500'}`}>
                                 {workerDetails.worker.negativePercent.toFixed(1)}%
@@ -212,7 +229,7 @@ export default function WorkerDetailsPage() {
                             </div>
                         </div>
 
-                        <div className="glass-card" style={{ flex: 1 }}>
+                        <div className="glass-card">
                             <div className="text-sm text-[var(--text-secondary)] mb-1">Total Feedbacks</div>
                             <div className="text-2xl font-bold">{workerDetails.worker.totalFeedbacks}</div>
                             <div className="text-sm text-[var(--text-secondary)] mt-1">
@@ -223,10 +240,10 @@ export default function WorkerDetailsPage() {
 
                     {/* Environment Breakdown and Timeline */}
                     {(workerDetails.ratingsByEnvironment.length > 0 || workerDetails.ratingsByMonth.length > 0) && (
-                        <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
                             {/* Environment Breakdown */}
                             {workerDetails.ratingsByEnvironment.length > 0 && (
-                                <div className="glass-card" style={{ flex: 1 }}>
+                                <div className="glass-card">
                                     <h3 className="font-semibold mb-3 flex items-center gap-2">
                                         <BarChart3 className="w-5 h-5" />
                                         Environment Breakdown
@@ -258,7 +275,7 @@ export default function WorkerDetailsPage() {
 
                             {/* Timeline */}
                             {workerDetails.ratingsByMonth.length > 0 && (
-                                <div className="glass-card" style={{ flex: 1 }}>
+                                <div className="glass-card">
                                     <h3 className="font-semibold mb-3 flex items-center gap-2">
                                         <Calendar className="w-5 h-5" />
                                         Timeline
@@ -292,54 +309,25 @@ export default function WorkerDetailsPage() {
                         <div className="flex items-center justify-between mb-3">
                             <h3 className="font-semibold">Rated Tasks ({filteredTasks.length})</h3>
                             <div className="flex gap-2">
-                                <button
-                                    onClick={() => setTaskFilter('all')}
-                                    className={taskFilter === 'all' ? 'btn-primary text-sm' : 'btn-secondary text-sm'}
-                                >
-                                    All
-                                </button>
-                                <button
-                                    onClick={() => setTaskFilter('positive')}
-                                    className={taskFilter === 'positive' ? 'btn-primary text-sm' : 'btn-secondary text-sm'}
-                                >
-                                    Positive
-                                </button>
-                                <button
-                                    onClick={() => setTaskFilter('negative')}
-                                    className={taskFilter === 'negative' ? 'btn-primary text-sm' : 'btn-secondary text-sm'}
-                                >
-                                    Negative
-                                </button>
-                                <button
-                                    onClick={() => setTaskFilter('disputed')}
-                                    className={taskFilter === 'disputed' ? 'btn-primary text-sm' : 'btn-secondary text-sm'}
-                                >
-                                    Disputed
-                                </button>
+                                {taskFilters.map(({ label, value }) => (
+                                    <button
+                                        key={value}
+                                        onClick={() => setTaskFilter(value)}
+                                        className={taskFilter === value ? 'btn-primary text-sm' : 'btn-secondary text-sm'}
+                                    >
+                                        {label}
+                                    </button>
+                                ))}
                             </div>
                         </div>
 
-                        <div className="space-y-6 max-h-96 overflow-y-auto">
+                        <div className="space-y-3 max-h-[600px] overflow-y-auto">
                             {filteredTasks.map((task) => (
                                 <div
                                     key={task.taskId}
-                                    className="cursor-pointer transition-all duration-200"
+                                    className="glass-card cursor-pointer transition-all duration-200 hover:border-[var(--accent)]"
                                     onClick={() => openTaskHistory(task.taskId)}
-                                    style={{
-                                        background: 'rgba(255, 255, 255, 0.05)',
-                                        border: '2px solid rgba(255, 255, 255, 0.2)',
-                                        borderRadius: '12px',
-                                        padding: '20px',
-                                        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.3)',
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        e.currentTarget.style.border = '2px solid var(--accent)'
-                                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.currentTarget.style.border = '2px solid rgba(255, 255, 255, 0.2)'
-                                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
-                                    }}
+                                    style={{ padding: '16px' }}
                                 >
                                     <div className="flex items-start justify-between mb-3">
                                         <div className="flex-1 pr-4">
@@ -385,6 +373,7 @@ export default function WorkerDetailsPage() {
                         right: 0,
                         bottom: 0,
                         background: 'rgba(0, 0, 0, 0.8)',
+                        backdropFilter: 'blur(4px)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
