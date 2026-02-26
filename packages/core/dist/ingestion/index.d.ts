@@ -46,18 +46,18 @@ export declare function processAndStore(records: any[], options: IngestOptions, 
 export declare function cancelIngest(jobId: string): Promise<void>;
 export declare function getIngestStatus(jobId: string): Promise<{
     id: string;
-    createdAt: Date;
-    updatedAt: Date;
-    projectId: string;
-    error: string | null;
+    type: import("@prisma/client").$Enums.RecordType;
     status: string;
     totalRecords: number;
-    type: import("@prisma/client").$Enums.RecordType;
     savedCount: number;
     skippedCount: number;
     skippedDetails: Prisma.JsonValue | null;
+    error: string | null;
     payload: string | null;
     options: Prisma.JsonValue | null;
+    createdAt: Date;
+    updatedAt: Date;
+    projectId: string;
 } | null>;
 export declare function deleteIngestedData(jobId: string): Promise<void>;
 //# sourceMappingURL=index.d.ts.map

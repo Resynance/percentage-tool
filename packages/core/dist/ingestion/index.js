@@ -130,8 +130,17 @@ async function processJobs(projectId) {
             });
         }
         else {
-            const response = await fetch(cache.payload);
-            const data = await response.json();
+            // API type: payload can be either a URL or direct JSON string
+            let data;
+            // Try to parse as JSON first (direct JSON payload)
+            try {
+                data = JSON.parse(cache.payload);
+            }
+            catch {
+                // If parsing fails, treat as URL and fetch
+                const response = await fetch(cache.payload);
+                data = await response.json();
+            }
             records = Array.isArray(data) ? data : [data];
         }
         await processAndStore(records, cache.options, nextJob.id);
@@ -366,13 +375,28 @@ export async function processAndStore(records, options, jobId) {
         // 1. FILTER: Content, Ratings, Keywords
         for (let j = 0; j < chunk.length; j++) {
             const record = chunk[j];
+            // --- Type Filtering (New CSV Format) ---
+            // Skip rows that don't match the selected ingestion type
+            // CSV 'type' column: 'prompt' = TASK, 'feedback' = FEEDBACK
+            if (record.type) {
+                const csvType = record.type.toLowerCase();
+                const skipRow = (type === 'TASK' && csvType !== 'prompt') ||
+                    (type === 'FEEDBACK' && csvType !== 'feedback');
+                if (skipRow) {
+                    skippedCount++;
+                    chunkSkipDetails['Type Mismatch'] = (chunkSkipDetails['Type Mismatch'] || 0) + 1;
+                    continue;
+                }
+            }
             // --- Content Extraction ---
             let content = '';
             if (typeof record === 'string') {
                 content = record;
             }
             else {
-                content = record.feedback_content || record.feedback || record.prompt ||
+                // New CSV format: 'prompt' column for tasks, 'feedback_content' for feedback
+                // Also support legacy formats for backward compatibility
+                content = record.prompt || record.feedback_content || record.feedback ||
                     record.content || record.body || record.task_content ||
                     record.text || record.message || record.instruction || record.response;
                 if (!content || content.length < 10) {
@@ -424,48 +448,67 @@ export async function processAndStore(records, options, jobId) {
             validChunk.push({ record, content, category });
         }
         // 2. DUPLICATE DETECTION (Optimized: Single query per chunk instead of per record)
-        // Extract all task IDs from the chunk
+        // Extract all task IDs and task keys from the chunk (new CSV format uses task_id and task_key)
         const taskIds = validChunk
             .map(v => v.record.task_id || v.record.id || v.record.uuid || v.record.record_id)
             .filter(id => id != null);
-        // Single query to find all existing task IDs in this chunk
+        const taskKeys = validChunk
+            .map(v => v.record.task_key)
+            .filter(key => key != null);
+        // Single query to find all existing task IDs and keys in this chunk
         let existingTaskIds = new Set();
-        if (taskIds.length > 0) {
+        let existingTaskKeys = new Set();
+        if (taskIds.length > 0 || taskKeys.length > 0) {
             const taskIdStrings = taskIds.map(id => String(id));
-            const existing = await prisma.$queryRaw `
-                SELECT
-                    metadata->>'task_id' as task_id,
-                    metadata->>'id' as id,
-                    metadata->>'uuid' as uuid,
-                    metadata->>'record_id' as record_id
-                FROM public.data_records
-                WHERE "projectId" = ${projectId}
-                AND type = ${type}::"RecordType"
-                AND (
-                    metadata->>'task_id' IN (${Prisma.join(taskIdStrings)})
-                    OR metadata->>'id' IN (${Prisma.join(taskIdStrings)})
-                    OR metadata->>'uuid' IN (${Prisma.join(taskIdStrings)})
-                    OR metadata->>'record_id' IN (${Prisma.join(taskIdStrings)})
-                )
-            `;
-            // Add all non-null IDs from all fields to the set
-            for (const row of existing) {
-                if (row.task_id)
-                    existingTaskIds.add(row.task_id);
-                if (row.id)
-                    existingTaskIds.add(row.id);
-                if (row.uuid)
-                    existingTaskIds.add(row.uuid);
-                if (row.record_id)
-                    existingTaskIds.add(row.record_id);
+            const taskKeyStrings = taskKeys.map(key => String(key));
+            // Build query conditions using Prisma.Sql array
+            const conditions = [];
+            if (taskIdStrings.length > 0) {
+                conditions.push(Prisma.sql `metadata->>'task_id' IN (${Prisma.join(taskIdStrings)})`);
+                conditions.push(Prisma.sql `metadata->>'id' IN (${Prisma.join(taskIdStrings)})`);
+                conditions.push(Prisma.sql `metadata->>'uuid' IN (${Prisma.join(taskIdStrings)})`);
+                conditions.push(Prisma.sql `metadata->>'record_id' IN (${Prisma.join(taskIdStrings)})`);
+            }
+            if (taskKeyStrings.length > 0) {
+                conditions.push(Prisma.sql `metadata->>'task_key' IN (${Prisma.join(taskKeyStrings)})`);
+            }
+            if (conditions.length > 0) {
+                const existing = await prisma.$queryRaw `
+                    SELECT
+                        metadata->>'task_id' as task_id,
+                        metadata->>'task_key' as task_key,
+                        metadata->>'id' as id,
+                        metadata->>'uuid' as uuid,
+                        metadata->>'record_id' as record_id
+                    FROM public.data_records
+                    WHERE "projectId" = ${projectId}
+                    AND type = ${type}::"RecordType"
+                    AND (${Prisma.join(conditions, ' OR ')})
+                `;
+                // Add all non-null IDs and keys to the sets
+                for (const row of existing) {
+                    if (row.task_id)
+                        existingTaskIds.add(row.task_id);
+                    if (row.task_key)
+                        existingTaskKeys.add(row.task_key);
+                    if (row.id)
+                        existingTaskIds.add(row.id);
+                    if (row.uuid)
+                        existingTaskIds.add(row.uuid);
+                    if (row.record_id)
+                        existingTaskIds.add(row.record_id);
+                }
             }
         }
         // Filter out duplicates in memory
         const finalChunk = validChunk.filter(v => {
             const taskId = v.record.task_id || v.record.id || v.record.uuid || v.record.record_id;
-            if (!taskId)
-                return true; // No ID to check, allow it
-            const isDuplicate = existingTaskIds.has(String(taskId));
+            const taskKey = v.record.task_key;
+            if (!taskId && !taskKey)
+                return true; // No ID or key to check, allow it
+            const isDuplicateById = taskId && existingTaskIds.has(String(taskId));
+            const isDuplicateByKey = taskKey && existingTaskKeys.has(String(taskKey));
+            const isDuplicate = isDuplicateById || isDuplicateByKey;
             if (isDuplicate) {
                 chunkSkipDetails['Duplicate ID'] = (chunkSkipDetails['Duplicate ID'] || 0) + 1;
             }
@@ -497,9 +540,10 @@ export async function processAndStore(records, options, jobId) {
                     content: v.content,
                     metadata: typeof v.record === 'object' ? v.record : { value: v.record },
                     // embedding is Unsupported("vector") - defaults to NULL, set via raw SQL in vectorizeJob
+                    // Support both new format (author_*) and legacy format (created_by_*)
                     createdById: v.record?.created_by_id ? String(v.record.created_by_id) : null,
-                    createdByName: v.record?.created_by_name ? String(v.record.created_by_name) : null,
-                    createdByEmail: v.record?.created_by_email ? String(v.record.created_by_email) : null,
+                    createdByName: v.record?.author_name || v.record?.created_by_name ? String(v.record?.author_name || v.record?.created_by_name) : null,
+                    createdByEmail: v.record?.author_email || v.record?.created_by_email ? String(v.record?.author_email || v.record?.created_by_email) : null,
                     ...(validCreatedAt && { createdAt: validCreatedAt }),
                     ...(validUpdatedAt && { updatedAt: validUpdatedAt }),
                 }

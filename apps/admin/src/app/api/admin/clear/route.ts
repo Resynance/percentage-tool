@@ -37,7 +37,9 @@ export async function POST(req: NextRequest) {
                         lastFeedbackAnalysis: null
                     }
                 })
-            ]);
+            ], {
+                timeout: 60000 // 60 seconds - increased for large datasets
+            });
 
             // Log audit event (critical operation)
             const auditResult = await logAudit({
@@ -155,7 +157,9 @@ export async function POST(req: NextRequest) {
                 prisma.dataRecord.deleteMany({
                     where: { projectId }
                 })
-            ]);
+            ], {
+                timeout: 60000 // 60 seconds - increased for large datasets
+            });
 
             // Reset project analysis
             await prisma.project.update({

@@ -109,6 +109,18 @@ export async function GET(req: NextRequest) {
             }
         }
 
+        // Filter TASK records to show only version 1 (but only for "All" and "STANDARD" categories)
+        // TOP_10 and BOTTOM_10 categories show all versions
+        // Checks for version fields in multiple naming conventions (version, version_no, versionNo)
+        if (type === 'TASK' && (!category || category === 'STANDARD')) {
+            whereConditions.push(Prisma.sql`(
+                metadata->>'version' = '1'
+                OR metadata->>'version_no' = '1'
+                OR metadata->>'versionNo' = '1'
+                OR (metadata->>'version' IS NULL AND metadata->>'version_no' IS NULL AND metadata->>'versionNo' IS NULL)
+            )`);
+        }
+
         const orderDirection = sortOrder === 'asc' ? 'ASC' : 'DESC';
         const nullsPosition = sortOrder === 'desc' ? 'NULLS LAST' : 'NULLS FIRST';
 
@@ -151,20 +163,14 @@ export async function GET(req: NextRequest) {
 
         const records = await prisma.$queryRaw<DataRecordRow[]>(query);
 
-        // Use Prisma for count
-        const total = await prisma.dataRecord.count({
-            where: {
-                projectId: projectId || undefined,
-                type: (type as 'TASK' | 'FEEDBACK') || undefined,
-                // For STANDARD category, count both STANDARD and NULL records
-                ...(category === 'STANDARD'
-                    ? { OR: [{ category: RecordCategory.STANDARD }, { category: null }] }
-                    : category
-                        ? { category: category as RecordCategory }
-                        : {}
-                ),
-            }
-        });
+        // Use raw SQL for count to match the complex WHERE clause (including version filter)
+        const countQuery = Prisma.sql`
+            SELECT COUNT(*) as count
+            FROM data_records
+            ${whereClause}
+        `;
+        const countResult = await prisma.$queryRaw<{ count: bigint }[]>(countQuery);
+        const total = Number(countResult[0]?.count || 0);
 
         return NextResponse.json({ records, total });
     } catch (error: any) {
