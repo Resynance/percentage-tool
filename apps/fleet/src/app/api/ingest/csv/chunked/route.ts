@@ -14,7 +14,7 @@ export const maxDuration = 60;
 // Security limits
 const MAX_CHUNKS = 100;
 const MAX_CHUNK_SIZE = 4 * 1024 * 1024; // 4MB per chunk
-const MAX_TOTAL_SIZE = 100 * 1024 * 1024; // 100MB total
+const MAX_TOTAL_SIZE = 150 * 1024 * 1024; // 150MB total
 const SESSION_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
 // Use OS temp directory (works on Vercel, local dev, etc.)

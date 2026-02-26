@@ -8,8 +8,8 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-// Size limit for direct upload (use chunked upload for larger files)
-const MAX_FILE_SIZE = 4 * 1024 * 1024; // 4MB (leaves room for Vercel's 4.5MB limit)
+// Size limit for direct upload (increased for local development)
+const MAX_FILE_SIZE = 150 * 1024 * 1024; // 150MB
 const VALID_TYPES: RecordType[] = ['TASK', 'FEEDBACK'];
 
 export async function POST(req: NextRequest) {
