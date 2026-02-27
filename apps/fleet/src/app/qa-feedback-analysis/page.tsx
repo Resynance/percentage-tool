@@ -248,7 +248,6 @@ export default function QAFeedbackAnalysisPage() {
         let bVal = b[sortField]
 
         if (sortField === 'qaEmail') {
-            // Sort by last name
             const aLastName = getLastName(a)
             const bLastName = getLastName(b)
             return sortDirection === 'asc'
@@ -292,13 +291,27 @@ export default function QAFeedbackAnalysisPage() {
         }
     }
 
+    const quickRanges: { label: string; value: QuickRange }[] = [
+        { label: 'Last 7 Days', value: 7 },
+        { label: 'Last 30 Days', value: 30 },
+        { label: 'Last 90 Days', value: 90 },
+        { label: 'All Time', value: null },
+    ]
+
+    const quickRanges: { label: string; value: QuickRange }[] = [
+        { label: 'Last 7 Days', value: 7 },
+        { label: 'Last 30 Days', value: 30 },
+        { label: 'Last 90 Days', value: 90 },
+        { label: 'All Time', value: null },
+    ]
+
     return (
         <div className="page-container">
             {/* Header */}
             <div className="mb-8 flex items-start justify-between">
                 <div>
-                    <h1 className="page-title">
-                        <span className="gradient-text">QA Feedback Analysis</span>
+                    <h1 style={{ fontSize: '2rem' }}>
+                        <span className="premium-gradient">QA Feedback Analysis</span>
                     </h1>
                     <p className="text-[var(--text-secondary)] mt-2">
                         Analyze QA worker performance based on feedback ratings from the external rating system.
@@ -326,8 +339,11 @@ export default function QAFeedbackAnalysisPage() {
                         <input
                             type="date"
                             value={startDate}
-                            onChange={(e) => setStartDate(e.target.value)}
-                            className="w-full px-3 py-2 bg-[var(--bg-secondary)] border border-[var(--border)] rounded-lg"
+                            onChange={(e) => {
+                                setStartDate(e.target.value)
+                                setActiveRange(undefined as any)
+                            }}
+                            className="input-field"
                         />
                     </div>
 
@@ -336,8 +352,11 @@ export default function QAFeedbackAnalysisPage() {
                         <input
                             type="date"
                             value={endDate}
-                            onChange={(e) => setEndDate(e.target.value)}
-                            className="w-full px-3 py-2 bg-[var(--bg-secondary)] border border-[var(--border)] rounded-lg"
+                            onChange={(e) => {
+                                setEndDate(e.target.value)
+                                setActiveRange(undefined as any)
+                            }}
+                            className="input-field"
                         />
                     </div>
 
@@ -346,7 +365,7 @@ export default function QAFeedbackAnalysisPage() {
                         <select
                             value={environment}
                             onChange={(e) => setEnvironment(e.target.value)}
-                            className="w-full px-3 py-2 bg-[var(--bg-secondary)] border border-[var(--border)] rounded-lg"
+                            className="input-field"
                         >
                             <option value="">All Environments</option>
                             {environments.map(env => (
@@ -380,7 +399,8 @@ export default function QAFeedbackAnalysisPage() {
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             placeholder="Search workers..."
-                            className="w-full pl-10 pr-4 py-2 bg-[var(--bg-secondary)] border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent"
+                            className="input-field"
+                            style={{ paddingLeft: '40px' }}
                         />
                         {searchQuery && (
                             <button
@@ -394,13 +414,13 @@ export default function QAFeedbackAnalysisPage() {
                 </div>
 
                 <div className="flex flex-wrap gap-2 mb-4">
-                    {([7, 30, 90, null] as QuickRange[]).map((days) => (
+                    {quickRanges.map(({ label, value }) => (
                         <button
-                            key={days ?? 'all'}
-                            onClick={() => setQuickRange(days)}
-                            className={activeRange === days ? 'btn-primary text-sm' : 'btn-secondary text-sm'}
+                            key={label}
+                            onClick={() => setQuickRange(value)}
+                            className={activeRange === value ? 'btn-primary text-sm' : 'btn-secondary text-sm'}
                         >
-                            {days === null ? 'All Time' : `Last ${days} Days`}
+                            {label}
                         </button>
                     ))}
                 </div>

@@ -176,6 +176,13 @@ export default function WorkerDetailsPage() {
         return true
     }) || []
 
+    const taskFilters: { label: string; value: typeof taskFilter }[] = [
+        { label: 'All', value: 'all' },
+        { label: 'Positive', value: 'positive' },
+        { label: 'Negative', value: 'negative' },
+        { label: 'Disputed', value: 'disputed' },
+    ]
+
     return (
         <div className="page-container">
             {/* Header */}

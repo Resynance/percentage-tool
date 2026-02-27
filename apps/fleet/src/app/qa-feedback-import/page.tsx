@@ -94,8 +94,8 @@ export default function QAFeedbackImportPage() {
         <div className="page-container">
             {/* Header */}
             <div className="mb-8">
-                <h1 className="page-title">
-                    <span className="gradient-text">QA Feedback Import</span>
+                <h1 style={{ fontSize: '2rem' }}>
+                    <span className="premium-gradient">QA Feedback Import</span>
                 </h1>
                 <p className="text-[var(--text-secondary)] mt-2">
                     Import QA worker feedback ratings from CSV files. This data is used for performance analysis and quality monitoring.
