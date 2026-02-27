@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { Check, Inbox } from "lucide-react";
-import { useProjects } from "@/hooks/useProjects";
 
 interface TopPromptRecord {
     id: string;
@@ -23,16 +22,6 @@ interface TopPromptRecord {
 
 export default function TopPromptsReview() {
     const searchParams = useSearchParams();
-    const {
-        projects,
-        selectedProjectId,
-        setSelectedProjectId,
-        loading: projectsLoading,
-        error: projectsError
-    } = useProjects({
-        autoSelectFirst: true,
-        initialProjectId: searchParams.get("projectId") || ""
-    });
 
     const [allRecords, setAllRecords] = useState<TopPromptRecord[]>([]);
     const [environments, setEnvironments] = useState<string[]>([]);
@@ -53,18 +42,12 @@ export default function TopPromptsReview() {
     });
 
     const fetchRecords = useCallback(async () => {
-        if (!selectedProjectId || selectedProjectId.trim() === "" || selectedProjectId === "undefined") {
-            setError("No project selected");
-            setLoading(false);
-            return;
-        }
-
         try {
             setLoading(true);
             setError(null);
 
             const response = await fetch(
-                `/api/records/topbottom-review?projectId=${selectedProjectId}&category=TOP_10&includeReviewed=true`,
+                `/api/records/topbottom-review?category=TOP_10&includeReviewed=true`,
             );
 
             if (!response.ok) {
@@ -90,18 +73,11 @@ export default function TopPromptsReview() {
         } finally {
             setLoading(false);
         }
-    }, [selectedProjectId]);
+    }, []);
 
     useEffect(() => {
-        if (selectedProjectId) {
-            fetchRecords();
-        } else {
-            setAllRecords([]);
-            setEnvironments([]);
-            setLoading(false);
-            setError(null);
-        }
-    }, [selectedProjectId, fetchRecords]);
+        fetchRecords();
+    }, [fetchRecords]);
 
     const getVerificationStatus = (record: TopPromptRecord) => {
         return record.hasBeenReviewed && record.isCategoryCorrect === true;
@@ -114,13 +90,7 @@ export default function TopPromptsReview() {
                 <p style={{ color: "rgba(255,255,255,0.6)" }}>Browse and filter top-performing prompts</p>
             </div>
 
-                {!selectedProjectId ? (
-                <div style={{ padding: '80px', textAlign: 'center' }}>
-                    <Inbox size={48} style={{ margin: '0 auto 16px', opacity: 0.3 }} />
-                    <div style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '8px', opacity: 0.6 }}>No project selected</div>
-                    <div style={{ fontSize: '0.9rem', opacity: 0.4 }}>Select a project from the dropdown above to view prompts</div>
-                </div>
-            ) : loading ? (
+                {loading ? (
                 <div
                     style={{
                         textAlign: "center",

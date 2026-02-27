@@ -3,7 +3,7 @@ import { prisma } from '@repo/database';
 interface RecordWithEmbedding {
   id: string;
   content: string;
-  projectId: string;
+  environment: string;
   type: string;
   embedding: string; // pgvector returns as string
 }
@@ -19,7 +19,7 @@ function parseVector(vectorStr: string): number[] {
 export async function findSimilarRecords(targetId: string, limit: number = 5) {
   // Get target record with embedding via raw SQL
   const targetRecords: RecordWithEmbedding[] = await prisma.$queryRaw`
-    SELECT id, content, "projectId", type, embedding::text as embedding
+    SELECT id, content, environment, type, embedding::text as embedding
     FROM public.data_records
     WHERE id = ${targetId}
     AND embedding IS NOT NULL
@@ -56,7 +56,7 @@ export async function findSimilarRecords(targetId: string, limit: number = 5) {
     record: {
       id: record.id,
       content: record.content,
-      projectId: record.projectId,
+      environment: record.environment,
       type: record.type,
     },
     similarity: Number(record.similarity)

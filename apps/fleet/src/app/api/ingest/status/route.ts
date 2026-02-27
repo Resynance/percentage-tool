@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
         // This ensures jobs actually get processed even if the initial trigger was killed
         // IMPORTANT: Must await in serverless - there is no "background" after response is sent
         if (job.status === 'PENDING' || job.status === 'QUEUED_FOR_VEC') {
-            await processQueuedJobs(job.projectId).catch(err =>
+            await processQueuedJobs(job.environment).catch(err =>
                 console.error('Queue Processor Error:', err)
             );
 

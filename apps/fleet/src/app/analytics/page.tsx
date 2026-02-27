@@ -11,11 +11,7 @@ import {
     TrendingUp,
     Trash2
 } from 'lucide-react';
-
-interface Project {
-    id: string;
-    name: string;
-}
+import { EnvironmentFilter } from '@repo/ui/components';
 
 interface Summary {
     totalRecords: number;
@@ -47,9 +43,7 @@ interface ModelStats {
 }
 
 export default function AnalyticsPage() {
-    const [projects, setProjects] = useState<Project[]>([]);
-    const [selectedProjectId, setSelectedProjectId] = useState<string>('');
-    const [loading, setLoading] = useState(true);
+    const [environment, setEnvironment] = useState<string>('');
     const [loadingData, setLoadingData] = useState(false);
     const [clearing, setClearing] = useState(false);
 
@@ -61,40 +55,16 @@ export default function AnalyticsPage() {
     const [modelComparison, setModelComparison] = useState<ModelStats[]>([]);
 
     useEffect(() => {
-        fetchProjects();
-    }, []);
-
-    useEffect(() => {
-        if (selectedProjectId) {
-            fetchAnalytics();
-        }
-    }, [selectedProjectId]);
-
-    const fetchProjects = async () => {
-        try {
-            const res = await fetch('/api/projects');
-            if (res.ok) {
-                const data = await res.json();
-                // Handle both wrapped { projects: [] } and direct array formats
-                const projectList = Array.isArray(data) ? data : (data.projects || []);
-                setProjects(projectList);
-                if (projectList.length > 0) {
-                    setSelectedProjectId(projectList[0].id);
-                }
-            }
-        } catch (error) {
-            console.error('Error fetching projects:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
+        // Always fetch analytics (empty environment = all environments)
+        fetchAnalytics();
+    }, [environment]);
 
     const fetchAnalytics = async () => {
         setLoadingData(true);
         try {
             const [summaryRes, comparisonRes] = await Promise.all([
-                fetch(`/api/analytics/likert-summary?projectId=${selectedProjectId}`),
-                fetch(`/api/analytics/model-comparison?projectId=${selectedProjectId}`)
+                fetch(`/api/analytics/likert-summary?environment=${environment}`),
+                fetch(`/api/analytics/model-comparison?environment=${environment}`)
             ]);
 
             if (summaryRes.ok) {
@@ -117,20 +87,19 @@ export default function AnalyticsPage() {
     };
 
     const handleExport = (format: 'csv' | 'json') => {
-        window.open(`/api/analytics/export?projectId=${selectedProjectId}&format=${format}`, '_blank');
+        window.open(`/api/analytics/export?environment=${environment}&format=${format}`, '_blank');
     };
 
     const handleClearLikertData = async () => {
-        if (!selectedProjectId) return;
-        const projectName = projects.find(p => p.id === selectedProjectId)?.name || 'this project';
-        if (!confirm(`Are you sure you want to clear all Likert ratings for "${projectName}"? This cannot be undone.`)) return;
+        if (!environment) return;
+        if (!confirm(`Are you sure you want to clear all Likert ratings for environment "${environment}"? This cannot be undone.`)) return;
 
         setClearing(true);
         try {
             const res = await fetch('/api/admin/clear', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ target: 'LIKERT_SCORES', projectId: selectedProjectId })
+                body: JSON.stringify({ target: 'LIKERT_SCORES', environment })
             });
             const data = await res.json();
             if (res.ok) {
@@ -147,16 +116,15 @@ export default function AnalyticsPage() {
     };
 
     const handleClearAllRecords = async () => {
-        if (!selectedProjectId) return;
-        const projectName = projects.find(p => p.id === selectedProjectId)?.name || 'this project';
-        if (!confirm(`⚠️ WARNING: This will permanently delete ALL ${summary?.totalRecords || 0} records and ratings for "${projectName}".\n\nThis action cannot be undone. Are you sure?`)) return;
+        if (!environment) return;
+        if (!confirm(`⚠️ WARNING: This will permanently delete ALL ${summary?.totalRecords || 0} records and ratings for environment "${environment}".\n\nThis action cannot be undone. Are you sure?`)) return;
 
         setClearing(true);
         try {
             const res = await fetch('/api/admin/clear', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ target: 'PROJECT_RECORDS', projectId: selectedProjectId })
+                body: JSON.stringify({ target: 'ENVIRONMENT_RECORDS', environment })
             });
             const data = await res.json();
             if (res.ok) {
@@ -197,14 +165,6 @@ export default function AnalyticsPage() {
         );
     };
 
-    if (loading) {
-        return (
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
-                <Loader2 className="animate-spin" size={48} color="var(--accent)" />
-            </div>
-        );
-    }
-
     return (
         <div>
             <header style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -219,7 +179,7 @@ export default function AnalyticsPage() {
                 <div style={{ display: 'flex', gap: '8px' }}>
                     <button
                         onClick={() => handleExport('csv')}
-                        disabled={!selectedProjectId}
+                        disabled={!environment}
                         className="btn-secondary"
                         style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
                     >
@@ -228,7 +188,7 @@ export default function AnalyticsPage() {
                     </button>
                     <button
                         onClick={() => handleExport('json')}
-                        disabled={!selectedProjectId}
+                        disabled={!environment}
                         className="btn-secondary"
                         style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
                     >
@@ -237,7 +197,7 @@ export default function AnalyticsPage() {
                     </button>
                     <button
                         onClick={handleClearLikertData}
-                        disabled={!selectedProjectId || clearing}
+                        disabled={!environment || clearing}
                         title="Clear Likert ratings only"
                         style={{
                             display: 'flex',
@@ -248,8 +208,8 @@ export default function AnalyticsPage() {
                             border: '1px solid rgba(255,170,0,0.3)',
                             background: 'rgba(255,170,0,0.1)',
                             color: '#ffaa00',
-                            cursor: !selectedProjectId || clearing ? 'not-allowed' : 'pointer',
-                            opacity: !selectedProjectId || clearing ? 0.5 : 1
+                            cursor: !environment || clearing ? 'not-allowed' : 'pointer',
+                            opacity: !environment || clearing ? 0.5 : 1
                         }}
                     >
                         <Trash2 size={18} />
@@ -257,7 +217,7 @@ export default function AnalyticsPage() {
                     </button>
                     <button
                         onClick={handleClearAllRecords}
-                        disabled={!selectedProjectId || clearing}
+                        disabled={!environment || clearing}
                         title="Clear all records and ratings"
                         style={{
                             display: 'flex',
@@ -268,8 +228,8 @@ export default function AnalyticsPage() {
                             border: '1px solid rgba(255,77,77,0.3)',
                             background: 'rgba(255,77,77,0.1)',
                             color: '#ff4d4d',
-                            cursor: !selectedProjectId || clearing ? 'not-allowed' : 'pointer',
-                            opacity: !selectedProjectId || clearing ? 0.5 : 1
+                            cursor: !environment || clearing ? 'not-allowed' : 'pointer',
+                            opacity: !environment || clearing ? 0.5 : 1
                         }}
                     >
                         <Trash2 size={18} />
@@ -278,28 +238,18 @@ export default function AnalyticsPage() {
                 </div>
             </header>
 
-            {/* Project Selection */}
+            {/* Environment Selection */}
             <div className="glass-card" style={{ padding: '20px', marginBottom: '24px' }}>
-                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500 }}>Select Project</label>
-                <select
-                    value={selectedProjectId}
-                    onChange={e => setSelectedProjectId(e.target.value)}
-                    className="input-field"
-                    style={{ maxWidth: '400px' }}
-                >
-                    <option value="">-- Select a project --</option>
-                    {projects.map(p => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
-                </select>
+                <EnvironmentFilter
+                    value={environment}
+                    onChange={setEnvironment}
+                    apiUrl="/api/environments"
+                    label="Filter by Environment"
+                    includeAll={true}
+                />
             </div>
 
-            {!selectedProjectId ? (
-                <div className="glass-card" style={{ padding: '48px', textAlign: 'center' }}>
-                    <BarChart3 size={48} style={{ opacity: 0.3, marginBottom: '16px' }} />
-                    <p style={{ opacity: 0.6 }}>Select a project to view analytics</p>
-                </div>
-            ) : loadingData ? (
+            {loadingData ? (
                 <div style={{ display: 'flex', justifyContent: 'center', padding: '48px' }}>
                     <Loader2 className="animate-spin" size={32} color="var(--accent)" />
                 </div>

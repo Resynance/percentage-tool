@@ -9,6 +9,7 @@ export const dynamic = 'force-dynamic'
 interface CSVRow {
     rating_id: string;
     feedback_id: string;
+    feedback_content?: string;
     eval_task_id?: string;
     is_helpful: string;
     is_dispute?: string;
@@ -22,12 +23,25 @@ interface CSVRow {
     resolved_at?: string;
     resolved_by_name?: string;
     resolution_reason?: string;
+    // Task fields
+    task_id?: string;
+    task_key?: string;
+    task_prompt?: string;
+    task_creator_name?: string;
+    task_creator_email?: string;
+    task_created_at?: string;
+    env_key?: string;
+    env_version?: string;
+    env_data_key?: string;
+    scenario_title?: string;
+    task_modality?: string;
 }
 
 interface ImportSummary {
     imported: number;
     updated: number;
     skipped: number;
+    tasksCreated: number;
     errors: string[];
 }
 
@@ -123,6 +137,7 @@ export async function POST(req: Request) {
             imported: 0,
             updated: 0,
             skipped: 0,
+            tasksCreated: 0,
             errors: []
         }
 
@@ -134,8 +149,16 @@ export async function POST(req: Request) {
             for (const row of batch) {
                 try {
                     // Validate required fields
-                    if (!row.rating_id || !row.is_helpful || !row.rated_at || !row.rater_email || !row.qa_email) {
-                        summary.errors.push(`Row ${i + batch.indexOf(row) + 2}: Missing required fields (rating_id, is_helpful, rated_at, rater_email, or qa_email)`)
+                    const missingFields: string[] = []
+                    if (!row.rating_id) missingFields.push('rating_id')
+                    if (!row.feedback_id) missingFields.push('feedback_id')
+                    if (!row.is_helpful) missingFields.push('is_helpful')
+                    if (!row.rated_at) missingFields.push('rated_at')
+                    if (!row.rater_email) missingFields.push('rater_email')
+                    if (!row.qa_email) missingFields.push('qa_email')
+
+                    if (missingFields.length > 0) {
+                        summary.errors.push(`Row ${i + batch.indexOf(row) + 2}: Missing required fields: ${missingFields.join(', ')}`)
                         summary.skipped++
                         continue
                     }
@@ -168,9 +191,57 @@ export async function POST(req: Request) {
                     // Parse boolean is_helpful
                     const isHelpful = row.is_helpful.toLowerCase() === 'true' || row.is_helpful === '1'
 
-                    // Check if eval_task_id exists in database (if provided)
+                    // Create task record if it doesn't exist
                     let evalTaskId: string | null = null
-                    if (row.eval_task_id) {
+                    if (row.task_id && row.task_prompt) {
+                        // Check if task exists
+                        let taskExists = await prisma.dataRecord.findUnique({
+                            where: { id: row.task_id },
+                            select: { id: true }
+                        })
+
+                        if (!taskExists) {
+                            // Create task record
+                            try {
+                                const taskCreatedAt = row.task_created_at ? new Date(row.task_created_at) : new Date()
+
+                                await prisma.dataRecord.create({
+                                    data: {
+                                        id: row.task_id,
+                                        type: 'TASK',
+                                        environment: row.env_key || 'unknown',
+                                        source: 'qa_feedback_import',
+                                        content: row.task_prompt,
+                                        createdByEmail: row.task_creator_email || null,
+                                        createdByName: row.task_creator_name || null,
+                                        createdAt: taskCreatedAt,
+                                        updatedAt: taskCreatedAt,
+                                        metadata: {
+                                            task_key: row.task_key || null,
+                                            env_key: row.env_key || null,
+                                            env_version: row.env_version || null,
+                                            env_data_key: row.env_data_key || null,
+                                            scenario_title: row.scenario_title || null,
+                                            environment_name: row.env_key || null,
+                                            task_modality: row.task_modality || null,
+                                        }
+                                    }
+                                })
+                                summary.tasksCreated++
+                                taskExists = { id: row.task_id } // Mark as created
+                            } catch (taskError) {
+                                // If task creation fails, log and skip linking
+                                console.warn(`Failed to create task ${row.task_id}:`, taskError)
+                                taskExists = null
+                            }
+                        }
+
+                        // Only set evalTaskId if task exists or was successfully created
+                        if (taskExists) {
+                            evalTaskId = row.task_id
+                        }
+                    } else if (row.eval_task_id) {
+                        // Fallback: check if eval_task_id exists (for old format CSVs)
                         const taskExists = await prisma.dataRecord.findUnique({
                             where: { id: row.eval_task_id },
                             select: { id: true }
@@ -191,6 +262,7 @@ export async function POST(req: Request) {
                             where: { ratingId: row.rating_id },
                             data: {
                                 feedbackId: row.feedback_id,
+                                feedbackContent: row.feedback_content || null,
                                 evalTaskId: evalTaskId,
                                 isHelpful,
                                 isDispute: row.is_dispute?.toLowerCase() === 'true' || row.is_dispute === '1' || false,
@@ -213,6 +285,7 @@ export async function POST(req: Request) {
                             data: {
                                 ratingId: row.rating_id,
                                 feedbackId: row.feedback_id,
+                                feedbackContent: row.feedback_content || null,
                                 evalTaskId: evalTaskId,
                                 isHelpful,
                                 isDispute: row.is_dispute?.toLowerCase() === 'true' || row.is_dispute === '1' || false,
@@ -244,6 +317,7 @@ export async function POST(req: Request) {
             imported: summary.imported,
             updated: summary.updated,
             skipped: summary.skipped,
+            tasksCreated: summary.tasksCreated,
             errorCount: summary.errors.length
         })
 

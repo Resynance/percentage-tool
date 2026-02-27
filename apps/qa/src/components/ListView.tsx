@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ChevronLeft, ChevronRight, LayoutDashboard, AlertCircle, Inbox } from 'lucide-react';
 import Link from 'next/link';
-import { useProjects } from '@/hooks/useProjects';
+import { EnvironmentFilter } from '@repo/ui/components';
 
 interface Record {
     id: string;
@@ -25,17 +25,7 @@ export default function ListView() {
 
 function ListContent() {
     const searchParams = useSearchParams();
-    const {
-        projects,
-        selectedProjectId,
-        setSelectedProjectId,
-        loading: projectsLoading,
-        error: projectsError
-    } = useProjects({
-        autoSelectFirst: true,
-        initialProjectId: searchParams.get('projectId') || ''
-    });
-
+    const [environment, setEnvironment] = useState<string>(searchParams.get('environment') || '');
     const [selectedType, setSelectedType] = useState<string>(searchParams.get('type') || 'TASK');
     const [selectedCategory, setSelectedCategory] = useState<string>(searchParams.get('category') || 'ALL');
 
@@ -47,23 +37,33 @@ function ListContent() {
     const pageSize = 10;
 
     useEffect(() => {
-        if (selectedProjectId && selectedType) {
+        if (selectedType) {
             fetchRecords();
-        } else {
-            // No project selected: clear records and stop loading
-            setRecords([]);
-            setTotal(0);
-            setLoading(false);
         }
-    }, [selectedProjectId, selectedType, selectedCategory, page]);
+    }, [environment, selectedType, selectedCategory, page]);
 
     const fetchRecords = async () => {
         setLoading(true);
         try {
             const skip = (page - 1) * pageSize;
+            // Build query parameters
+            const params = new URLSearchParams({
+                type: selectedType,
+                skip: skip.toString(),
+                take: pageSize.toString()
+            });
+
+            // Optional environment filter
+            if (environment) {
+                params.append('environment', environment);
+            }
+
             // Only include category parameter if not 'ALL'
-            const categoryParam = selectedCategory !== 'ALL' ? `&category=${selectedCategory}` : '';
-            const res = await fetch(`/api/records?projectId=${selectedProjectId}&type=${selectedType}${categoryParam}&skip=${skip}&take=${pageSize}`);
+            if (selectedCategory !== 'ALL') {
+                params.append('category', selectedCategory);
+            }
+
+            const res = await fetch(`/api/records?${params.toString()}`);
             const data = await res.json();
             setRecords(data.records || []);
             setTotal(data.total || 0);
@@ -79,7 +79,7 @@ function ListContent() {
     useEffect(() => {
         // Reset page when filters change
         setPage(1);
-    }, [selectedProjectId, selectedType, selectedCategory]);
+    }, [environment, selectedType, selectedCategory]);
 
     const totalPages = Math.ceil(total / pageSize);
 
@@ -92,26 +92,18 @@ function ListContent() {
                 <p style={{ color: 'rgba(255,255,255,0.6)' }}>Exploration View • {total} Total Records</p>
             </div>
 
-            {projectsError && (
-                <div className="glass-card" style={{
-                    padding: '16px 20px',
-                    marginBottom: '24px',
-                    background: 'rgba(255, 68, 68, 0.05)',
-                    border: '1px solid rgba(255, 68, 68, 0.2)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px'
-                }}>
-                    <AlertCircle size={20} color="#ff4444" />
-                    <div>
-                        <div style={{ fontWeight: 600, color: '#ff4444', marginBottom: '4px' }}>Failed to load projects</div>
-                        <div style={{ fontSize: '0.85rem', opacity: 0.7 }}>{projectsError}</div>
-                    </div>
-                </div>
-            )}
+            {/* Environment Filter - Optional */}
+            <div className="glass-card" style={{ padding: '16px 20px', marginBottom: '16px' }}>
+                <EnvironmentFilter
+                    value={environment}
+                    onChange={setEnvironment}
+                    apiUrl="/api/environments"
+                    label="Filter by Environment (optional)"
+                    includeAll={true}
+                />
+            </div>
 
             <div className="glass-card" style={{ padding: '12px 16px', marginBottom: '16px', display: 'flex', gap: '16px', alignItems: 'center', justifyContent: 'space-between' }}>
-                {/* Project selection is handled globally via ProjectContext in the header */}
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <label style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.7)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Record Type</label>
@@ -274,13 +266,10 @@ function ListContent() {
                             <div style={{ padding: '80px', textAlign: 'center' }}>
                                 <Inbox size={48} style={{ margin: '0 auto 16px', opacity: 0.3 }} />
                                 <div style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '8px', opacity: 0.6 }}>
-                                    {!selectedProjectId ? 'No project selected' : 'No records found'}
+                                    No records found
                                 </div>
                                 <div style={{ fontSize: '0.9rem', opacity: 0.4 }}>
-                                    {!selectedProjectId
-                                        ? 'Select a project from the dropdown above to view records'
-                                        : `No ${selectedCategory === 'ALL' ? '' : selectedCategory?.replace('_', ' ').toLowerCase() + ' '}${selectedType.toLowerCase()}s found for this project`
-                                    }
+                                    {`No ${selectedCategory === 'ALL' ? '' : selectedCategory?.replace('_', ' ').toLowerCase() + ' '}${selectedType.toLowerCase()}s found${environment ? ` for environment "${environment}"` : ''}`}
                                 </div>
                             </div>
                         )}

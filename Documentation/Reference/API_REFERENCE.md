@@ -5,7 +5,7 @@ Complete reference for all REST API endpoints in the Operations Tools.
 ## Table of Contents
 
 - [Authentication](#authentication)
-- [Projects](#projects)
+- [Environments](#environments)
 - [Records](#records)
 - [Ingestion](#ingestion)
 - [Analysis](#analysis)
@@ -32,119 +32,45 @@ POST /api/auth/login
 
 ### Role-Based Access Control
 
+Roles are hierarchical — higher roles inherit all permissions of lower roles.
+
 | Role | Description | Access Level |
 |------|-------------|--------------|
-| **USER** | Standard user | Read data, generate analyses |
-| **MANAGER** | Team manager | USER + Access time tracking & bonus windows |
-| **ADMIN** | Administrator | MANAGER + User management, system settings |
+| **USER** | Standard user | Time tracking, links |
+| **QA** | QA analyst | USER + Records management, similarity search |
+| **CORE** | Core reviewer | QA + Likert scoring, review decisions |
+| **FLEET** | Fleet manager | CORE + Ingestion, analytics, workforce tools, similarity check |
+| **MANAGER** | Team manager (legacy) | FLEET + bonus windows, time reporting |
+| **ADMIN** | Administrator | All access + user management, system settings |
 
 ---
 
-## Projects
+## Environments
 
-### GET /api/projects
+Records are organized by a plain `environment` string field (e.g. "production", "staging"). There is no separate Environments table — environments are derived from the distinct values in `data_records.environment`.
 
-List all projects visible to the authenticated user.
+### GET /api/environments
+
+List all distinct environment values across all records.
 
 **Authentication**: Required
 **Authorization**: All roles
 
 **Request**
 ```http
-GET /api/projects HTTP/1.1
+GET /api/environments HTTP/1.1
 Cookie: sb-auth-token=...
 ```
 
 **Response** (200 OK)
 ```json
 {
-  "projects": [
-    {
-      "id": "uuid",
-      "name": "Project Name",
-      "createdAt": "2024-01-15T10:30:00Z",
-      "updatedAt": "2024-01-15T10:30:00Z",
-      "guidelines": "data:application/pdf;base64,..."
-    }
-  ]
+  "environments": ["production", "staging", "dev"]
 }
 ```
 
 **Error Responses**
 - `401 Unauthorized` - Not authenticated
-- `500 Internal Server Error` - Database error
-
----
-
-### POST /api/projects
-
-Create a new project.
-
-**Authentication**: Required
-**Authorization**: All roles
-
-**Request**
-```http
-POST /api/projects HTTP/1.1
-Content-Type: application/json
-Cookie: sb-auth-token=...
-
-{
-  "name": "New Project",
-  "guidelines": "data:application/pdf;base64,JVBERi0xLjQ..."
-}
-```
-
-**Request Body**
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `name` | string | Yes | Project name (max 255 chars) |
-| `guidelines` | string | No | Base64-encoded PDF (data URI format) |
-
-**Response** (201 Created)
-```json
-{
-  "project": {
-    "id": "uuid",
-    "name": "New Project",
-    "createdAt": "2024-01-15T10:30:00Z",
-    "updatedAt": "2024-01-15T10:30:00Z"
-  }
-}
-```
-
-**Error Responses**
-- `400 Bad Request` - Missing or invalid fields
-- `401 Unauthorized` - Not authenticated
-- `500 Internal Server Error` - Database or file processing error
-
----
-
-### DELETE /api/projects/:id
-
-Delete a project and all associated records.
-
-**Authentication**: Required
-**Authorization**: ADMIN only
-
-**Request**
-```http
-DELETE /api/projects/uuid HTTP/1.1
-Cookie: sb-auth-token=...
-```
-
-**Response** (200 OK)
-```json
-{
-  "message": "Project deleted successfully",
-  "deletedRecords": 1234
-}
-```
-
-**Error Responses**
-- `401 Unauthorized` - Not authenticated
-- `403 Forbidden` - Insufficient permissions
-- `404 Not Found` - Project doesn't exist
 - `500 Internal Server Error` - Database error
 
 ---
@@ -162,12 +88,11 @@ Query and filter data records with pagination.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `projectId` | string | Required | Filter by project ID |
+| `environment` | string | - | Filter by environment (e.g. "production") |
 | `type` | enum | - | Filter by type: `TASK`, `FEEDBACK` |
 | `category` | enum | - | Filter by category: `TOP_10`, `BOTTOM_10`, `STANDARD` |
 | `search` | string | - | Full-text search in content |
 | `hasAlignment` | boolean | - | Filter by alignment analysis status |
-| `environment` | string | - | Filter by metadata environment field |
 | `limit` | number | 20 | Results per page (max 100) |
 | `offset` | number | 0 | Pagination offset |
 | `sortBy` | string | `createdAt` | Sort field: `createdAt`, `alignment`, `category`, `environment` |
@@ -175,7 +100,7 @@ Query and filter data records with pagination.
 
 **Request**
 ```http
-GET /api/records?projectId=uuid&type=TASK&limit=10&offset=0 HTTP/1.1
+GET /api/records?environment=production&type=TASK&limit=10&offset=0 HTTP/1.1
 Cookie: sb-auth-token=...
 ```
 
@@ -185,13 +110,12 @@ Cookie: sb-auth-token=...
   "records": [
     {
       "id": "uuid",
-      "projectId": "uuid",
+      "environment": "production",
       "type": "TASK",
       "category": "TOP_10",
       "content": "The task content...",
       "originalId": "task-123",
       "metadata": {
-        "environment_name": "production",
         "custom_field": "value"
       },
       "embedding": [0.1, 0.2, ...],
@@ -267,7 +191,7 @@ Content-Type: application/json
 Cookie: sb-auth-token=...
 
 {
-  "projectId": "uuid",
+  "environment": "production",
   "type": "TASK",
   "csvData": "task_id,content,rating\ntask-1,Content here,top 10",
   "filterKeywords": ["production"],
@@ -278,7 +202,7 @@ Cookie: sb-auth-token=...
 **Request Body**
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `projectId` | string | Yes | Target project ID |
+| `environment` | string | Yes | Target environment (e.g. "production") |
 | `type` | enum | Yes | `TASK` or `FEEDBACK` |
 | `csvData` | string | Yes | CSV file content as string |
 | `filterKeywords` | string[] | No | Only ingest records containing these keywords |
@@ -305,7 +229,7 @@ Cookie: sb-auth-token=...
 **Error Responses**
 - `400 Bad Request` - Invalid CSV format or missing fields
 - `401 Unauthorized` - Not authenticated
-- `404 Not Found` - Project not found
+- `400 Bad Request` - Missing or invalid environment
 - `500 Internal Server Error` - Processing error
 
 ---
@@ -330,7 +254,7 @@ Cookie: sb-auth-token=...
 ```json
 {
   "id": "uuid",
-  "projectId": "uuid",
+  "environment": "production",
   "type": "TASK",
   "status": "VECTORIZING",
   "totalRecords": 150,
@@ -575,7 +499,7 @@ Cookie: sb-auth-token=...
 
 ### POST /api/admin/bulk-align
 
-Start bulk alignment analysis for a project.
+Start bulk alignment analysis for an environment.
 
 **Authentication**: Required
 **Authorization**: ADMIN only
@@ -587,7 +511,7 @@ Content-Type: application/json
 Cookie: sb-auth-token=...
 
 {
-  "projectId": "uuid"
+  "environment": "production"
 }
 ```
 
@@ -616,14 +540,14 @@ Content-Type: application/json
 Cookie: sb-auth-token=...
 
 {
-  "projectId": "uuid",
+  "environment": "production",
   "action": "clear_analyses"
 }
 ```
 
 **Actions**
-- `clear_analyses` - Remove all alignment analyses for a project
-- `wipe_all` - **DANGER**: Delete all projects and data
+- `clear_analyses` - Remove all alignment analyses for an environment
+- `wipe_all` - **DANGER**: Delete all records and data
 
 ---
 
@@ -640,7 +564,6 @@ Get all bonus windows with user breakdown data (Manager/Admin only).
   "bonusWindows": [
     {
       "id": "uuid",
-      "projectId": "uuid",
       "name": "Q1 2024 Bonus",
       "startTime": "2024-01-01T00:00:00Z",
       "endTime": "2024-03-31T23:59:59Z",
@@ -671,7 +594,6 @@ Content-Type: application/json
 Cookie: sb-auth-token=...
 
 {
-  "projectId": "uuid",
   "name": "Q1 2024 Bonus",
   "startTime": "2024-01-01T00:00:00Z",
   "endTime": "2024-03-31T23:59:59Z",
@@ -685,7 +607,6 @@ Cookie: sb-auth-token=...
 **Request Body**
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `projectId` | string | Yes | Target project ID |
 | `name` | string | Yes | Bonus window name |
 | `startTime` | ISO 8601 | Yes | Window start date/time |
 | `endTime` | ISO 8601 | Yes | Window end date/time |
@@ -699,7 +620,6 @@ Cookie: sb-auth-token=...
 {
   "bonusWindow": {
     "id": "uuid",
-    "projectId": "uuid",
     "name": "Q1 2024 Bonus",
     "startTime": "2024-01-01T00:00:00Z",
     "endTime": "2024-03-31T23:59:59Z"
@@ -917,7 +837,7 @@ Official SDKs are not yet available. Use standard HTTP clients:
 
 ```typescript
 // Example: Fetch API
-const response = await fetch('/api/projects', {
+const response = await fetch('/api/records?environment=production&type=TASK', {
   method: 'GET',
   credentials: 'include', // Include session cookie
   headers: {

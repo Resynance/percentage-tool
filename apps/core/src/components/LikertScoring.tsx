@@ -4,12 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { Inbox } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@repo/auth/client";
-import { useProjects } from '@/hooks/useProjects';
-
-interface Project {
-    id: string;
-    name: string;
-}
+import { EnvironmentFilter } from '@repo/ui/components';
 
 interface LikertRecord {
     id: string;
@@ -23,11 +18,11 @@ interface LikertRecord {
 
 export default function LikertScoring() {
     const searchParams = useSearchParams();
-    const { projects, selectedProjectId, setSelectedProjectId } = useProjects({ initialProjectId: searchParams.get("projectId") || undefined });
-    
+    const [environment, setEnvironment] = useState<string>(searchParams.get("environment") || '');
+
     // Use centralized client which handles missing env vars gracefully
     const supabase = useMemo(() => createClient(), []);
-    
+
     const [userId, setUserId] = useState<string | null>(null);
     const [authLoading, setAuthLoading] = useState(true);
     const [authError, setAuthError] = useState<string | null>(null);
@@ -43,8 +38,6 @@ export default function LikertScoring() {
     const [llmAlreadyEvaluated, setLlmAlreadyEvaluated] = useState(false);
     const [llmEvaluatedThisSession, setLlmEvaluatedThisSession] = useState(false);
     const [userSubmittedRecordIds, setUserSubmittedRecordIds] = useState<Set<string>>(new Set());
-
-    // Projects and selected project are provided by ProjectContext via `useProjects`
 
     // Fetch current user from Supabase auth
     useEffect(() => {
@@ -73,16 +66,16 @@ export default function LikertScoring() {
     }, [supabase]);
 
     useEffect(() => {
-        if (userId && selectedProjectId) {
+        if (userId) {
             fetchRecords();
         } else {
-            // No project selected or no user yet: clear data
+            // No user yet: clear data
             setRecords([]);
             setCurrentIndex(0);
             setError(null);
             setLoading(false);
         }
-    }, [selectedProjectId, userId]);
+    }, [environment, userId]);
 
     // Check if current record has been evaluated by LLM and submitted by user
     useEffect(() => {
@@ -93,17 +86,17 @@ export default function LikertScoring() {
     }, [currentIndex, records]);
 
     const fetchRecords = async () => {
-        if (!selectedProjectId || selectedProjectId.trim() === "" || selectedProjectId === "undefined") {
-            setError("No project selected");
-            setLoading(false);
-            return;
-        }
-
         try {
             setLoading(true);
             setError(null);
 
-            const response = await fetch(`/api/records/likert?projectId=${selectedProjectId}&userId=${userId}`);
+            // Build query parameters (optional environment filter)
+            const params = new URLSearchParams({ userId: userId || '' });
+            if (environment) {
+                params.append('environment', environment);
+            }
+
+            const response = await fetch(`/api/records/likert?${params.toString()}`);
 
             if (!response.ok) {
                 throw new Error("Failed to fetch records");
@@ -347,8 +340,19 @@ export default function LikertScoring() {
                 </h1>                
                 <p style={{ color: "rgba(255,255,255,0.5)", margin: 0 }}>
                     Rate prompts on Realism and Quality (1-7 scale)
-                </p>            
+                </p>
                 </div>
+
+            {/* Environment Filter - Optional */}
+            <div className="glass-card" style={{ padding: '16px 20px', marginBottom: '16px' }}>
+                <EnvironmentFilter
+                    value={environment}
+                    onChange={setEnvironment}
+                    apiUrl="/api/environments"
+                    label="Filter by Environment (optional)"
+                    includeAll={true}
+                />
+            </div>
 
             {authLoading ? (
                 <div style={{ textAlign: "center", color: "#60a5fa", padding: "60px 20px" }}>
@@ -366,12 +370,6 @@ export default function LikertScoring() {
                     >
                         Go to Login
                     </button>
-                </div>
-            ) : !selectedProjectId ? (
-                <div style={{ padding: '80px', textAlign: 'center' }}>
-                    <Inbox size={48} style={{ margin: '0 auto 16px', opacity: 0.3 }} />
-                    <div style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '8px', opacity: 0.6 }}>No project selected</div>
-                    <div style={{ fontSize: '0.9rem', opacity: 0.4 }}>Select a project from the dropdown above to view prompts</div>
                 </div>
             ) : loading ? (
                 <div style={{ textAlign: "center", color: "#60a5fa", padding: "60px 20px" }}>

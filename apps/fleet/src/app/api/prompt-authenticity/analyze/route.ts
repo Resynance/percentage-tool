@@ -153,7 +153,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    let { batchSize = 200, startDate, endDate, limit } = body;
+    let { batchSize = 40, startDate, endDate, limit } = body;
 
     // VALIDATION: Clamp batchSize to safe range (1-500)
     batchSize = Math.max(1, Math.min(batchSize, 500));
@@ -190,7 +190,8 @@ export async function POST(request: NextRequest) {
     // Build where clause with optional date range
     const where: any = {
       analysisStatus: 'PENDING',
-      versionNo: 1  // Only analyze first version of each prompt
+      // VERSION CHECK DISABLED - Analyze all versions for now
+      // versionNo: 1
     };
 
     if (parsedStartDate || parsedEndDate) {
@@ -257,7 +258,7 @@ export async function POST(request: NextRequest) {
 async function processAnalysisJob(jobId: string, batchSize: number) {
   // Concurrency limit: Process up to 60 prompts in parallel
   // Custom OpenRouter rate limits allow for high concurrency
-  const CONCURRENT_ANALYSES = 60;
+  const CONCURRENT_ANALYSES = 15;
   const HEARTBEAT_INTERVAL_MS = 30000; // Update heartbeat every 30 seconds
 
   let heartbeatInterval: NodeJS.Timeout | null = null;
@@ -294,7 +295,8 @@ async function processAnalysisJob(jobId: string, batchSize: number) {
       // Build where clause with date range from job
       const where: any = {
         analysisStatus: 'PENDING',
-        versionNo: 1  // Only analyze first version of each prompt
+        // VERSION CHECK DISABLED - Analyze all versions for now
+        // versionNo: 1
       };
       if (job.filterStartDate || job.filterEndDate) {
         where.createdAt = {};

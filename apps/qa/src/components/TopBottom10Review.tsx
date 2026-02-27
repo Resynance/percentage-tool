@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useProjects } from '@/hooks/useProjects';
 import { useSearchParams } from "next/navigation";
 import { ChevronLeft, ChevronRight, Check, X, Inbox } from "lucide-react";
+import { EnvironmentFilter } from '@repo/ui/components';
 
 interface ReviewRecord {
   id: string;
@@ -18,7 +18,7 @@ interface ReviewRecord {
 
 export default function TopBottom10Review() {
   const searchParams = useSearchParams();
-  const { selectedProjectId, setSelectedProjectId } = useProjects({ initialProjectId: searchParams.get("projectId") || undefined });
+  const [environment, setEnvironment] = useState<string>(searchParams.get("environment") || '');
 
   const [category, setCategory] = useState<"TOP_10" | "BOTTOM_10">("TOP_10");
   const [allRecords, setAllRecords] = useState<ReviewRecord[]>([]);
@@ -39,34 +39,26 @@ export default function TopBottom10Review() {
     return hovered === btnCategory ? "#374151" : "transparent";
   };
 
-  // Projects and selectedProjectId are provided by ProjectContext via useProjects
-
   useEffect(() => {
-    if (selectedProjectId) {
-      fetchRecords();
-    } else {
-      setAllRecords([]);
-      setCurrentIndex(0);
-      setError(null);
-      setLoading(false);
-    }
-  }, [selectedProjectId]);
+    fetchRecords();
+  }, [environment]);
 
   const fetchRecords = async () => {
-    if (!selectedProjectId || selectedProjectId.trim() === "" || selectedProjectId === "undefined") {
-      setError("No project selected");
-      setLoading(false);
-      return;
-    }
-
     try {
       setLoading(true);
       setError(null);
 
+      // Build query parameters (optional environment filter)
+      const params = new URLSearchParams();
+      if (environment) {
+        params.append('environment', environment);
+      }
+
+      const queryString = params.toString();
+      const url = `/api/records/topbottom-review${queryString ? `?${queryString}` : ''}`;
+
       // Fetch all TOP_10 and BOTTOM_10 records in one call
-      const response = await fetch(
-        `/api/records/topbottom-review?projectId=${selectedProjectId}`,
-      );
+      const response = await fetch(url);
 
       if (!response.ok) {
         throw new Error("Failed to fetch records");
@@ -158,19 +150,18 @@ export default function TopBottom10Review() {
         <p style={{ color: "rgba(255,255,255,0.6)" }}>Verify and correct automated percentage classifications</p>
       </div>
 
-      {/* Project selection is handled in the header; no inline project dropdown here. */}
+      {/* Environment Filter - Optional */}
+      <div className="glass-card" style={{ padding: '16px 20px', marginBottom: '16px' }}>
+        <EnvironmentFilter
+          value={environment}
+          onChange={setEnvironment}
+          apiUrl="/api/environments"
+          label="Filter by Environment (optional)"
+          includeAll={true}
+        />
+      </div>
 
-      { !selectedProjectId ? (
-        <div style={{ padding: '80px', textAlign: 'center' }}>
-          <Inbox size={48} style={{ margin: '0 auto 16px', opacity: 0.3 }} />
-          <div style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '8px', opacity: 0.6 }}>
-            No project selected
-          </div>
-          <div style={{ fontSize: '0.9rem', opacity: 0.4 }}>
-            Select a project from the dropdown above to view records
-          </div>
-        </div>
-      ) : loading ? (
+      {loading ? (
         <div
           style={{
             textAlign: "center",
@@ -208,7 +199,9 @@ export default function TopBottom10Review() {
           <div className="glass-card" style={{ textAlign: "center", padding: "60px 20px" }}>
             <Inbox size={48} style={{ margin: '0 auto 16px', opacity: 0.3 }} />
             <div style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '8px', opacity: 0.6 }}>No prompts found</div>
-            <div style={{ fontSize: '0.9rem', opacity: 0.4 }}>There are no Top/Bottom prompts to review for this project</div>
+            <div style={{ fontSize: '0.9rem', opacity: 0.4 }}>
+              There are no Top/Bottom prompts to review{environment ? ` for environment "${environment}"` : ''}
+            </div>
           </div>
       ) : (
         <>

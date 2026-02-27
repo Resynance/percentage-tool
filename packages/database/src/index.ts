@@ -56,7 +56,6 @@ export {
 // Re-export types (not runtime values)
 export type {
   Profile,
-  Project,
   DataRecord,
   IngestJob,
   AnalyticsJob,
@@ -72,6 +71,7 @@ export type {
   CandidateStatus,
   RaterGroup,
   RaterGroupMember,
+  Guideline,
   LLMModelConfig,
   LLMEvaluationJob,
 } from '@prisma/client';

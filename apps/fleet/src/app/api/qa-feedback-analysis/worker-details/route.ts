@@ -40,6 +40,7 @@ interface TaskRating {
     taskEnvironment: string | null;
     taskCreatedAt: Date;
     ratingId: string;
+    feedbackContent: string | null;
     isHelpful: boolean;
     isDispute: boolean;
     ratedAt: Date;
@@ -82,7 +83,7 @@ export async function GET(req: Request) {
         }, { status: 500 })
     }
 
-    if (!profile || !['FLEET', 'ADMIN'].includes(profile.role)) {
+    if (!profile || !['FLEET', 'MANAGER', 'ADMIN'].includes(profile.role)) {
         console.warn('[QA Worker Details API] Forbidden access attempt:', {
             errorId: ERROR_IDS.AUTH_FORBIDDEN,
             userId: user.id,
@@ -138,6 +139,7 @@ export async function GET(req: Request) {
                 id: true,
                 ratingId: true,
                 qaName: true,
+                feedbackContent: true,
                 isHelpful: true,
                 isDispute: true,
                 ratedAt: true,
@@ -292,6 +294,7 @@ export async function GET(req: Request) {
                     taskEnvironment: metadata?.scenario_title || metadata?.env_key || metadata?.environment_name || null,
                     taskCreatedAt: task?.createdAt || new Date(),
                     ratingId: rating.ratingId,
+                    feedbackContent: rating.feedbackContent,
                     isHelpful: rating.isHelpful,
                     isDispute: rating.isDispute,
                     ratedAt: rating.ratedAt,

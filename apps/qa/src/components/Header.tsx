@@ -2,7 +2,6 @@ import { createClient } from '@repo/auth/server'
 import Link from 'next/link'
 import BalanceIndicator from './AI/BalanceIndicator'
 import UserProfileDropdown from './navigation/UserProfileDropdown'
-import ProjectSelector from './navigation/ProjectSelector'
 import BugReportNotification from './BugReportNotification'
 import UserBugReportTracker from './UserBugReportTracker'
 import TimeEntryButton from './TimeEntryButton'
@@ -44,7 +43,7 @@ export default async function Header() {
             width: '100%'
         }}>
             <div style={{ display: 'flex', alignItems: 'center' }}>
-                {user && <ProjectSelector />}
+                {/* ProjectSelector removed - environment filtering now handled per-page */}
             </div>
 
             {user ? (

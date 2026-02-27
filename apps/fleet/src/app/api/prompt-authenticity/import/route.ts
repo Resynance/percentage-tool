@@ -183,8 +183,8 @@ export async function POST(request: NextRequest) {
     const promptIdx = header.findIndex(h => h === 'prompt');
     const versionNoIdx = header.findIndex(h => h === 'version_no');
     const isActiveIdx = header.findIndex(h => h === 'is_active');
-    const createdByNameIdx = header.findIndex(h => h === 'author_name');
-    const createdByEmailIdx = header.findIndex(h => h === 'author_email');
+    const createdByNameIdx = header.findIndex(h => h === 'created_by_name' || h === 'author_name');
+    const createdByEmailIdx = header.findIndex(h => h === 'created_by_email' || h === 'author_email');
     const createdAtIdx = header.findIndex(h => h === 'task_created_at');
     const envKeyIdx = header.findIndex(h => h === 'env_key');
     const taskLifecycleStatusIdx = header.findIndex(h => h === 'task_lifecycle_status');
@@ -204,6 +204,8 @@ export async function POST(request: NextRequest) {
     const HEARTBEAT_INTERVAL = 5000; // Log progress every 5 seconds
     let imported = 0;
     let skipped = 0;
+    let skippedFleetEmails = 0;
+    let skippedWrongVersion = 0;
     let errors: string[] = [];
     let lastHeartbeat = Date.now();
 
@@ -230,9 +232,18 @@ export async function POST(request: NextRequest) {
             continue;
           }
 
-          // Only import version 1 records
-          if (versionNo !== 1) {
+          // VERSION CHECK DISABLED - Import all versions for now
+          // if (versionNo !== 1) {
+          //   skipped++;
+          //   skippedWrongVersion++;
+          //   continue;
+          // }
+
+          // Skip records created by @fleet.so email addresses
+          const createdByEmail = createdByEmailIdx >= 0 ? fields[createdByEmailIdx]?.trim() : null;
+          if (createdByEmail && createdByEmail.toLowerCase().endsWith('@fleet.so')) {
             skipped++;
+            skippedFleetEmails++;
             continue;
           }
 
@@ -243,7 +254,7 @@ export async function POST(request: NextRequest) {
             versionNo,
             isActive: isActiveIdx >= 0 ? fields[isActiveIdx]?.toLowerCase() === 'true' : null,
             createdByName: createdByNameIdx >= 0 ? fields[createdByNameIdx]?.trim() || null : null,
-            createdByEmail: createdByEmailIdx >= 0 ? fields[createdByEmailIdx]?.trim() || null : null,
+            createdByEmail,
             createdAt: createdAtIdx >= 0 && fields[createdAtIdx]?.trim() ? new Date(fields[createdAtIdx].trim()) : null,
             envKey: envKeyIdx >= 0 ? fields[envKeyIdx]?.trim() || null : null,
             taskLifecycleStatus: taskLifecycleStatusIdx >= 0 ? fields[taskLifecycleStatusIdx]?.trim() || null : null,
@@ -275,14 +286,16 @@ export async function POST(request: NextRequest) {
     const totalTime = ((Date.now() - startTime) / 1000).toFixed(2);
     const recordsPerSecond = (imported / parseFloat(totalTime)).toFixed(0);
 
-    console.log(`[Import] Complete: ${imported} imported, ${skipped} skipped, ${errors.length} errors in ${totalTime}s (${recordsPerSecond} records/s)`);
+    console.log(`[Import] Complete: ${imported} imported, ${skipped} skipped (${skippedFleetEmails} fleet emails, ${skippedWrongVersion} wrong version), ${errors.length} errors in ${totalTime}s (${recordsPerSecond} records/s)`);
 
     return NextResponse.json({
       success: true,
       imported,
       skipped,
+      skippedFleetEmails,
+      skippedWrongVersion,
       errors: errors.slice(0, 100), // Limit error list to first 100
-      message: `Imported ${imported} prompts, skipped ${skipped}${errors.length > 0 ? `, ${errors.length} errors` : ''}`,
+      message: `Imported ${imported} prompts, skipped ${skipped} (${skippedFleetEmails} @fleet.so, ${skippedWrongVersion} wrong version)${errors.length > 0 ? `, ${errors.length} errors` : ''}`,
       performance: {
         totalTimeSeconds: parseFloat(totalTime),
         recordsPerSecond: parseInt(recordsPerSecond),

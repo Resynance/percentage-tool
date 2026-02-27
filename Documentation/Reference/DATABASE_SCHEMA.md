@@ -20,7 +20,7 @@ Complete reference for the Operations Tools database schema, including entity re
 **Schemas**: `public` (application), `auth` (Supabase)
 
 ### Key Features
-- **Foreign Key Cascades**: Deleting a project cascades to all related records and jobs
+- **Environment-based Organization**: Records are grouped by a plain `environment` string field (replaces the former Project model)
 - **JSON Metadata**: Flexible storage for custom fields from CSV imports
 - **Vector Embeddings**: Float array for semantic similarity search
 - **Multi-Schema**: Integrates with Supabase `auth.users` table
@@ -31,7 +31,6 @@ Complete reference for the Operations Tools database schema, including entity re
 
 ```mermaid
 erDiagram
-    Profile ||--o{ Project : owns
     Profile {
         uuid id PK
         string email UK
@@ -41,25 +40,10 @@ erDiagram
         datetime updatedAt
     }
 
-    Project ||--o{ DataRecord : contains
-    Project ||--o{ IngestJob : has
-    Project ||--o{ AnalyticsJob : has
-    Project {
-        cuid id PK
-        string name UK
-        uuid ownerId FK
-        text guidelines
-        string guidelinesFileName
-        text lastTaskAnalysis
-        text lastFeedbackAnalysis
-        datetime createdAt
-        datetime updatedAt
-    }
-
     DataRecord ||--o{ LikertScore : rated_by
     DataRecord {
         cuid id PK
-        cuid projectId FK
+        string environment
         RecordType type
         RecordCategory category
         text content
@@ -78,7 +62,7 @@ erDiagram
 
     IngestJob {
         cuid id PK
-        cuid projectId FK
+        string environment
         RecordType type
         string status
         int totalRecords
@@ -92,7 +76,7 @@ erDiagram
 
     AnalyticsJob {
         cuid id PK
-        cuid projectId FK
+        string environment
         string status
         int totalRecords
         int processedCount
@@ -151,40 +135,9 @@ Application-specific user metadata. Links to Supabase `auth.users` via foreign k
 | `createdAt` | TIMESTAMP | NOT NULL, DEFAULT now() | Creation timestamp |
 | `updatedAt` | TIMESTAMP | NOT NULL, AUTO | Last update timestamp |
 
-**Relationships**:
-- `Profile` → `Project` (one-to-many)
-
 **Indexes**:
 - Primary key on `id`
 - Unique index on `email`
-
----
-
-### Project
-
-Organizational container for all data records, guidelines, and jobs.
-
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| `id` | CUID | PK | Project identifier |
-| `name` | VARCHAR | UNIQUE, NOT NULL | Project name |
-| `ownerId` | UUID | FK → Profile | Project owner |
-| `guidelines` | TEXT | NULLABLE | Base64-encoded PDF for RAG |
-| `guidelinesFileName` | VARCHAR | NULLABLE | Original filename |
-| `lastTaskAnalysis` | TEXT | NULLABLE | Cached AI summary |
-| `lastFeedbackAnalysis` | TEXT | NULLABLE | Cached AI summary |
-| `createdAt` | TIMESTAMP | NOT NULL, DEFAULT now() | Creation timestamp |
-| `updatedAt` | TIMESTAMP | NOT NULL, AUTO | Last update timestamp |
-
-**Relationships**:
-- `Project` → `DataRecord` (one-to-many, cascade delete)
-- `Project` → `IngestJob` (one-to-many, cascade delete)
-- `Project` → `AnalyticsJob` (one-to-many, cascade delete)
-
-**Indexes**:
-- Primary key on `id`
-- Unique index on `name`
-- Foreign key index on `ownerId`
 
 ---
 
@@ -195,7 +148,7 @@ Core data unit containing task/feedback content and vector embeddings.
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | `id` | CUID | PK | Record identifier |
-| `projectId` | CUID | FK → Project, NOT NULL | Parent project |
+| `environment` | VARCHAR | NOT NULL | Grouping string (e.g. "production", "staging") |
 | `type` | RecordType | NOT NULL | TASK or FEEDBACK |
 | `category` | RecordCategory | NULLABLE | TOP_10, BOTTOM_10, or STANDARD |
 | `source` | VARCHAR | NOT NULL | Origin (e.g., "csv:data.csv") |
@@ -214,15 +167,14 @@ Core data unit containing task/feedback content and vector embeddings.
 | `updatedAt` | TIMESTAMP | NOT NULL, AUTO | Last update timestamp |
 
 **Relationships**:
-- `DataRecord` → `Project` (many-to-one)
 - `DataRecord` → `LikertScore` (one-to-many, cascade delete)
 
 **Indexes**:
 - Primary key on `id`
-- Foreign key index on `projectId`
+- Index on `environment` for filtering
 - Index on `type` for filtering
 - Index on `category` for filtering
-- Composite index on `(projectId, type, category)` for common queries
+- Composite index on `(environment, type, category)` for common queries
 
 **Notes**:
 - `embedding` is a 1536-dimension vector used for cosine similarity searches
@@ -240,7 +192,7 @@ Tracks background data ingestion processes with real-time progress.
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | `id` | CUID | PK | Job identifier |
-| `projectId` | CUID | FK → Project, NOT NULL | Target project |
+| `environment` | VARCHAR | NOT NULL | Target environment |
 | `type` | RecordType | NOT NULL | TASK or FEEDBACK |
 | `status` | VARCHAR | NOT NULL, DEFAULT 'PENDING' | Job status |
 | `totalRecords` | INT | DEFAULT 0 | Expected record count |
@@ -260,24 +212,21 @@ Tracks background data ingestion processes with real-time progress.
 6. `FAILED` - Error occurred
 7. `CANCELLED` - User cancelled
 
-**Relationships**:
-- `IngestJob` → `Project` (many-to-one, cascade delete)
-
 **Indexes**:
 - Primary key on `id`
-- Foreign key index on `projectId`
+- Index on `environment` for queue management
 - Index on `status` for queue management
 
 ---
 
 ### AnalyticsJob
 
-Tracks bulk alignment analysis jobs for entire projects.
+Tracks bulk alignment analysis jobs for an environment.
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | `id` | CUID | PK | Job identifier |
-| `projectId` | CUID | FK → Project, NOT NULL | Target project |
+| `environment` | VARCHAR | NOT NULL | Target environment |
 | `status` | VARCHAR | NOT NULL, DEFAULT 'PENDING' | Job status |
 | `totalRecords` | INT | DEFAULT 0 | Records to process |
 | `processedCount` | INT | DEFAULT 0 | Records completed |
@@ -287,12 +236,9 @@ Tracks bulk alignment analysis jobs for entire projects.
 
 **Status Values**: `PENDING`, `PROCESSING`, `COMPLETED`, `FAILED`, `CANCELLED`
 
-**Relationships**:
-- `AnalyticsJob` → `Project` (many-to-one, cascade delete)
-
 **Indexes**:
 - Primary key on `id`
-- Foreign key index on `projectId`
+- Index on `environment`
 
 ---
 
@@ -381,14 +327,17 @@ User or LLM ratings for records on Realism and Quality scales (1-7).
 
 ### UserRole
 
-User access levels.
+User access levels (hierarchical — higher roles inherit all permissions of lower roles).
 
 ```typescript
 enum UserRole {
   PENDING  // Awaiting admin approval
-  USER     // Standard user (read & analyze)
-  MANAGER  // Team manager (+ time tracking)
-  ADMIN    // Administrator (+ user management, settings)
+  USER     // Standard user (read own data)
+  QA       // QA analyst (records management, similarity search)
+  CORE     // Core reviewer (Likert scoring, review decisions)
+  FLEET    // Fleet manager (ingestion, analytics, workforce tools)
+  MANAGER  // Team manager (legacy; maps to FLEET + time tracking)
+  ADMIN    // Administrator (user management, system settings)
 }
 ```
 
@@ -424,13 +373,10 @@ enum RecordCategory {
 - UUID for Supabase integration tables (`Profile`, `BonusWindow`)
 
 ### Foreign Keys
-- All foreign keys have cascade delete behavior
-- Deleting a `Project` cascades to all related records and jobs
 - Deleting a `DataRecord` cascades to all related Likert scores
 
 ### Unique Constraints
 - `Profile.email` - One account per email
-- `Project.name` - Unique project names
 - `SystemSetting.key` - One value per setting key
 
 ### Indexes for Performance
@@ -438,19 +384,21 @@ enum RecordCategory {
 -- Profile lookups
 CREATE INDEX idx_profile_email ON profiles(email);
 
--- Project queries
-CREATE INDEX idx_project_owner ON projects(ownerId);
-
 -- DataRecord filtering (most common queries)
-CREATE INDEX idx_record_project ON data_records(projectId);
+CREATE INDEX idx_record_environment ON data_records(environment);
 CREATE INDEX idx_record_type ON data_records(type);
 CREATE INDEX idx_record_category ON data_records(category);
-CREATE INDEX idx_record_composite ON data_records(projectId, type, category);
+CREATE INDEX idx_record_composite ON data_records(environment, type, category);
+
+-- Time reporting
+CREATE INDEX idx_time_report_records_worker_email ON time_report_records(worker_email);
+CREATE INDEX idx_time_report_records_work_date ON time_report_records(work_date DESC);
+CREATE INDEX idx_time_report_records_worker_date ON time_report_records(worker_email, work_date DESC);
 
 -- Job management
-CREATE INDEX idx_ingest_job_project ON ingest_jobs(projectId);
+CREATE INDEX idx_ingest_job_environment ON ingest_jobs(environment);
 CREATE INDEX idx_ingest_job_status ON ingest_jobs(status);
-CREATE INDEX idx_analytics_job_project ON analytics_jobs(projectId);
+CREATE INDEX idx_analytics_job_environment ON analytics_jobs(environment);
 
 -- Likert scores
 CREATE INDEX idx_likert_record ON likert_scores(recordId);
@@ -624,13 +572,13 @@ supabase db push --include-all
 **File**: `prisma/schema.prisma`
 
 **Contains**:
-- `projects` table
-- `data_records` table
+- `data_records` table (with `environment` field replacing the old `project_id`)
 - `ingest_jobs` table
 - `analytics_jobs` table
 - `system_settings` table
 - `bonus_windows` table
 - `likert_scores` table
+- `meetings` table (master catalog for time-reporting)
 
 **Management**:
 - Created automatically by Prisma on first run
@@ -706,7 +654,7 @@ ON DELETE SET NULL;
 // Efficient: Uses idx_record_composite
 await prisma.dataRecord.findMany({
   where: {
-    projectId: 'xyz',
+    environment: 'production',
     type: 'TASK',
     category: 'TOP_10'
   }
@@ -739,7 +687,7 @@ await prisma.dataRecord.findMany({
 ```typescript
 // Atomic: All-or-nothing operation
 await prisma.$transaction([
-  prisma.project.create({ data: projectData }),
+  prisma.ingestJob.create({ data: jobData }),
   prisma.dataRecord.createMany({ data: recordsData })
 ]);
 ```
@@ -798,7 +746,7 @@ When making schema changes, ensure consistency across environments:
 ### Prisma vs Supabase
 
 - **Supabase manages**: Auth schema (`auth.users`, `profiles`, RLS policies, triggers)
-- **Prisma manages**: Application schema (`projects`, `data_records`, etc.)
+- **Prisma manages**: Application schema (`data_records`, `ingest_jobs`, etc.)
 - **Both work together**: Profiles references `auth.users` via foreign key
 
 ### Schema Conflicts

@@ -23,20 +23,20 @@ export async function GET(request: NextRequest) {
         .eq('id', user.id)
         .single();
 
-    if (!profile || !['ADMIN', 'FLEET'].includes((profile as any)?.role)) {
+    if (!profile || !['ADMIN', 'MANAGER', 'FLEET'].includes((profile as any)?.role)) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     try {
         const searchParams = request.nextUrl.searchParams;
-        const projectId = searchParams.get('projectId');
+        const environment = searchParams.get('environment');
 
-        if (!projectId) {
-            return NextResponse.json({ error: 'projectId is required' }, { status: 400 });
+        if (!environment) {
+            return NextResponse.json({ error: 'environment is required' }, { status: 400 });
         }
 
         const groups = await prisma.raterGroup.findMany({
-            where: { projectId },
+            where: { environment },
             orderBy: { name: 'asc' },
             include: {
                 _count: {
@@ -80,40 +80,30 @@ export async function POST(request: NextRequest) {
         .eq('id', user.id)
         .single();
 
-    if (!profile || !['ADMIN', 'FLEET'].includes((profile as any)?.role)) {
+    if (!profile || !['ADMIN', 'MANAGER', 'FLEET'].includes((profile as any)?.role)) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     try {
         const body = await request.json();
-        const { projectId, name, description } = body;
+        const { environment, name, description } = body;
 
-        if (!projectId || !name?.trim()) {
-            return NextResponse.json({ error: 'projectId and name are required' }, { status: 400 });
+        if (!environment || !name?.trim()) {
+            return NextResponse.json({ error: 'environment and name are required' }, { status: 400 });
         }
 
-        // Check project exists
-        const project = await prisma.project.findUnique({
-            where: { id: projectId },
-            select: { id: true }
-        });
-
-        if (!project) {
-            return NextResponse.json({ error: 'Project not found' }, { status: 404 });
-        }
-
-        // Check for duplicate name in project
+        // Check for duplicate name in environment
         const existing = await prisma.raterGroup.findFirst({
-            where: { projectId, name: name.trim() }
+            where: { environment, name: name.trim() }
         });
 
         if (existing) {
-            return NextResponse.json({ error: 'A group with this name already exists in this project' }, { status: 409 });
+            return NextResponse.json({ error: 'A group with this name already exists in this environment' }, { status: 409 });
         }
 
         const group = await prisma.raterGroup.create({
             data: {
-                projectId,
+                environment,
                 name: name.trim(),
                 description: description?.trim() || null
             },
@@ -128,10 +118,9 @@ export async function POST(request: NextRequest) {
             action: 'RATER_GROUP_CREATED',
             entityType: 'RATER_GROUP',
             entityId: group.id,
-            projectId,
             userId: user.id,
             userEmail: user.email!,
-            metadata: { name: group.name }
+            metadata: { environment, name: group.name }
         });
 
         return NextResponse.json({ group }, { status: 201 });

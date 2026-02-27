@@ -38,6 +38,7 @@ interface TaskRating {
     taskEnvironment: string | null;
     taskCreatedAt: string;
     ratingId: string;
+    feedbackContent: string | null;
     isHelpful: boolean;
     isDispute: boolean;
     ratedAt: string;
@@ -324,7 +325,7 @@ export default function WorkerDetailsPage() {
                         <div className="space-y-3 max-h-[600px] overflow-y-auto">
                             {filteredTasks.map((task) => (
                                 <div
-                                    key={task.taskId}
+                                    key={task.ratingId}
                                     className="glass-card cursor-pointer transition-all duration-200 hover:border-[var(--accent)]"
                                     onClick={() => openTaskHistory(task.taskId)}
                                     style={{ padding: '16px' }}
@@ -347,6 +348,12 @@ export default function WorkerDetailsPage() {
                                             </span>
                                         </div>
                                     </div>
+                                    {task.feedbackContent && (
+                                        <div className="mb-3 p-3 bg-[var(--bg-secondary)] rounded-lg border border-[var(--border)]">
+                                            <div className="text-xs text-[var(--text-secondary)] mb-1 font-medium">Feedback:</div>
+                                            <div className="text-sm leading-relaxed">{task.feedbackContent}</div>
+                                        </div>
+                                    )}
                                     <div className="text-sm text-[var(--text-secondary)] pt-2 border-t border-[var(--border)]">
                                         Rated by {task.raterEmail} on {new Date(task.ratedAt).toLocaleDateString()}
                                     </div>

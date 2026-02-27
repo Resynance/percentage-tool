@@ -53,7 +53,7 @@ describe('GET /api/full-similarity-check', () => {
             }
         } as any);
 
-        const url = new URL('http://localhost:3004/api/full-similarity-check?projectId=test-project');
+        const url = new URL('http://localhost:3004/api/full-similarity-check?environment=test-project');
         const request = new NextRequest(url);
 
         const response = await GET(request);
@@ -69,7 +69,7 @@ describe('GET /api/full-similarity-check', () => {
             role: 'USER'
         } as any);
 
-        const url = new URL('http://localhost:3004/api/full-similarity-check?projectId=test-project');
+        const url = new URL('http://localhost:3004/api/full-similarity-check?environment=test-project');
         const request = new NextRequest(url);
 
         const response = await GET(request);
@@ -79,7 +79,7 @@ describe('GET /api/full-similarity-check', () => {
         expect(data.error).toBe('Forbidden');
     });
 
-    it('should return 400 if projectId is missing', async () => {
+    it('should return 400 if environment is missing', async () => {
         const url = new URL('http://localhost:3004/api/full-similarity-check');
         const request = new NextRequest(url);
 
@@ -87,7 +87,7 @@ describe('GET /api/full-similarity-check', () => {
         const data = await response.json();
 
         expect(response.status).toBe(400);
-        expect(data.error).toBe('projectId is required');
+        expect(data.error).toBe('environment is required');
     });
 
     it('should return tasks with embeddings for valid request', async () => {
@@ -112,7 +112,7 @@ describe('GET /api/full-similarity-check', () => {
         ];
         vi.mocked(prisma.dataRecord.findMany).mockResolvedValue(mockTasks as any);
 
-        const url = new URL('http://localhost:3004/api/full-similarity-check?projectId=test-project');
+        const url = new URL('http://localhost:3004/api/full-similarity-check?environment=test-project');
         const request = new NextRequest(url);
 
         const response = await GET(request);
@@ -141,7 +141,7 @@ describe('GET /api/full-similarity-check', () => {
             }
         ] as any);
 
-        const url = new URL('http://localhost:3004/api/full-similarity-check?projectId=test-project');
+        const url = new URL('http://localhost:3004/api/full-similarity-check?environment=test-project');
         const request = new NextRequest(url);
 
         const response = await GET(request);

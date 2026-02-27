@@ -20,7 +20,7 @@ async function requireFleetAuth(request: NextRequest) {
     .eq('id', user.id)
     .single();
 
-  if (profileError || !profile || !['FLEET', 'ADMIN'].includes(profile.role)) {
+  if (profileError || !profile || !['FLEET', 'MANAGER', 'ADMIN'].includes(profile.role)) {
     return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
   }
 
@@ -34,6 +34,13 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { startDate, endDate, workerEmail, workerEmails } = body;
+
+    if (startDate && isNaN(Date.parse(startDate))) {
+      return NextResponse.json({ error: 'Invalid startDate format' }, { status: 400 });
+    }
+    if (endDate && isNaN(Date.parse(endDate))) {
+      return NextResponse.json({ error: 'Invalid endDate format' }, { status: 400 });
+    }
 
     const options: any = {};
     if (startDate) options.startDate = new Date(startDate);
@@ -51,7 +58,7 @@ export async function POST(request: NextRequest) {
     options.forceReanalyze = forceReanalyze;
 
     // Run analysis (will use cached results if they exist and forceReanalyze is false)
-    const results = await analyzeAllTimeReports(options);
+    const { results, failedIds } = await analyzeAllTimeReports(options);
 
     // Check if any reports were newly analyzed vs using cached results
     const reportIds = results.map(r => r.reportId);
@@ -71,6 +78,8 @@ export async function POST(request: NextRequest) {
       success: true,
       analyzed: results.length,
       flagged: results.filter(r => r.shouldFlag).length,
+      failed: failedIds.length,
+      failedIds: failedIds.length > 0 ? failedIds : undefined,
       results,
       message: usedCache
         ? `Using existing analysis for ${results.length} time reports (already analyzed)`
@@ -96,6 +105,13 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
+
+    if (startDate && isNaN(Date.parse(startDate))) {
+      return NextResponse.json({ error: 'Invalid startDate format' }, { status: 400 });
+    }
+    if (endDate && isNaN(Date.parse(endDate))) {
+      return NextResponse.json({ error: 'Invalid endDate format' }, { status: 400 });
+    }
 
     const options: any = {};
     if (startDate) options.startDate = new Date(startDate);

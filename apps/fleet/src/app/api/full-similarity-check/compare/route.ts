@@ -44,19 +44,24 @@ export async function POST(req: NextRequest) {
             select: { role: true }
         });
 
-        if (!profile || !['FLEET', 'ADMIN'].includes(profile.role)) {
+        if (!profile || !['FLEET', 'MANAGER', 'ADMIN'].includes(profile.role)) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
-        const { projectId, taskIds, scope } = await req.json();
+        const { environment, taskIds, scope, threshold } = await req.json();
 
-        if (!projectId || !taskIds || !Array.isArray(taskIds) || taskIds.length === 0) {
+        if (!environment || !taskIds || !Array.isArray(taskIds) || taskIds.length === 0) {
             return NextResponse.json({ error: 'Invalid request parameters' }, { status: 400 });
         }
 
         if (scope !== 'environment' && scope !== 'all') {
             return NextResponse.json({ error: 'Invalid scope. Must be "environment" or "all"' }, { status: 400 });
         }
+
+        // Use provided threshold or default to 50%
+        const similarityThreshold = typeof threshold === 'number' && threshold >= 0 && threshold <= 100
+            ? threshold
+            : 50;
 
         // Fetch selected tasks with their embeddings
         const selectedTasks = await prisma.$queryRaw<Array<{
@@ -71,7 +76,7 @@ export async function POST(req: NextRequest) {
             SELECT id, content, metadata, embedding, "createdByName", "createdByEmail", "createdAt"
             FROM data_records
             WHERE id = ANY(${taskIds}::text[])
-            AND "projectId" = ${projectId}
+            AND environment = ${environment}
             AND type = 'TASK'
             AND embedding IS NOT NULL
         `;
@@ -86,28 +91,24 @@ export async function POST(req: NextRequest) {
 
         // For each selected task, find similar tasks
         for (const sourceTask of selectedTasks) {
-            const environment = (sourceTask.metadata as any)?.environment_name || 'N/A';
-
             // Build query to fetch comparison tasks
             let comparisonQuery;
             if (scope === 'environment') {
                 // Compare within same environment
                 comparisonQuery = Prisma.sql`
-                    SELECT id, content, metadata, embedding, "createdByName", "createdByEmail", "createdAt"
+                    SELECT id, content, metadata, environment, embedding, "createdByName", "createdByEmail", "createdAt"
                     FROM data_records
-                    WHERE "projectId" = ${projectId}
+                    WHERE environment = ${environment}
                     AND type = 'TASK'
                     AND id != ${sourceTask.id}
                     AND embedding IS NOT NULL
-                    AND metadata->>'environment_name' = ${environment}
                 `;
             } else {
-                // Compare with all tasks in project
+                // Compare with all tasks (across all environments)
                 comparisonQuery = Prisma.sql`
-                    SELECT id, content, metadata, embedding, "createdByName", "createdByEmail", "createdAt"
+                    SELECT id, content, metadata, environment, embedding, "createdByName", "createdByEmail", "createdAt"
                     FROM data_records
-                    WHERE "projectId" = ${projectId}
-                    AND type = 'TASK'
+                    WHERE type = 'TASK'
                     AND id != ${sourceTask.id}
                     AND embedding IS NOT NULL
                 `;
@@ -117,6 +118,7 @@ export async function POST(req: NextRequest) {
                 id: string;
                 content: string;
                 metadata: any;
+                environment: string;
                 embedding: number[] | null;
                 createdByName: string | null;
                 createdByEmail: string | null;
@@ -156,13 +158,12 @@ export async function POST(req: NextRequest) {
                 // Check for invalid values
                 if (isNaN(similarityPercent) || !isFinite(similarityPercent)) continue;
 
-                // Only include matches with similarity >= 50%
-                if (similarityPercent >= 50) {
-                    const compareEnv = (compareTask.metadata as any)?.environment_name || 'N/A';
+                // Only include matches with similarity >= threshold
+                if (similarityPercent >= similarityThreshold) {
                     matches.push({
                         taskId: compareTask.id,
                         content: compareTask.content,
-                        environment: compareEnv,
+                        environment: compareTask.environment,
                         createdBy: compareTask.createdByName || compareTask.createdByEmail || 'Unknown',
                         similarity: similarityPercent,
                         createdAt: compareTask.createdAt.toISOString()

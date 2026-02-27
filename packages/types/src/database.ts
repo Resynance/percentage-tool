@@ -1,6 +1,5 @@
 // Re-export Prisma types and enums
 export type {
-  Project,
   Profile,
   DataRecord,
   IngestJob,
@@ -17,7 +16,8 @@ export type {
   LLMEvaluationJob,
   LLMModelConfig,
   CrossEncoderCache,
-  RaterGroupMember
+  RaterGroupMember,
+  Guideline
 } from '@prisma/client';
 
 // Re-export enums
@@ -29,20 +29,6 @@ export {
   AssignmentStatus,
   RecordAssignmentStatus
 } from '@prisma/client';
-
-// Extended types for common query patterns
-export interface ProjectWithRecordCount {
-  id: string;
-  name: string;
-  guidelines: string | null;
-  guidelinesFileName: string | null;
-  ownerId: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-  _count: {
-    records: number;
-  };
-}
 
 export interface ProfileWithRole {
   id: string;

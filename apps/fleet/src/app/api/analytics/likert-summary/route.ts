@@ -20,17 +20,16 @@ export async function GET(request: NextRequest) {
 
     try {
         const searchParams = request.nextUrl.searchParams;
-        const projectId = searchParams.get('projectId');
+        const environment = searchParams.get('environment');
 
-        if (!projectId) {
-            return NextResponse.json({ error: 'projectId is required' }, { status: 400 });
-        }
+        // Build where clause - if environment is empty/null, return all environments
+        const whereClause = environment ? {
+            record: { environment }
+        } : {};
 
-        // Get all Likert scores for this project
+        // Get all Likert scores (filtered by environment if specified)
         const scores = await prisma.likertScore.findMany({
-            where: {
-                record: { projectId }
-            },
+            where: whereClause,
             select: {
                 userId: true,
                 realismScore: true,
@@ -86,7 +85,7 @@ export async function GET(request: NextRequest) {
 
         // Total records in project
         const totalRecords = await prisma.dataRecord.count({
-            where: { projectId }
+            where: environment ? { environment } : {}
         });
 
         return NextResponse.json({

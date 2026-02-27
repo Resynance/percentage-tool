@@ -23,13 +23,13 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-        const { projectId } = await req.json();
+        const { environment } = await req.json();
 
-        if (!projectId) {
+        if (!environment) {
             return NextResponse.json({ error: 'Project ID is required' }, { status: 400 });
         }
 
-        const jobId = await startBulkAlignment(projectId);
+        const jobId = await startBulkAlignment(environment);
 
         if (!jobId) {
             return NextResponse.json({ message: 'No records to analyze.' });
@@ -39,10 +39,9 @@ export async function POST(req: NextRequest) {
         await logAudit({
             action: 'BULK_ALIGNMENT_STARTED',
             entityType: 'DATA_RECORD',
-            projectId,
             userId: user.id,
             userEmail: user.email!,
-            metadata: { jobId }
+            metadata: { environment, jobId }
         });
 
         return NextResponse.json({ success: true, jobId });
@@ -71,14 +70,14 @@ export async function GET(req: NextRequest) {
     }
 
     try {
-        const projectId = req.nextUrl.searchParams.get('projectId');
+        const environment = req.nextUrl.searchParams.get('environment');
 
-        if (!projectId) {
+        if (!environment) {
             return NextResponse.json({ error: 'Project ID is required' }, { status: 400 });
         }
 
         const jobs = await prisma.analyticsJob.findMany({
-            where: { projectId },
+            where: { environment },
             orderBy: { createdAt: 'desc' },
             take: 5
         });

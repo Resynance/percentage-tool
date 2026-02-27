@@ -27,7 +27,7 @@ export async function DELETE(
         .eq('id', user.id)
         .single();
 
-    if (!profile || !['ADMIN', 'FLEET'].includes((profile as any)?.role)) {
+    if (!profile || !['ADMIN', 'MANAGER', 'FLEET'].includes((profile as any)?.role)) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -40,7 +40,7 @@ export async function DELETE(
             },
             include: {
                 raterGroup: {
-                    select: { name: true, projectId: true }
+                    select: { name: true, environment: true }
                 },
                 user: {
                     select: { email: true }
@@ -77,10 +77,10 @@ export async function DELETE(
             action: 'RATER_GROUP_MEMBER_REMOVED',
             entityType: 'RATER_GROUP',
             entityId: id,
-            projectId: membership.raterGroup.projectId,
             userId: user.id,
             userEmail: user.email!,
             metadata: {
+                environment: membership.raterGroup.environment,
                 removedUserId: userId,
                 removedUserEmail: membership.user.email,
                 groupName: membership.raterGroup.name

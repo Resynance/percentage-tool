@@ -55,6 +55,7 @@ export async function detectMeetingClaims(
       llmCost: result.usage?.cost || null,
     };
   } catch (error: any) {
+    console.error('[MeetingDetection] LLM extraction failed, using fallback:', error);
     return fallbackMeetingDetection(workerNotes);
   }
 }

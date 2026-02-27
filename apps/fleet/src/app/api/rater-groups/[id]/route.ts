@@ -27,7 +27,7 @@ export async function GET(
         .eq('id', user.id)
         .single();
 
-    if (!profile || !['ADMIN', 'FLEET'].includes((profile as any)?.role)) {
+    if (!profile || !['ADMIN', 'MANAGER', 'FLEET'].includes((profile as any)?.role)) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -35,9 +35,6 @@ export async function GET(
         const group = await prisma.raterGroup.findUnique({
             where: { id },
             include: {
-                project: {
-                    select: { id: true, name: true }
-                },
                 members: {
                     include: {
                         user: {
@@ -97,7 +94,7 @@ export async function PATCH(
         .eq('id', user.id)
         .single();
 
-    if (!profile || !['ADMIN', 'FLEET'].includes((profile as any)?.role)) {
+    if (!profile || !['ADMIN', 'MANAGER', 'FLEET'].includes((profile as any)?.role)) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -117,7 +114,7 @@ export async function PATCH(
             // Check for duplicate name
             const duplicate = await prisma.raterGroup.findFirst({
                 where: {
-                    projectId: existing.projectId,
+                    environment: existing.environment,
                     name: body.name.trim(),
                     id: { not: id }
                 }
@@ -150,10 +147,9 @@ export async function PATCH(
             action: 'RATER_GROUP_UPDATED',
             entityType: 'RATER_GROUP',
             entityId: group.id,
-            projectId: group.projectId,
             userId: user.id,
             userEmail: user.email!,
-            metadata: { updatedFields: Object.keys(updateData) }
+            metadata: { environment: group.environment, updatedFields: Object.keys(updateData) }
         });
 
         return NextResponse.json({ group });
@@ -185,7 +181,7 @@ export async function DELETE(
         .eq('id', user.id)
         .single();
 
-    if (!profile || !['ADMIN', 'FLEET'].includes((profile as any)?.role)) {
+    if (!profile || !['ADMIN', 'MANAGER', 'FLEET'].includes((profile as any)?.role)) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -225,10 +221,9 @@ export async function DELETE(
             action: 'RATER_GROUP_DELETED',
             entityType: 'RATER_GROUP',
             entityId: id,
-            projectId: existing.projectId,
             userId: user.id,
             userEmail: user.email!,
-            metadata: { name: existing.name }
+            metadata: { environment: existing.environment, name: existing.name }
         });
 
         return NextResponse.json({ success: true });

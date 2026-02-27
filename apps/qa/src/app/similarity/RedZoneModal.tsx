@@ -19,27 +19,31 @@ interface RedZonePair {
 interface RedZoneModalProps {
   isOpen: boolean;
   onClose: () => void;
-  projectId: string;
+  environment?: string;
   threshold?: number;
 }
 
-export default function RedZoneModal({ isOpen, onClose, projectId, threshold = 70 }: RedZoneModalProps) {
+export default function RedZoneModal({ isOpen, onClose, environment, threshold = 70 }: RedZoneModalProps) {
   const [pairs, setPairs] = useState<RedZonePair[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [totalPrompts, setTotalPrompts] = useState(0);
 
   useEffect(() => {
-    if (!isOpen || !projectId) return;
+    if (!isOpen) return;
 
     const fetchRedZone = async () => {
       setLoading(true);
       setError(null);
 
       try {
-        const response = await fetch(
-          `/api/analytics/red-zone?projectId=${projectId}&threshold=${threshold}`
-        );
+        const url = new URL("/api/analytics/red-zone", window.location.origin);
+        url.searchParams.set("threshold", threshold.toString());
+        if (environment) {
+          url.searchParams.set("environment", environment);
+        }
+
+        const response = await fetch(url.toString());
         const data = await response.json();
 
         if (data.error) {
@@ -57,7 +61,7 @@ export default function RedZoneModal({ isOpen, onClose, projectId, threshold = 7
     };
 
     fetchRedZone();
-  }, [isOpen, projectId, threshold]);
+  }, [isOpen, environment, threshold]);
 
   if (!isOpen) return null;
 

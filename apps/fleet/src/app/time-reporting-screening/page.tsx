@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { AppSwitcher } from '@repo/ui';
 import Link from 'next/link';
+import { CheckSquare, Filter, X, Calendar, Upload, CheckCircle2, XCircle } from 'lucide-react';
 
 interface WorkerMetrics {
   workerName: string;
@@ -32,6 +33,15 @@ interface Summary {
   inconsistentWorkers: number;
 }
 
+interface Pagination {
+  page: number;
+  limit: number;
+  totalPages: number;
+  totalRecords: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+}
+
 const EXPERIENCE_COLORS = {
   LOW: '#ff6600',
   MEDIUM: '#ffa500',
@@ -48,6 +58,7 @@ const FLAG_COLORS = {
 export default function TimeReportingScreeningPage() {
   const [workers, setWorkers] = useState<WorkerMetrics[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
+  const [pagination, setPagination] = useState<Pagination | null>(null);
   const [loading, setLoading] = useState(false);
   const [selectedWorkers, setSelectedWorkers] = useState<Set<string>>(new Set());
 
@@ -58,15 +69,25 @@ export default function TimeReportingScreeningPage() {
   const [flagFilter, setFlagFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageLimit] = useState(50);
+
   // Sorting
   const [sortColumn, setSortColumn] = useState<keyof WorkerMetrics>('avgHoursPerTask');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+
+  // Import state
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<any>(null);
+  const [importError, setImportError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchScreening();
   }, []);
 
-  const fetchScreening = async () => {
+  const fetchScreening = async (page: number = currentPage) => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -74,16 +95,54 @@ export default function TimeReportingScreeningPage() {
       if (endDate) params.append('endDate', endDate);
       if (experienceFilter !== 'all') params.append('experienceLevel', experienceFilter);
       if (flagFilter !== 'all') params.append('flagStatus', flagFilter);
+      params.append('page', page.toString());
+      params.append('limit', pageLimit.toString());
 
       const response = await fetch(`/api/time-reporting/screening?${params.toString()}`);
       const data = await response.json();
 
       setWorkers(data.workers || []);
       setSummary(data.summary || null);
+      setPagination(data.pagination || null);
+      setCurrentPage(page);
     } catch (error) {
       console.error('Error fetching screening data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImporting(true);
+    setImportError(null);
+    setImportResult(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/api/time-reporting/import', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        setImportError(result.error || 'Import failed');
+      } else {
+        setImportResult(result);
+        // Refresh data after successful import
+        fetchScreening();
+      }
+    } catch (err) {
+      setImportError(err instanceof Error ? err.message : 'Import failed');
+    } finally {
+      setImporting(false);
+      e.target.value = ''; // Reset file input
     }
   };
 
@@ -159,26 +218,36 @@ export default function TimeReportingScreeningPage() {
       <AppSwitcher currentApp="fleet" />
 
       {/* Header */}
-      <div style={{ marginBottom: '32px' }}>
-        <h1
-          style={{
-            fontSize: '32px',
-            fontWeight: 700,
-            marginBottom: '8px',
-            background: 'linear-gradient(135deg, var(--accent) 0%, #00d4ff 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-          }}
+      <div style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <h1
+            style={{
+              fontSize: '32px',
+              fontWeight: 700,
+              marginBottom: '8px',
+              background: 'linear-gradient(135deg, var(--accent) 0%, #00d4ff 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+            }}
+          >
+            Quick Screening
+          </h1>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '16px' }}>
+            Fast metrics-based analysis to identify workers with unusual patterns. Select workers for{' '}
+            <Link href="/time-reporting-analysis" style={{ color: 'var(--accent)', textDecoration: 'none' }}>
+              Deep Analysis
+            </Link>
+            .
+          </p>
+        </div>
+        <button
+          onClick={() => setShowImportModal(true)}
+          className="btn-primary"
+          style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
         >
-          Quick Screening
-        </h1>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '16px' }}>
-          Fast metrics-based analysis to identify workers with unusual patterns. Select workers for{' '}
-          <Link href="/time-reporting-analysis" style={{ color: 'var(--accent)', textDecoration: 'none' }}>
-            Deep Analysis
-          </Link>
-          .
-        </p>
+          <Upload className="w-4 h-4" />
+          Import CSV
+        </button>
       </div>
 
       {/* Filters */}
@@ -186,41 +255,75 @@ export default function TimeReportingScreeningPage() {
         <h3 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '16px' }}>Filters</h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
           <div>
-            <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', color: 'var(--text-secondary)' }}>
+            <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', color: 'var(--text-secondary)', fontWeight: 500 }}>
               Start Date
             </label>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '8px 12px',
-                borderRadius: '6px',
-                border: '1px solid var(--border-primary)',
-                backgroundColor: 'var(--bg-secondary)',
-                color: 'var(--text-primary)',
-              }}
-            />
+            <div style={{ position: 'relative' }}>
+              <Calendar
+                className="w-4 h-4"
+                style={{
+                  position: 'absolute',
+                  left: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: 'var(--accent)',
+                  pointerEvents: 'none',
+                  zIndex: 1
+                }}
+              />
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px 8px 36px',
+                  borderRadius: '6px',
+                  border: '2px solid var(--accent)',
+                  backgroundColor: 'rgba(var(--accent-rgb), 0.05)',
+                  color: 'var(--text-primary)',
+                  fontSize: '14px',
+                  fontWeight: 500,
+                  cursor: 'pointer'
+                }}
+              />
+            </div>
           </div>
 
           <div>
-            <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', color: 'var(--text-secondary)' }}>
+            <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', color: 'var(--text-secondary)', fontWeight: 500 }}>
               End Date
             </label>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '8px 12px',
-                borderRadius: '6px',
-                border: '1px solid var(--border-primary)',
-                backgroundColor: 'var(--bg-secondary)',
-                color: 'var(--text-primary)',
-              }}
-            />
+            <div style={{ position: 'relative' }}>
+              <Calendar
+                className="w-4 h-4"
+                style={{
+                  position: 'absolute',
+                  left: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: 'var(--accent)',
+                  pointerEvents: 'none',
+                  zIndex: 1
+                }}
+              />
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px 8px 36px',
+                  borderRadius: '6px',
+                  border: '2px solid var(--accent)',
+                  backgroundColor: 'rgba(var(--accent-rgb), 0.05)',
+                  color: 'var(--text-primary)',
+                  fontSize: '14px',
+                  fontWeight: 500,
+                  cursor: 'pointer'
+                }}
+              />
+            </div>
           </div>
 
           <div>
@@ -292,7 +395,15 @@ export default function TimeReportingScreeningPage() {
         </div>
 
         <div style={{ marginTop: '16px', display: 'flex', gap: '12px' }}>
-          <button onClick={fetchScreening} className="btn-primary">
+          <button
+            onClick={() => {
+              setCurrentPage(1);
+              fetchScreening(1);
+            }}
+            className="btn-primary"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+          >
+            <Filter className="w-4 h-4" />
             Apply Filters
           </button>
           <button
@@ -302,9 +413,21 @@ export default function TimeReportingScreeningPage() {
               setExperienceFilter('all');
               setFlagFilter('all');
               setSearchQuery('');
+              setCurrentPage(1);
+              // Trigger fetch after clearing
+              setTimeout(() => fetchScreening(1), 0);
             }}
-            className="btn-secondary"
+            className="btn-primary"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              backgroundColor: 'rgba(239, 68, 68, 0.15)',
+              borderColor: 'rgb(239, 68, 68)',
+              color: 'rgb(239, 68, 68)'
+            }}
           >
+            <X className="w-4 h-4" />
             Clear Filters
           </button>
         </div>
@@ -339,7 +462,7 @@ export default function TimeReportingScreeningPage() {
               Team Avg AHT
             </div>
             <div style={{ fontSize: '32px', fontWeight: 600 }}>
-              {summary.teamAvgAHT.toFixed(2)}h
+              {summary.teamAvgAHT?.toFixed(2) || '0.00'}h
             </div>
             <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginTop: '4px' }}>
               Hours per task
@@ -351,7 +474,7 @@ export default function TimeReportingScreeningPage() {
               Avg Tasks/Day
             </div>
             <div style={{ fontSize: '32px', fontWeight: 600 }}>
-              {summary.teamAvgTasksPerDay.toFixed(1)}
+              {summary.teamAvgTasksPerDay?.toFixed(1) || '0.0'}
             </div>
           </div>
 
@@ -428,7 +551,17 @@ export default function TimeReportingScreeningPage() {
               </p>
             )}
           </div>
-          <button onClick={selectAllFlagged} className="btn-secondary" style={{ fontSize: '13px' }}>
+          <button
+            onClick={selectAllFlagged}
+            className="btn-primary"
+            style={{
+              fontSize: '13px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            <CheckSquare className="w-4 h-4" />
             Select All Flagged
           </button>
         </div>
@@ -578,7 +711,200 @@ export default function TimeReportingScreeningPage() {
             </table>
           </div>
         )}
+
+        {/* Pagination Controls */}
+        {pagination && pagination.totalPages > 1 && (
+          <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
+              Showing {((currentPage - 1) * pageLimit) + 1} - {Math.min(currentPage * pageLimit, pagination.totalRecords)} of {pagination.totalRecords} workers
+            </div>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <button
+                onClick={() => fetchScreening(1)}
+                disabled={!pagination.hasPreviousPage}
+                className="btn-secondary"
+                style={{
+                  padding: '6px 12px',
+                  fontSize: '14px',
+                  opacity: pagination.hasPreviousPage ? 1 : 0.4,
+                  cursor: pagination.hasPreviousPage ? 'pointer' : 'not-allowed'
+                }}
+              >
+                First
+              </button>
+              <button
+                onClick={() => fetchScreening(currentPage - 1)}
+                disabled={!pagination.hasPreviousPage}
+                className="btn-secondary"
+                style={{
+                  padding: '6px 12px',
+                  fontSize: '14px',
+                  opacity: pagination.hasPreviousPage ? 1 : 0.4,
+                  cursor: pagination.hasPreviousPage ? 'pointer' : 'not-allowed'
+                }}
+              >
+                Previous
+              </button>
+              <span style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: 500, padding: '0 12px' }}>
+                Page {currentPage} of {pagination.totalPages}
+              </span>
+              <button
+                onClick={() => fetchScreening(currentPage + 1)}
+                disabled={!pagination.hasNextPage}
+                className="btn-secondary"
+                style={{
+                  padding: '6px 12px',
+                  fontSize: '14px',
+                  opacity: pagination.hasNextPage ? 1 : 0.4,
+                  cursor: pagination.hasNextPage ? 'pointer' : 'not-allowed'
+                }}
+              >
+                Next
+              </button>
+              <button
+                onClick={() => fetchScreening(pagination.totalPages)}
+                disabled={!pagination.hasNextPage}
+                className="btn-secondary"
+                style={{
+                  padding: '6px 12px',
+                  fontSize: '14px',
+                  opacity: pagination.hasNextPage ? 1 : 0.4,
+                  cursor: pagination.hasNextPage ? 'pointer' : 'not-allowed'
+                }}
+              >
+                Last
+              </button>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Import Modal */}
+      {showImportModal && (
+        <div
+          onClick={() => setShowImportModal(false)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="glass-card"
+            style={{
+              padding: '32px',
+              maxWidth: '600px',
+              width: '90%',
+              maxHeight: '80vh',
+              overflow: 'auto',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+              <h2 style={{ fontSize: '24px', fontWeight: 600 }}>Import Time Reports</h2>
+              <button
+                onClick={() => setShowImportModal(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  padding: '4px',
+                }}
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div style={{ marginBottom: '24px' }}>
+              <p style={{ color: 'var(--text-secondary)', marginBottom: '16px' }}>
+                Upload a CSV file with time reporting data. The file should include columns for worker email, date, task count, and hours.
+              </p>
+
+              <input
+                type="file"
+                accept=".csv"
+                onChange={handleImport}
+                disabled={importing}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: '2px dashed var(--border-primary)',
+                  borderRadius: '8px',
+                  backgroundColor: 'var(--bg-secondary)',
+                  cursor: 'pointer',
+                }}
+              />
+            </div>
+
+            {importing && (
+              <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-secondary)' }}>
+                Importing...
+              </div>
+            )}
+
+            {importError && (
+              <div
+                style={{
+                  padding: '16px',
+                  backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid rgb(239, 68, 68)',
+                  borderRadius: '8px',
+                  marginBottom: '16px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'rgb(239, 68, 68)' }}>
+                  <XCircle className="w-5 h-5" />
+                  <span style={{ fontWeight: 500 }}>Import Failed</span>
+                </div>
+                <p style={{ marginTop: '8px', color: 'rgb(239, 68, 68)', fontSize: '14px' }}>{importError}</p>
+              </div>
+            )}
+
+            {importResult && (
+              <div
+                style={{
+                  padding: '16px',
+                  backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                  border: '1px solid rgb(34, 197, 94)',
+                  borderRadius: '8px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'rgb(34, 197, 94)', marginBottom: '12px' }}>
+                  <CheckCircle2 className="w-5 h-5" />
+                  <span style={{ fontWeight: 500 }}>Import Successful</span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', fontSize: '14px' }}>
+                  <div>
+                    <span style={{ color: 'var(--text-secondary)' }}>Imported:</span>
+                    <span style={{ color: 'rgb(34, 197, 94)', fontWeight: 600, marginLeft: '8px' }}>
+                      {importResult.imported || 0}
+                    </span>
+                  </div>
+                  <div>
+                    <span style={{ color: 'var(--text-secondary)' }}>Skipped:</span>
+                    <span style={{ color: 'rgb(234, 179, 8)', fontWeight: 600, marginLeft: '8px' }}>
+                      {importResult.skipped || 0}
+                    </span>
+                  </div>
+                </div>
+                {importResult.message && (
+                  <p style={{ marginTop: '12px', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                    {importResult.message}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

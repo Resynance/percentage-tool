@@ -28,7 +28,7 @@ export async function POST(
         .eq('id', user.id)
         .single();
 
-    if (!profile || !['ADMIN', 'FLEET'].includes((profile as any)?.role)) {
+    if (!profile || !['ADMIN', 'MANAGER', 'FLEET'].includes((profile as any)?.role)) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -36,7 +36,7 @@ export async function POST(
         // Verify group exists
         const group = await prisma.raterGroup.findUnique({
             where: { id },
-            select: { id: true, name: true, projectId: true }
+            select: { id: true, name: true, environment: true }
         });
 
         if (!group) {
@@ -91,10 +91,9 @@ export async function POST(
             action: 'RATER_GROUP_MEMBERS_ADDED',
             entityType: 'RATER_GROUP',
             entityId: id,
-            projectId: group.projectId,
             userId: user.id,
             userEmail: user.email!,
-            metadata: { addedUserIds: newUserIds, groupName: group.name }
+            metadata: { environment: group.environment, addedUserIds: newUserIds, groupName: group.name }
         });
 
         // Return updated group with members

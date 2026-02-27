@@ -46,8 +46,7 @@ export async function POST(req: NextRequest) {
     let record;
     try {
         record = await prisma.dataRecord.findUnique({
-            where: { id: recordId },
-            include: { project: true }
+            where: { id: recordId }
         });
     } catch (dbError: any) {
         console.error('Compare API Error: Database query failed', {
@@ -65,16 +64,16 @@ export async function POST(req: NextRequest) {
 
     try {
 
-        // Verify user owns the project (write operation - ownership required)
+        // Verify user has appropriate role (FLEET or ADMIN)
         const profile = await prisma.profile.findUnique({
             where: { id: user.id },
             select: { role: true }
         });
         const role = profile?.role || 'USER';
 
-        if (role !== 'ADMIN' && record.project.ownerId !== user.id) {
+        if (!['FLEET', 'MANAGER', 'ADMIN'].includes(role)) {
             return NextResponse.json({
-                error: 'Forbidden: Only project owners can generate alignment analysis'
+                error: 'Forbidden: Only FLEET and ADMIN users can generate alignment analysis'
             }, { status: 403 });
         }
 
@@ -82,7 +81,7 @@ export async function POST(req: NextRequest) {
         if (record.alignmentAnalysis && !forceRegenerate) {
             console.log('Compare API: Returned cached alignment analysis', {
                 recordId: record.id,
-                projectId: record.projectId,
+                environment: record.environment,
                 userId: user.id,
                 cached: true
             });
@@ -94,18 +93,21 @@ export async function POST(req: NextRequest) {
             });
         }
 
-        const project = record.project;
-        if (!project.guidelines) {
-            return NextResponse.json({ error: 'Project guidelines not found. Please upload them in Project Management.' }, { status: 400 });
-        }
+        // TODO: Phase 5 - Implement system-wide guidelines management
+        // Guidelines should be fetched from SystemSettings instead of Project table
+        // For now, return error indicating feature migration in progress
+        return NextResponse.json({
+            error: 'Alignment analysis with guidelines is currently being migrated to the new environment-based system. This feature will be available soon.'
+        }, { status: 503 }); // 503 Service Unavailable
 
+        /* DEPRECATED - Guidelines logic to be reimplemented in Phase 5
         // Parse PDF guidelines
         let guidelinesText = '';
-        const base64Data = project.guidelines.split(';base64,').pop();
+        const base64Data = guidelines.split(';base64,').pop();
 
         if (!base64Data) {
             console.error('Compare API Error: Guidelines data is not in expected base64 format', {
-                projectId: record.projectId,
+                environment: record.environment,
                 recordId: record.id
             });
             return NextResponse.json({
@@ -120,7 +122,7 @@ export async function POST(req: NextRequest) {
 
             if (!guidelinesText || guidelinesText.trim().length === 0) {
                 console.error('Compare API Error: PDF parsed successfully but contains no text content', {
-                    projectId: record.projectId,
+                    environment: record.environment,
                     recordId: record.id
                 });
                 return NextResponse.json({
@@ -129,7 +131,7 @@ export async function POST(req: NextRequest) {
             }
         } catch (pdfError: any) {
             console.error('Compare API Error: PDF parsing failed', {
-                projectId: record.projectId,
+                environment: record.environment,
                 recordId: record.id,
                 error: pdfError.message,
                 stack: pdfError.stack
@@ -163,7 +165,7 @@ export async function POST(req: NextRequest) {
             result = await generateCompletionWithUsage(prompt, systemPrompt);
         } catch (aiError: any) {
             console.error('Compare API Error: AI service failed', {
-                projectId: record.projectId,
+                environment: record.environment,
                 recordId: record.id,
                 error: aiError.message,
                 stack: aiError.stack
@@ -181,7 +183,7 @@ export async function POST(req: NextRequest) {
             });
         } catch (updateError: any) {
             console.error('Compare API Error: Failed to save analysis to database', {
-                projectId: record.projectId,
+                environment: record.environment,
                 recordId: record.id,
                 error: updateError.message
             });
@@ -192,7 +194,7 @@ export async function POST(req: NextRequest) {
         // Log successful operation
         console.log('Compare API: Alignment analysis generated', {
             recordId: record.id,
-            projectId: record.projectId,
+            environment: record.environment,
             userId: user.id,
             wasRegenerated: forceRegenerate,
             cached: false,
@@ -209,6 +211,7 @@ export async function POST(req: NextRequest) {
             usage: result.usage,
             provider: result.provider
         });
+        */
 
     } catch (error: any) {
         console.error('Compare API Error: Unexpected error', {

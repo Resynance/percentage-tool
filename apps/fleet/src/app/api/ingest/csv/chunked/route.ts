@@ -14,7 +14,7 @@ export const maxDuration = 60;
 // Security limits
 const MAX_CHUNKS = 100;
 const MAX_CHUNK_SIZE = 4 * 1024 * 1024; // 4MB per chunk
-const MAX_TOTAL_SIZE = 100 * 1024 * 1024; // 100MB total
+const MAX_TOTAL_SIZE = 150 * 1024 * 1024; // 150MB total
 const SESSION_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
 // Use OS temp directory (works on Vercel, local dev, etc.)
@@ -70,31 +70,16 @@ export async function POST(req: NextRequest) {
 
         switch (action) {
             case 'start': {
-                const { uploadId, projectId, type, fileName, totalChunks, generateEmbeddings } = body;
+                const { uploadId, fileName, totalChunks, generateEmbeddings } = body;
 
                 // Validation
                 if (!uploadId || typeof uploadId !== 'string' || uploadId.length > 100) {
                     return NextResponse.json({ error: 'Invalid uploadId' }, { status: 400 });
                 }
-                if (!projectId || typeof projectId !== 'string') {
-                    return NextResponse.json({ error: 'projectId is required' }, { status: 400 });
-                }
-                if (!type || !['TASK', 'FEEDBACK'].includes(type)) {
-                    return NextResponse.json({ error: 'Invalid type' }, { status: 400 });
-                }
                 if (!Number.isInteger(totalChunks) || totalChunks < 1 || totalChunks > MAX_CHUNKS) {
                     return NextResponse.json({
                         error: `totalChunks must be between 1 and ${MAX_CHUNKS}`
                     }, { status: 400 });
-                }
-
-                // Verify project exists
-                const project = await prisma.project.findUnique({
-                    where: { id: projectId },
-                    select: { id: true }
-                });
-                if (!project) {
-                    return NextResponse.json({ error: 'Project not found' }, { status: 404 });
                 }
 
                 await ensureUploadDir();
@@ -108,8 +93,6 @@ export async function POST(req: NextRequest) {
                 // Create session directory and metadata
                 await mkdir(sessionDir, { recursive: true });
                 const meta = {
-                    projectId,
-                    type,
                     fileName: (fileName || 'upload.csv').slice(0, 255),
                     totalChunks,
                     generateEmbeddings: generateEmbeddings ?? true,
@@ -240,18 +223,16 @@ export async function POST(req: NextRequest) {
 
                 const csvContent = chunks.join('');
 
-                // Start background ingestion
+                // Start background ingestion (environment and type extracted from CSV)
                 const jobId = await startBackgroundIngest('CSV', csvContent, {
-                    projectId: meta.projectId,
                     source: `csv:${meta.fileName}`,
-                    type: meta.type as RecordType,
                     filterKeywords: undefined,
                     generateEmbeddings: meta.generateEmbeddings,
                 });
 
                 // IMPORTANT: In serverless, we must await initial processing or it gets killed
                 // Status endpoint will continue processing on each poll
-                await processQueuedJobs(meta.projectId).catch(err =>
+                await processQueuedJobs().catch(err =>
                     console.error('Initial Queue Processor Error:', err)
                 );
 

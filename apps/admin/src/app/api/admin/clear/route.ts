@@ -24,19 +24,13 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-        const { target, projectId } = await req.json();
+        const { target, environment } = await req.json();
 
         if (target === 'ALL_DATA') {
-            // Delete all records, Likert scores, and reset project analysis
+            // Delete all records and Likert scores
             await prisma.$transaction([
                 prisma.likertScore.deleteMany({}),
                 prisma.dataRecord.deleteMany({}),
-                prisma.project.updateMany({
-                    data: {
-                        lastTaskAnalysis: null,
-                        lastFeedbackAnalysis: null
-                    }
-                })
             ]);
 
             // Log audit event (critical operation)
@@ -56,12 +50,9 @@ export async function POST(req: NextRequest) {
         }
 
         if (target === 'ANALYTICS_ONLY') {
-            // Reset project analysis only
-            await prisma.project.updateMany({
-                data: {
-                    lastTaskAnalysis: null,
-                    lastFeedbackAnalysis: null
-                }
+            // Clear alignment analysis from all data records
+            await prisma.dataRecord.updateMany({
+                data: { alignmentAnalysis: null }
             });
 
             // Log audit event (critical operation)
@@ -82,10 +73,10 @@ export async function POST(req: NextRequest) {
 
         if (target === 'LIKERT_SCORES') {
             // Delete Likert scores (optionally for a specific project)
-            if (projectId) {
+            if (environment) {
                 // Get record IDs for this project first
                 const records = await prisma.dataRecord.findMany({
-                    where: { projectId },
+                    where: { environment },
                     select: { id: true }
                 });
                 const recordIds = records.map(r => r.id);
@@ -97,10 +88,9 @@ export async function POST(req: NextRequest) {
                 const auditResult = await logAudit({
                     action: 'LIKERT_SCORES_CLEARED',
                     entityType: 'LIKERT_SCORE',
-                    projectId,
                     userId: user.id,
                     userEmail: user.email!,
-                    metadata: { projectId, count: result.count }
+                    metadata: { environment, count: result.count }
                 });
 
                 checkAuditResult(auditResult, 'LIKERT_SCORES_CLEARED', {
@@ -136,13 +126,13 @@ export async function POST(req: NextRequest) {
 
         if (target === 'PROJECT_RECORDS') {
             // Delete all records and their Likert scores for a specific project
-            if (!projectId) {
-                return NextResponse.json({ error: 'projectId required for PROJECT_RECORDS' }, { status: 400 });
+            if (!environment) {
+                return NextResponse.json({ error: 'environment required for PROJECT_RECORDS' }, { status: 400 });
             }
 
             // Get record IDs first for Likert score deletion
             const records = await prisma.dataRecord.findMany({
-                where: { projectId },
+                where: { environment },
                 select: { id: true }
             });
             const recordIds = records.map(r => r.id);
@@ -153,27 +143,23 @@ export async function POST(req: NextRequest) {
                     where: { recordId: { in: recordIds } }
                 }),
                 prisma.dataRecord.deleteMany({
-                    where: { projectId }
+                    where: { environment }
                 })
             ]);
 
-            // Reset project analysis
-            await prisma.project.update({
-                where: { id: projectId },
-                data: {
-                    lastTaskAnalysis: null,
-                    lastFeedbackAnalysis: null
-                }
+            // Clear alignment analysis for records in this environment
+            await prisma.dataRecord.updateMany({
+                where: { environment },
+                data: { alignmentAnalysis: null }
             });
 
             const auditResult = await logAudit({
                 action: 'PROJECT_RECORDS_CLEARED',
                 entityType: 'DATA_RECORD',
-                projectId,
                 userId: user.id,
                 userEmail: user.email!,
                 metadata: {
-                    projectId,
+                    environment,
                     recordsDeleted: recordResult.count,
                     likertScoresDeleted: likertResult.count
                 }

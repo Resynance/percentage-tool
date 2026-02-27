@@ -25,9 +25,6 @@ export async function GET(
         const batch = await prisma.assignmentBatch.findUnique({
             where: { id },
             include: {
-                project: {
-                    select: { id: true, name: true }
-                },
                 raterGroup: {
                     select: { id: true, name: true }
                 },
@@ -147,10 +144,9 @@ export async function PATCH(
             action: 'ASSIGNMENT_BATCH_UPDATED',
             entityType: 'ASSIGNMENT_BATCH',
             entityId: batch.id,
-            projectId: batch.projectId,
             userId: user.id,
             userEmail: user.email!,
-            metadata: { updatedFields: Object.keys(updateData) }
+            metadata: { environment: batch.environment, updatedFields: Object.keys(updateData) }
         });
 
         return NextResponse.json({ batch });
@@ -190,7 +186,7 @@ export async function DELETE(
     try {
         const existing = await prisma.assignmentBatch.findUnique({
             where: { id },
-            select: { id: true, name: true, projectId: true, status: true }
+            select: { id: true, name: true, environment: true, status: true }
         });
 
         if (!existing) {
@@ -205,10 +201,9 @@ export async function DELETE(
             action: 'ASSIGNMENT_BATCH_DELETED',
             entityType: 'ASSIGNMENT_BATCH',
             entityId: id,
-            projectId: existing.projectId,
             userId: user.id,
             userEmail: user.email!,
-            metadata: { name: existing.name }
+            metadata: { environment: existing.environment, name: existing.name }
         });
 
         return NextResponse.json({ success: true });

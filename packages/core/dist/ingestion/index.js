@@ -33,22 +33,65 @@ import { RecordCategory } from '@repo/types';
  * NOTE: Stores payload and options in database instead of memory for serverless compatibility.
  * Vercel functions are stateless and terminate after sending HTTP response,
  * so in-memory caches don't persist across invocations.
+ *
+ * Environment and type can be extracted from CSV data if not provided.
  */
 export async function startBackgroundIngest(type, payload, options) {
+    // For CSV ingestion without explicit environment/type, extract from first row
+    let environment = options.environment;
+    let recordType = options.type;
+    if (!environment || !recordType) {
+        try {
+            const rows = parse(payload, {
+                columns: true,
+                skip_empty_lines: true,
+                trim: true,
+                relax_column_count: true
+            });
+            if (rows.length > 0) {
+                const firstRow = rows[0];
+                // Extract environment from common column names
+                if (!environment) {
+                    environment = firstRow.environment_name ||
+                        firstRow.environment ||
+                        firstRow.env_key ||
+                        firstRow.env ||
+                        'default';
+                }
+                // Extract type from common column names
+                if (!recordType) {
+                    const typeValue = (firstRow.type || firstRow.record_type || 'TASK').toString().toUpperCase();
+                    recordType = (typeValue === 'FEEDBACK' ? 'FEEDBACK' : 'TASK');
+                }
+            }
+            else {
+                // Fallback if CSV is empty or can't be parsed
+                environment = environment || 'default';
+                recordType = recordType || 'TASK';
+            }
+        }
+        catch (error) {
+            console.error('Error extracting environment/type from CSV:', error);
+            environment = environment || 'default';
+            recordType = recordType || 'TASK';
+        }
+    }
     const job = await prisma.ingestJob.create({
         data: {
-            projectId: options.projectId,
-            type: options.type,
+            environment: environment,
+            type: recordType,
             status: 'PENDING',
             payload: payload, // Store in database for serverless compatibility
             options: {
                 ...options,
-                type: type, // Store whether CSV or API
+                environment,
+                type: recordType,
+                ingestionType: type, // Store whether CSV or API
             },
         }
     });
     // Trigger processing (will be killed in serverless, but status endpoint will re-trigger)
-    processQueuedJobs(options.projectId).catch(err => console.error('Queue Processor Error:', err));
+    processQueuedJobs().catch(err => console.error('Queue Processor Error:', err));
     return job.id;
 }
 /**
@@ -59,29 +102,49 @@ export async function startBackgroundIngest(type, payload, options) {
  * SERVERLESS COMPATIBILITY: This function is called by the status endpoint on each poll
  * to ensure jobs actually get processed (since background triggers get killed when the
  * serverless function terminates after returning the HTTP response).
+ *
+ * If environment is provided, only processes jobs for that environment.
+ * If not provided, processes jobs for all environments.
  */
-export async function processQueuedJobs(projectId) {
-    // Trigger both queues - they have internal locking to prevent concurrent execution
-    await Promise.allSettled([
-        processJobs(projectId),
-        processVectorizationJobs(projectId)
-    ]);
+export async function processQueuedJobs(environment) {
+    if (environment) {
+        // Process specific environment
+        await Promise.allSettled([
+            processJobs(environment),
+            processVectorizationJobs(environment)
+        ]);
+    }
+    else {
+        // Process all environments - get distinct environments from pending/queued jobs
+        const environments = await prisma.ingestJob.findMany({
+            where: {
+                status: { in: ['PENDING', 'QUEUED_FOR_VEC'] }
+            },
+            select: { environment: true },
+            distinct: ['environment']
+        });
+        // Process each environment's jobs
+        await Promise.allSettled(environments.map(({ environment }) => Promise.allSettled([
+            processJobs(environment),
+            processVectorizationJobs(environment)
+        ])));
+    }
 }
 /**
  * QUEUE PROCESSOR: processJobs
  * Manages Phase 1 (Data Loading). This phase can run in parallel with Phase 2 (Vectorizing).
- * However, we still only allow one PROCESSING job per project to ensure DB write order.
+ * However, we still only allow one PROCESSING job per environment to ensure DB write order.
  */
-async function processJobs(projectId) {
+async function processJobs(environment) {
     const activeProcessing = await prisma.ingestJob.findFirst({
-        where: { projectId, status: 'PROCESSING' }
+        where: { environment, status: 'PROCESSING' }
     });
     if (activeProcessing) {
         // In serverless, we can't rely on memory state, so just return and let the job be picked up later
         return; // Wait for the active data load to finish
     }
     const nextJob = await prisma.ingestJob.findFirst({
-        where: { projectId, status: 'PENDING' },
+        where: { environment, status: 'PENDING' },
         orderBy: { createdAt: 'asc' }
     });
     if (!nextJob)
@@ -91,7 +154,7 @@ async function processJobs(projectId) {
             where: { id: nextJob.id },
             data: { status: 'FAILED', error: 'Job payload missing from database.' }
         });
-        processJobs(projectId);
+        processJobs(environment);
         return;
     }
     if (!nextJob.options) {
@@ -99,16 +162,16 @@ async function processJobs(projectId) {
             where: { id: nextJob.id },
             data: { status: 'FAILED', error: 'Job options missing from database.' }
         });
-        processJobs(projectId);
+        processJobs(environment);
         return;
     }
     // Reconstruct cache object from database-stored payload and options
     const storedOptions = nextJob.options;
     const cache = {
-        type: (storedOptions.type || 'CSV'),
+        type: (storedOptions.ingestionType || 'CSV'),
         payload: nextJob.payload,
         options: {
-            projectId: nextJob.projectId,
+            environment: nextJob.environment,
             source: storedOptions.source || 'csv',
             type: nextJob.type,
             filterKeywords: storedOptions.filterKeywords,
@@ -130,10 +193,24 @@ async function processJobs(projectId) {
             });
         }
         else {
-            const response = await fetch(cache.payload);
-            const data = await response.json();
+            // API type: payload can be either a URL or direct JSON string
+            let data;
+            // Try to parse as JSON first (direct JSON payload)
+            try {
+                data = JSON.parse(cache.payload);
+            }
+            catch {
+                // If parsing fails, treat as URL and fetch
+                const response = await fetch(cache.payload);
+                data = await response.json();
+            }
             records = Array.isArray(data) ? data : [data];
         }
+        // Update job with total record count for progress tracking
+        await prisma.ingestJob.update({
+            where: { id: nextJob.id },
+            data: { totalRecords: records.length }
+        });
         await processAndStore(records, cache.options, nextJob.id);
         // Phase 1 Complete: Mark as queued for vectorization
         if (cache.options.generateEmbeddings) {
@@ -142,7 +219,7 @@ async function processJobs(projectId) {
                 data: { status: 'QUEUED_FOR_VEC' }
             });
             // Trigger vectorization queue processor
-            processVectorizationJobs(projectId).catch(err => console.error('Vectorization Queue Error:', err));
+            processVectorizationJobs(environment).catch(err => console.error('Vectorization Queue Error:', err));
         }
         else {
             // No vectorization needed, mark as complete and clear payload
@@ -151,7 +228,7 @@ async function processJobs(projectId) {
                 data: { status: 'COMPLETED', payload: null }
             });
         }
-        processJobs(projectId);
+        processJobs(environment);
     }
     catch (error) {
         console.error('[Ingestion] Job failed:', error);
@@ -159,25 +236,25 @@ async function processJobs(projectId) {
             where: { id: nextJob.id },
             data: { status: 'FAILED', error: error.message, payload: null }
         });
-        processJobs(projectId);
+        processJobs(environment);
     }
 }
 /**
  * VECTORIZATION QUEUE PROCESSOR: processVectorizationJobs
- * Manages Phase 2 (Vectorization). Only one VECTORIZING job per project is allowed
+ * Manages Phase 2 (Vectorization). Only one VECTORIZING job per environment is allowed
  * to prevent overloading the AI server.
  */
-async function processVectorizationJobs(projectId) {
-    // Check if there's already a job vectorizing for this project
+async function processVectorizationJobs(environment) {
+    // Check if there's already a job vectorizing for this environment
     const activeVectorizing = await prisma.ingestJob.findFirst({
-        where: { projectId, status: 'VECTORIZING' }
+        where: { environment, status: 'VECTORIZING' }
     });
     if (activeVectorizing) {
         return; // Wait for active vectorization to finish
     }
     // Get the next job queued for vectorization
     const nextJob = await prisma.ingestJob.findFirst({
-        where: { projectId, status: 'QUEUED_FOR_VEC' },
+        where: { environment, status: 'QUEUED_FOR_VEC' },
         orderBy: { createdAt: 'asc' }
     });
     if (!nextJob)
@@ -189,14 +266,14 @@ async function processVectorizationJobs(projectId) {
             data: { status: 'VECTORIZING' }
         });
         // Run vectorization
-        await vectorizeJob(nextJob.id, projectId);
+        await vectorizeJob(nextJob.id, environment);
         // Mark as complete and clear payload
         await prisma.ingestJob.update({
             where: { id: nextJob.id },
             data: { status: 'COMPLETED', payload: null }
         });
         // Process next job in queue
-        processVectorizationJobs(projectId);
+        processVectorizationJobs(environment);
     }
     catch (error) {
         console.error('[Vectorization] Job failed:', error);
@@ -204,14 +281,14 @@ async function processVectorizationJobs(projectId) {
             where: { id: nextJob.id },
             data: { status: 'FAILED', error: error.message, payload: null }
         });
-        processVectorizationJobs(projectId);
+        processVectorizationJobs(environment);
     }
 }
 /**
  * Phase 2: Vectorization
- * Iterates through records in the project that lack embeddings and generates them using the active AI provider.
+ * Iterates through records in the environment that lack embeddings and generates them using the active AI provider.
  *
- * Note: Scoped to the Project ID. This serves as a self-healing mechanism: any record in the project
+ * Note: Scoped to the Environment. This serves as a self-healing mechanism: any record in the environment
  * missing an embedding (from this job or previous failed jobs) will be processed.
  *
  * Uses raw SQL for vector operations because Prisma's Unsupported("vector") type
@@ -222,7 +299,7 @@ async function processVectorizationJobs(projectId) {
  * - After MAX_RETRIES_PER_RECORD attempts, marks records with embedding error in metadata
  * - Continues processing other batches instead of failing the entire job on intermittent API failures
  */
-async function vectorizeJob(jobId, projectId) {
+async function vectorizeJob(jobId, environment) {
     const RECORDS_BATCH_SIZE = 50;
     const MAX_RETRIES_PER_RECORD = 3;
     const failedRecordAttempts = new Map(); // Track retry attempts per record
@@ -241,7 +318,7 @@ async function vectorizeJob(jobId, projectId) {
         const batch = failedIdsArray.length > 0
             ? await prisma.$queryRaw `
                 SELECT id, content, metadata FROM public.data_records
-                WHERE "projectId" = ${projectId}
+                WHERE environment = ${environment}
                 AND embedding IS NULL
                 AND (metadata->>'embeddingError' IS NULL)
                 AND id NOT IN (${Prisma.join(failedIdsArray)})
@@ -250,7 +327,7 @@ async function vectorizeJob(jobId, projectId) {
             `
             : await prisma.$queryRaw `
                 SELECT id, content, metadata FROM public.data_records
-                WHERE "projectId" = ${projectId}
+                WHERE environment = ${environment}
                 AND embedding IS NULL
                 AND (metadata->>'embeddingError' IS NULL)
                 ORDER BY id ASC
@@ -343,11 +420,14 @@ async function vectorizeJob(jobId, projectId) {
  *
  * New Feature: Detailed Skip Tracking
  * - Tracks 'Keyword Mismatch' (filtered out by user keywords)
- * - Tracks 'Duplicate ID' (existing Task ID or Feedback ID in project)
+ * - Tracks 'Duplicate ID' (existing Task ID or Feedback ID in environment)
  * - Updates `IngestJob.skippedDetails` JSON for UI visibility.
  */
 export async function processAndStore(records, options, jobId) {
-    const { projectId, source, type, filterKeywords } = options;
+    const { environment, source, type, filterKeywords } = options;
+    // Ensure required fields have defaults
+    const actualEnvironment = environment || 'default';
+    const actualType = type || 'TASK';
     const CHUNK_SIZE = 100;
     let savedCount = 0;
     let skippedCount = 0;
@@ -366,13 +446,43 @@ export async function processAndStore(records, options, jobId) {
         // 1. FILTER: Content, Ratings, Keywords
         for (let j = 0; j < chunk.length; j++) {
             const record = chunk[j];
+            // --- Type Detection (Per Row) ---
+            // Determine the actual type for this specific row based on CSV 'type' column
+            // 'prompt' = TASK, 'feedback' = FEEDBACK
+            let rowType = actualType; // Default to job-level type
+            if (record.type) {
+                const csvType = record.type.toLowerCase();
+                if (csvType === 'feedback') {
+                    rowType = 'FEEDBACK';
+                }
+                else if (csvType === 'prompt' || csvType === 'task') {
+                    rowType = 'TASK';
+                }
+            }
+            // --- Environment Detection (Per Row) ---
+            // Extract environment from CSV columns: env_key, environment_name, environment, env
+            let rowEnvironment = actualEnvironment; // Default to job-level environment
+            if (record.env_key) {
+                rowEnvironment = String(record.env_key).trim();
+            }
+            else if (record.environment_name) {
+                rowEnvironment = String(record.environment_name).trim();
+            }
+            else if (record.environment) {
+                rowEnvironment = String(record.environment).trim();
+            }
+            else if (record.env) {
+                rowEnvironment = String(record.env).trim();
+            }
             // --- Content Extraction ---
             let content = '';
             if (typeof record === 'string') {
                 content = record;
             }
             else {
-                content = record.feedback_content || record.feedback || record.prompt ||
+                // New CSV format: 'prompt' column for tasks, 'feedback_content' for feedback
+                // Also support legacy formats for backward compatibility
+                content = record.prompt || record.feedback_content || record.feedback ||
                     record.content || record.body || record.task_content ||
                     record.text || record.message || record.instruction || record.response;
                 if (!content || content.length < 10) {
@@ -417,61 +527,88 @@ export async function processAndStore(records, options, jobId) {
             }
             // --- Keyword Filtering ---
             if (filterKeywords?.length && !filterKeywords.some(k => content.toLowerCase().includes(k.toLowerCase()))) {
-                skippedCount++;
                 chunkSkipDetails['Keyword Mismatch'] = (chunkSkipDetails['Keyword Mismatch'] || 0) + 1;
                 continue;
             }
-            validChunk.push({ record, content, category });
+            validChunk.push({ record, content, category, rowType, rowEnvironment });
         }
         // 2. DUPLICATE DETECTION (Optimized: Single query per chunk instead of per record)
-        // Extract all task IDs from the chunk
+        // Extract all task IDs and task keys from the chunk (new CSV format uses task_id and task_key)
         const taskIds = validChunk
             .map(v => v.record.task_id || v.record.id || v.record.uuid || v.record.record_id)
             .filter(id => id != null);
-        // Single query to find all existing task IDs in this chunk
-        let existingTaskIds = new Set();
-        if (taskIds.length > 0) {
+        const taskKeys = validChunk
+            .map(v => v.record.task_key)
+            .filter(key => key != null);
+        // Single query to find all existing task IDs and keys in this chunk
+        // Store as Map<type, Set<id/key>> to handle mixed TASK/FEEDBACK records
+        const existingTaskIdsByType = new Map();
+        const existingTaskKeysByType = new Map();
+        existingTaskIdsByType.set('TASK', new Set());
+        existingTaskIdsByType.set('FEEDBACK', new Set());
+        existingTaskKeysByType.set('TASK', new Set());
+        existingTaskKeysByType.set('FEEDBACK', new Set());
+        if (taskIds.length > 0 || taskKeys.length > 0) {
             const taskIdStrings = taskIds.map(id => String(id));
-            const existing = await prisma.$queryRaw `
-                SELECT
-                    metadata->>'task_id' as task_id,
-                    metadata->>'id' as id,
-                    metadata->>'uuid' as uuid,
-                    metadata->>'record_id' as record_id
-                FROM public.data_records
-                WHERE "projectId" = ${projectId}
-                AND type = ${type}::"RecordType"
-                AND (
-                    metadata->>'task_id' IN (${Prisma.join(taskIdStrings)})
-                    OR metadata->>'id' IN (${Prisma.join(taskIdStrings)})
-                    OR metadata->>'uuid' IN (${Prisma.join(taskIdStrings)})
-                    OR metadata->>'record_id' IN (${Prisma.join(taskIdStrings)})
-                )
-            `;
-            // Add all non-null IDs from all fields to the set
-            for (const row of existing) {
-                if (row.task_id)
-                    existingTaskIds.add(row.task_id);
-                if (row.id)
-                    existingTaskIds.add(row.id);
-                if (row.uuid)
-                    existingTaskIds.add(row.uuid);
-                if (row.record_id)
-                    existingTaskIds.add(row.record_id);
+            const taskKeyStrings = taskKeys.map(key => String(key));
+            // Build query conditions using Prisma.Sql array
+            const conditions = [];
+            if (taskIdStrings.length > 0) {
+                conditions.push(Prisma.sql `metadata->>'task_id' IN (${Prisma.join(taskIdStrings)})`);
+                conditions.push(Prisma.sql `metadata->>'id' IN (${Prisma.join(taskIdStrings)})`);
+                conditions.push(Prisma.sql `metadata->>'uuid' IN (${Prisma.join(taskIdStrings)})`);
+                conditions.push(Prisma.sql `metadata->>'record_id' IN (${Prisma.join(taskIdStrings)})`);
+            }
+            if (taskKeyStrings.length > 0) {
+                conditions.push(Prisma.sql `metadata->>'task_key' IN (${Prisma.join(taskKeyStrings)})`);
+            }
+            if (conditions.length > 0) {
+                const existing = await prisma.$queryRaw `
+                    SELECT
+                        type,
+                        metadata->>'task_id' as task_id,
+                        metadata->>'task_key' as task_key,
+                        metadata->>'id' as id,
+                        metadata->>'uuid' as uuid,
+                        metadata->>'record_id' as record_id
+                    FROM public.data_records
+                    WHERE environment = ${actualEnvironment}
+                    AND (${Prisma.join(conditions, ' OR ')})
+                `;
+                // Add all non-null IDs and keys to the type-specific sets
+                for (const row of existing) {
+                    const typeIds = existingTaskIdsByType.get(row.type);
+                    const typeKeys = existingTaskKeysByType.get(row.type);
+                    if (row.task_id)
+                        typeIds.add(row.task_id);
+                    if (row.task_key)
+                        typeKeys.add(row.task_key);
+                    if (row.id)
+                        typeIds.add(row.id);
+                    if (row.uuid)
+                        typeIds.add(row.uuid);
+                    if (row.record_id)
+                        typeIds.add(row.record_id);
+                }
             }
         }
-        // Filter out duplicates in memory
+        // Filter out duplicates in memory (check by type)
         const finalChunk = validChunk.filter(v => {
             const taskId = v.record.task_id || v.record.id || v.record.uuid || v.record.record_id;
-            if (!taskId)
-                return true; // No ID to check, allow it
-            const isDuplicate = existingTaskIds.has(String(taskId));
+            const taskKey = v.record.task_key;
+            if (!taskId && !taskKey)
+                return true; // No ID or key to check, allow it
+            // Check duplicates against the same type only
+            const existingIds = existingTaskIdsByType.get(v.rowType);
+            const existingKeys = existingTaskKeysByType.get(v.rowType);
+            const isDuplicateById = taskId && existingIds.has(String(taskId));
+            const isDuplicateByKey = taskKey && existingKeys.has(String(taskKey));
+            const isDuplicate = isDuplicateById || isDuplicateByKey;
             if (isDuplicate) {
                 chunkSkipDetails['Duplicate ID'] = (chunkSkipDetails['Duplicate ID'] || 0) + 1;
             }
             return !isDuplicate;
         });
-        skippedCount += (validChunk.length - finalChunk.length);
         // Merge details
         Object.entries(chunkSkipDetails).forEach(([reason, count]) => {
             currentDetails[reason] = (currentDetails[reason] || 0) + count;
@@ -490,25 +627,38 @@ export async function processAndStore(records, options, jobId) {
             const validUpdatedAt = updatedAt && !isNaN(updatedAt.getTime()) ? updatedAt : undefined;
             return prisma.dataRecord.create({
                 data: {
-                    projectId,
-                    type,
+                    environment: v.rowEnvironment, // Use row-specific environment from CSV
+                    type: v.rowType, // Use row-specific type instead of job-level type
                     category: v.category,
                     source,
                     content: v.content,
                     metadata: typeof v.record === 'object' ? v.record : { value: v.record },
                     // embedding is Unsupported("vector") - defaults to NULL, set via raw SQL in vectorizeJob
+                    // Support both new format (author_*) and legacy format (created_by_*)
                     createdById: v.record?.created_by_id ? String(v.record.created_by_id) : null,
-                    createdByName: v.record?.created_by_name ? String(v.record.created_by_name) : null,
-                    createdByEmail: v.record?.created_by_email ? String(v.record.created_by_email) : null,
+                    createdByName: v.record?.author_name || v.record?.created_by_name ? String(v.record?.author_name || v.record?.created_by_name) : null,
+                    createdByEmail: v.record?.author_email || v.record?.created_by_email ? String(v.record?.author_email || v.record?.created_by_email) : null,
                     ...(validCreatedAt && { createdAt: validCreatedAt }),
                     ...(validUpdatedAt && { updatedAt: validUpdatedAt }),
                 }
             });
         }));
-        savedCount += finalChunk.length;
+        const chunkSaved = finalChunk.length;
+        // Calculate total skipped: keyword mismatches + duplicates
+        const keywordSkipped = chunk.length - validChunk.length;
+        const duplicateSkipped = validChunk.length - finalChunk.length;
+        const chunkSkipped = keywordSkipped + duplicateSkipped;
+        savedCount += chunkSaved;
+        skippedCount += chunkSkipped;
+        // Use Prisma's atomic increment to prevent count flickering
         await prisma.ingestJob.update({
             where: { id: jobId },
-            data: { savedCount, skippedCount, skippedDetails: currentDetails }
+            data: {
+                savedCount: { increment: chunkSaved },
+                skippedCount: { increment: chunkSkipped },
+                skippedDetails: currentDetails,
+                updatedAt: new Date()
+            }
         });
     }
     return { savedCount, skippedCount };

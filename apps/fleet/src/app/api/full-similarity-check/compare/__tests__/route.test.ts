@@ -44,7 +44,7 @@ describe('POST /api/full-similarity-check/compare', () => {
         const request = new NextRequest('http://localhost:3004/api/full-similarity-check/compare', {
             method: 'POST',
             body: JSON.stringify({
-                projectId: 'test-project',
+                environment: 'test-project',
                 taskIds: ['task-1'],
                 scope: 'all'
             })
@@ -66,7 +66,7 @@ describe('POST /api/full-similarity-check/compare', () => {
         const request = new NextRequest('http://localhost:3004/api/full-similarity-check/compare', {
             method: 'POST',
             body: JSON.stringify({
-                projectId: 'test-project',
+                environment: 'test-project',
                 taskIds: ['task-1'],
                 scope: 'all'
             })
@@ -83,7 +83,7 @@ describe('POST /api/full-similarity-check/compare', () => {
         const request = new NextRequest('http://localhost:3004/api/full-similarity-check/compare', {
             method: 'POST',
             body: JSON.stringify({
-                projectId: 'test-project',
+                environment: 'test-project',
                 taskIds: [],
                 scope: 'all'
             })
@@ -100,7 +100,7 @@ describe('POST /api/full-similarity-check/compare', () => {
         const request = new NextRequest('http://localhost:3004/api/full-similarity-check/compare', {
             method: 'POST',
             body: JSON.stringify({
-                projectId: 'test-project',
+                environment: 'test-project',
                 taskIds: ['task-1'],
                 scope: 'invalid'
             })
@@ -120,7 +120,7 @@ describe('POST /api/full-similarity-check/compare', () => {
         const request = new NextRequest('http://localhost:3004/api/full-similarity-check/compare', {
             method: 'POST',
             body: JSON.stringify({
-                projectId: 'test-project',
+                environment: 'test-project',
                 taskIds: ['task-1'],
                 scope: 'all'
             })
@@ -167,7 +167,7 @@ describe('POST /api/full-similarity-check/compare', () => {
         const request = new NextRequest('http://localhost:3004/api/full-similarity-check/compare', {
             method: 'POST',
             body: JSON.stringify({
-                projectId: 'test-project',
+                environment: 'test-project',
                 taskIds: ['task-1'],
                 scope: 'all'
             })
@@ -214,7 +214,7 @@ describe('POST /api/full-similarity-check/compare', () => {
         const request = new NextRequest('http://localhost:3004/api/full-similarity-check/compare', {
             method: 'POST',
             body: JSON.stringify({
-                projectId: 'test-project',
+                environment: 'test-project',
                 taskIds: ['task-1'],
                 scope: 'all'
             })
@@ -258,7 +258,7 @@ describe('POST /api/full-similarity-check/compare', () => {
         const request = new NextRequest('http://localhost:3004/api/full-similarity-check/compare', {
             method: 'POST',
             body: JSON.stringify({
-                projectId: 'test-project',
+                environment: 'test-project',
                 taskIds: ['task-1'],
                 scope: 'all'
             })
@@ -313,7 +313,7 @@ describe('POST /api/full-similarity-check/compare', () => {
         const request = new NextRequest('http://localhost:3004/api/full-similarity-check/compare', {
             method: 'POST',
             body: JSON.stringify({
-                projectId: 'test-project',
+                environment: 'test-project',
                 taskIds: ['task-1'],
                 scope: 'all'
             })

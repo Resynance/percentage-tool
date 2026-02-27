@@ -19,15 +19,15 @@ export async function GET(request: NextRequest) {
 
     try {
         const searchParams = request.nextUrl.searchParams;
-        const projectId = searchParams.get('projectId');
+        const environment = searchParams.get('environment');
         const status = searchParams.get('status');
         const raterGroupId = searchParams.get('raterGroupId');
         const limit = parseInt(searchParams.get('limit') || '50');
 
         const where: any = {};
 
-        if (projectId) {
-            where.projectId = projectId;
+        if (environment) {
+            where.environment = environment;
         }
 
         if (status) {
@@ -43,9 +43,6 @@ export async function GET(request: NextRequest) {
             orderBy: { createdAt: 'desc' },
             take: limit,
             include: {
-                project: {
-                    select: { id: true, name: true }
-                },
                 raterGroup: {
                     select: { id: true, name: true }
                 },
@@ -94,7 +91,7 @@ export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
         const {
-            projectId,
+            environment,
             name,
             description,
             raterGroupId,
@@ -105,8 +102,8 @@ export async function POST(request: NextRequest) {
         } = body;
 
         // Validation
-        if (!projectId || !name?.trim()) {
-            return NextResponse.json({ error: 'projectId and name are required' }, { status: 400 });
+        if (!environment || !name?.trim()) {
+            return NextResponse.json({ error: 'environment and name are required' }, { status: 400 });
         }
 
         if (!recordIds || !Array.isArray(recordIds) || recordIds.length === 0) {
@@ -121,21 +118,11 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Cannot assign to both group and individual' }, { status: 400 });
         }
 
-        // Verify project exists
-        const project = await prisma.project.findUnique({
-            where: { id: projectId },
-            select: { id: true }
-        });
-
-        if (!project) {
-            return NextResponse.json({ error: 'Project not found' }, { status: 404 });
-        }
-
-        // Verify records exist and belong to the project
+        // Verify records exist and belong to the environment
         const records = await prisma.dataRecord.findMany({
             where: {
                 id: { in: recordIds },
-                projectId
+                environment
             },
             select: { id: true }
         });
@@ -148,14 +135,14 @@ export async function POST(request: NextRequest) {
         if (raterGroupId) {
             const group = await prisma.raterGroup.findUnique({
                 where: { id: raterGroupId },
-                select: { id: true, projectId: true }
+                select: { id: true, environment: true }
             });
 
             if (!group) {
                 return NextResponse.json({ error: 'Rater group not found' }, { status: 404 });
             }
 
-            if (group.projectId !== projectId) {
+            if (group.environment !== environment) {
                 return NextResponse.json({ error: 'Rater group does not belong to this project' }, { status: 400 });
             }
         }
@@ -176,7 +163,7 @@ export async function POST(request: NextRequest) {
         const batch = await prisma.$transaction(async (tx) => {
             const newBatch = await tx.assignmentBatch.create({
                 data: {
-                    projectId,
+                    environment,
                     name: name.trim(),
                     description: description?.trim() || null,
                     raterGroupId: raterGroupId || null,
@@ -205,10 +192,10 @@ export async function POST(request: NextRequest) {
             action: 'ASSIGNMENT_BATCH_CREATED',
             entityType: 'ASSIGNMENT_BATCH',
             entityId: batch.id,
-            projectId,
             userId: user.id,
             userEmail: user.email!,
             metadata: {
+                environment,
                 name: batch.name,
                 recordCount: recordIds.length,
                 raterGroupId,

@@ -276,10 +276,7 @@ export async function generateCompletionWithUsage(prompt, systemPrompt, options)
         const errorMessage = config.provider === 'openrouter'
             ? `Analysis Error: ${error.message}. Please verify your OpenRouter API key and that the model "${config.llmModel}" is available.`
             : `Analysis Error: ${error.message}. Please verify that LM Studio is running at ${config.baseUrl} and that the model "${config.llmModel}" is loaded.`;
-        return {
-            content: errorMessage,
-            provider: config.provider,
-        };
+        throw new Error(errorMessage);
     }
 }
 /**

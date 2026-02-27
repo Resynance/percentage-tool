@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronDown, ChevronUp, Filter, TrendingDown, AlertTriangle, Users, Search, X } from 'lucide-react'
+import { ChevronDown, ChevronUp, Filter, TrendingDown, AlertTriangle, Users, Search, X, Upload, CheckCircle2, XCircle } from 'lucide-react'
 
 interface WorkerStats {
     qaEmail: string;
@@ -44,6 +44,12 @@ export default function QAFeedbackAnalysisPage() {
     const [workers, setWorkers] = useState<WorkerStats[]>([])
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
+
+    // State for import
+    const [importing, setImporting] = useState(false)
+    const [importResult, setImportResult] = useState<any>(null)
+    const [importError, setImportError] = useState<string | null>(null)
+    const [showImportModal, setShowImportModal] = useState(false)
 
     // State for table
     const [sortField, setSortField] = useState<SortField>('negativePercent')
@@ -87,6 +93,44 @@ export default function QAFeedbackAnalysisPage() {
             fetchData()
         }
     }, [startDate, endDate])
+
+    // Handle CSV import
+    const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+
+        setImporting(true)
+        setImportError(null)
+        setImportResult(null)
+
+        try {
+            const formData = new FormData()
+            formData.append('file', file)
+
+            const response = await fetch('/api/qa-feedback-import', {
+                method: 'POST',
+                body: formData
+            })
+
+            const result = await response.json()
+
+            if (!response.ok) {
+                setImportError(result.error || 'Import failed')
+            } else {
+                setImportResult(result.summary)
+                // Refresh data after successful import
+                if (startDate && endDate) {
+                    fetchData()
+                }
+            }
+        } catch (err) {
+            setImportError(err instanceof Error ? err.message : 'Import failed')
+        } finally {
+            setImporting(false)
+            // Reset file input
+            e.target.value = ''
+        }
+    }
 
     // Fetch worker data
     const fetchData = useCallback(async (overrideStart?: string, overrideEnd?: string) => {
@@ -257,13 +301,22 @@ export default function QAFeedbackAnalysisPage() {
     return (
         <div className="page-container">
             {/* Header */}
-            <div className="mb-8">
-                <h1 style={{ fontSize: '2rem' }}>
-                    <span className="premium-gradient">QA Feedback Analysis</span>
-                </h1>
-                <p className="text-[var(--text-secondary)] mt-2">
-                    Analyze QA worker performance based on feedback ratings from the external rating system.
-                </p>
+            <div className="mb-8 flex items-start justify-between">
+                <div>
+                    <h1 style={{ fontSize: '2rem' }}>
+                        <span className="premium-gradient">QA Feedback Analysis</span>
+                    </h1>
+                    <p className="text-[var(--text-secondary)] mt-2">
+                        Analyze QA worker performance based on feedback ratings from the external rating system.
+                    </p>
+                </div>
+                <button
+                    onClick={() => setShowImportModal(true)}
+                    className="btn-primary inline-flex items-center gap-2"
+                >
+                    <Upload className="w-4 h-4" />
+                    Import CSV
+                </button>
             </div>
 
             {/* Filters */}
@@ -616,6 +669,286 @@ export default function QAFeedbackAnalysisPage() {
                     <button onClick={() => fetchData()} className="btn-primary">
                         Reload Data
                     </button>
+                </div>
+            )}
+
+            {/* Import Modal */}
+            {showImportModal && (
+                <div
+                    onClick={() => setShowImportModal(false)}
+                    style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 1000,
+                        padding: '2rem'
+                    }}
+                >
+                    <div
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                            backgroundColor: 'rgba(10, 10, 15, 0.95)',
+                            borderRadius: '12px',
+                            border: '1px solid rgba(255, 255, 255, 0.2)',
+                            maxWidth: '600px',
+                            width: '100%',
+                            maxHeight: '80vh',
+                            overflow: 'auto',
+                            padding: '2rem',
+                            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)'
+                        }}
+                    >
+                        {/* Modal Header */}
+                        <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'flex-start',
+                            marginBottom: '1.5rem'
+                        }}>
+                            <div>
+                                <h2 style={{
+                                    fontSize: '1.5rem',
+                                    fontWeight: 600,
+                                    color: 'rgba(255, 255, 255, 0.9)',
+                                    margin: 0,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.5rem'
+                                }}>
+                                    <Upload className="w-6 h-6" style={{ color: 'var(--accent)' }} />
+                                    Import QA Feedback Ratings
+                                </h2>
+                                <p style={{
+                                    fontSize: '0.875rem',
+                                    color: 'rgba(255, 255, 255, 0.6)',
+                                    marginTop: '0.5rem'
+                                }}>
+                                    Upload a CSV file containing QA feedback ratings
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setShowImportModal(false)}
+                                style={{
+                                    background: 'rgba(255, 255, 255, 0.05)',
+                                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                                    borderRadius: '6px',
+                                    color: 'rgba(255, 255, 255, 0.7)',
+                                    cursor: 'pointer',
+                                    padding: '0.5rem 1rem',
+                                    fontSize: '0.875rem',
+                                    fontWeight: 500
+                                }}
+                            >
+                                Close
+                            </button>
+                        </div>
+
+                        {/* Required Columns Info */}
+                        <div style={{
+                            padding: '1rem',
+                            backgroundColor: 'rgba(100, 200, 255, 0.1)',
+                            borderRadius: '8px',
+                            border: '1px solid rgba(100, 200, 255, 0.3)',
+                            marginBottom: '1.5rem'
+                        }}>
+                            <p style={{
+                                fontSize: '0.875rem',
+                                fontWeight: 600,
+                                color: 'rgba(100, 200, 255, 0.9)',
+                                marginBottom: '0.5rem'
+                            }}>
+                                Required Columns:
+                            </p>
+                            <p style={{
+                                fontSize: '0.8rem',
+                                color: 'rgba(255, 255, 255, 0.7)',
+                                fontFamily: 'monospace',
+                                lineHeight: '1.6'
+                            }}>
+                                rating_id, feedback_id, is_helpful, rated_at, rater_email, qa_email
+                            </p>
+                        </div>
+
+                        {/* Upload Button */}
+                        <div style={{ marginBottom: '1.5rem' }}>
+                            <label className="btn-primary cursor-pointer inline-flex items-center gap-2"
+                                style={{ width: '100%', justifyContent: 'center', padding: '1rem' }}>
+                                <Upload className="w-5 h-5" />
+                                <span style={{ fontSize: '1rem' }}>
+                                    {importing ? 'Importing...' : 'Select CSV File'}
+                                </span>
+                                <input
+                                    type="file"
+                                    accept=".csv"
+                                    onChange={handleImport}
+                                    disabled={importing}
+                                    className="hidden"
+                                />
+                            </label>
+
+                            {importing && (
+                                <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '0.5rem',
+                                    marginTop: '1rem',
+                                    color: 'var(--accent)'
+                                }}>
+                                    <div className="animate-spin h-5 w-5 border-2 border-[var(--accent)] border-t-transparent rounded-full" />
+                                    <span style={{ fontSize: '0.875rem' }}>Processing...</span>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Import Error */}
+                        {importError && (
+                            <div style={{
+                                padding: '1rem',
+                                backgroundColor: 'rgba(255, 100, 100, 0.1)',
+                                borderRadius: '8px',
+                                border: '1px solid rgba(255, 100, 100, 0.3)',
+                                display: 'flex',
+                                alignItems: 'start',
+                                gap: '0.75rem',
+                                marginBottom: '1.5rem'
+                            }}>
+                                <XCircle className="w-5 h-5" style={{ color: 'rgba(255, 100, 100, 0.9)', flexShrink: 0, marginTop: '0.125rem' }} />
+                                <div>
+                                    <p style={{
+                                        color: 'rgba(255, 100, 100, 0.9)',
+                                        fontWeight: 600,
+                                        fontSize: '0.875rem',
+                                        marginBottom: '0.25rem'
+                                    }}>
+                                        Import Failed
+                                    </p>
+                                    <p style={{
+                                        color: 'rgba(255, 255, 255, 0.7)',
+                                        fontSize: '0.8rem'
+                                    }}>
+                                        {importError}
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Import Success */}
+                        {importResult && (
+                            <div style={{
+                                padding: '1.5rem',
+                                backgroundColor: 'rgba(100, 255, 100, 0.1)',
+                                borderRadius: '8px',
+                                border: '1px solid rgba(100, 255, 100, 0.3)'
+                            }}>
+                                <div style={{
+                                    display: 'flex',
+                                    alignItems: 'start',
+                                    gap: '0.75rem',
+                                    marginBottom: '1rem'
+                                }}>
+                                    <CheckCircle2 className="w-5 h-5" style={{ color: 'rgba(100, 255, 100, 0.9)', flexShrink: 0, marginTop: '0.125rem' }} />
+                                    <div>
+                                        <p style={{
+                                            color: 'rgba(100, 255, 100, 0.9)',
+                                            fontWeight: 600,
+                                            fontSize: '0.875rem'
+                                        }}>
+                                            Import Complete!
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div style={{
+                                    display: 'grid',
+                                    gridTemplateColumns: 'repeat(2, 1fr)',
+                                    gap: '1rem',
+                                    fontSize: '0.875rem'
+                                }}>
+                                    <div>
+                                        <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Imported:</span>
+                                        <span style={{ color: 'rgba(100, 255, 100, 0.9)', fontWeight: 600, marginLeft: '0.5rem' }}>
+                                            {importResult.imported}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Updated:</span>
+                                        <span style={{ color: 'rgba(100, 200, 255, 0.9)', fontWeight: 600, marginLeft: '0.5rem' }}>
+                                            {importResult.updated}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Tasks Created:</span>
+                                        <span style={{ color: 'rgba(150, 255, 150, 0.9)', fontWeight: 600, marginLeft: '0.5rem' }}>
+                                            {importResult.tasksCreated || 0}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Skipped:</span>
+                                        <span style={{ color: 'rgba(255, 200, 100, 0.9)', fontWeight: 600, marginLeft: '0.5rem' }}>
+                                            {importResult.skipped}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Errors:</span>
+                                        <span style={{ color: 'rgba(255, 100, 100, 0.9)', fontWeight: 600, marginLeft: '0.5rem' }}>
+                                            {importResult.errors?.length || 0}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {importResult.errors && importResult.errors.length > 0 && (
+                                    <details style={{ marginTop: '1rem' }}>
+                                        <summary style={{
+                                            cursor: 'pointer',
+                                            fontSize: '0.875rem',
+                                            fontWeight: 500,
+                                            color: 'rgba(255, 255, 255, 0.7)',
+                                            userSelect: 'none'
+                                        }}>
+                                            View Errors ({importResult.errors.length})
+                                        </summary>
+                                        <div style={{
+                                            marginTop: '0.75rem',
+                                            padding: '0.75rem',
+                                            backgroundColor: 'rgba(0, 0, 0, 0.3)',
+                                            borderRadius: '6px',
+                                            maxHeight: '200px',
+                                            overflowY: 'auto'
+                                        }}>
+                                            {importResult.errors.slice(0, 10).map((err: string, i: number) => (
+                                                <div key={i} style={{
+                                                    fontSize: '0.75rem',
+                                                    color: 'rgba(255, 255, 255, 0.6)',
+                                                    paddingTop: '0.25rem',
+                                                    paddingBottom: '0.25rem'
+                                                }}>
+                                                    {err}
+                                                </div>
+                                            ))}
+                                            {importResult.errors.length > 10 && (
+                                                <div style={{
+                                                    fontSize: '0.75rem',
+                                                    color: 'rgba(255, 255, 255, 0.6)',
+                                                    paddingTop: '0.25rem',
+                                                    paddingBottom: '0.25rem',
+                                                    fontStyle: 'italic'
+                                                }}>
+                                                    ... and {importResult.errors.length - 10} more
+                                                </div>
+                                            )}
+                                        </div>
+                                    </details>
+                                )}
+                            </div>
+                        )}
+                    </div>
                 </div>
             )}
         </div>

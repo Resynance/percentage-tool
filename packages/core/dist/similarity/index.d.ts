@@ -2,7 +2,7 @@ export declare function findSimilarRecords(targetId: string, limit?: number): Pr
     record: {
         id: string;
         content: string;
-        projectId: string;
+        environment: string;
         type: string;
     };
     similarity: number;

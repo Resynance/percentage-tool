@@ -1,42 +1,15 @@
-import { useEffect } from 'react';
-import { useProjectContext } from '@/context/ProjectContext';
+/**
+ * DEPRECATED: This hook is a temporary stub.
+ * Projects have been removed in favor of environment-based organization.
+ * TODO: Update all components to use environment filtering instead.
+ */
 
-export interface Project {
-    id: string;
-    name: string;
-}
-
-interface UseProjectsOptions {
-    autoSelectFirst?: boolean;
-    initialProjectId?: string;
-}
-
-export function useProjects(options: UseProjectsOptions = {}) {
-    const {
-        projects,
-        selectedProjectId,
-        setSelectedProjectId,
-        loading,
-        error,
-        refreshProjects
-    } = useProjectContext();
-
-    // Handle initialProjectId option - set it once projects are loaded
-    useEffect(() => {
-        if (!loading && projects.length > 0 && options.initialProjectId) {
-            const projectExists = projects.find(p => p.id === options.initialProjectId);
-            if (projectExists && selectedProjectId !== options.initialProjectId) {
-                setSelectedProjectId(options.initialProjectId);
-            }
-        }
-    }, [loading, projects, options.initialProjectId, selectedProjectId, setSelectedProjectId]);
-
-    return {
-        projects,
-        selectedProjectId,
-        setSelectedProjectId,
-        loading,
-        error,
-        refetch: refreshProjects
-    };
+export function useProjects({ initialProjectId, autoSelectFirst }: { initialProjectId?: string; autoSelectFirst?: boolean } = {}) {
+  return {
+    projects: [] as Array<{ id: string; name: string }>,
+    selectedProjectId: null as string | null,
+    setSelectedProjectId: (_id: string | null) => {},
+    loading: false,
+    error: null as string | null,
+  };
 }

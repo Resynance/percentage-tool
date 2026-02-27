@@ -22,11 +22,11 @@ function parseVector(vectorStr: string): number[] {
 
 export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
-    const projectId = searchParams.get('projectId');
+    const environment = searchParams.get('environment');
     const threshold = parseFloat(searchParams.get('threshold') || '0.7');
     const limit = parseInt(searchParams.get('limit') || '50');
 
-    if (!projectId) {
+    if (!environment) {
         return NextResponse.json({ error: 'Project ID is required' }, { status: 400 });
     }
 
@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
         const tasks: RecordWithEmbedding[] = await prisma.$queryRaw`
             SELECT id, content, category, metadata, embedding::text as embedding
             FROM public.data_records
-            WHERE "projectId" = ${projectId}
+            WHERE "environment" = ${environment}
             AND type = 'TASK'
             AND embedding IS NOT NULL
         `;
@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
         const feedbacks: RecordWithEmbedding[] = await prisma.$queryRaw`
             SELECT id, content, category, metadata, embedding::text as embedding
             FROM public.data_records
-            WHERE "projectId" = ${projectId}
+            WHERE "environment" = ${environment}
             AND type = 'FEEDBACK'
             AND embedding IS NOT NULL
         `;

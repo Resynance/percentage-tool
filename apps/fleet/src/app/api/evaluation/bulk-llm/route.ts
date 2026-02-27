@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@repo/database';
 import { createClient } from '@repo/auth/server';
 import { logAudit } from '@repo/core/audit';
-import { startBulkEvaluation, startBulkEvaluationAllModels, getProjectEvaluationJobs } from '@repo/core/evaluation';
+import { startBulkEvaluation, startBulkEvaluationAllModels, getEnvironmentEvaluationJobs } from '@repo/core/evaluation';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,20 +25,20 @@ export async function GET(request: NextRequest) {
         .single();
 
     const role = (profile as any)?.role;
-    if (!['ADMIN', 'FLEET'].includes(role)) {
+    if (!['ADMIN', 'MANAGER', 'FLEET'].includes(role)) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     try {
         const searchParams = request.nextUrl.searchParams;
-        const projectId = searchParams.get('projectId');
+        const environment = searchParams.get('environment');
         const limit = parseInt(searchParams.get('limit') || '20');
 
-        if (!projectId) {
-            return NextResponse.json({ error: 'projectId is required' }, { status: 400 });
+        if (!environment) {
+            return NextResponse.json({ error: 'environment is required' }, { status: 400 });
         }
 
-        const jobs = await getProjectEvaluationJobs(projectId, limit);
+        const jobs = await getEnvironmentEvaluationJobs(environment, limit);
         return NextResponse.json({ jobs });
     } catch (error) {
         console.error('Error fetching evaluation jobs:', error);
@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
 /**
  * POST /api/evaluation/bulk-llm
  * Start a bulk evaluation job
- * Body: { projectId, modelConfigId?, allModels?: boolean }
+ * Body: { environment, modelConfigId?, allModels?: boolean }
  */
 export async function POST(request: NextRequest) {
     const supabase = await createClient();
@@ -66,33 +66,23 @@ export async function POST(request: NextRequest) {
         .single();
 
     const postRole = (profile as any)?.role;
-    if (!['ADMIN', 'FLEET'].includes(postRole)) {
+    if (!['ADMIN', 'MANAGER', 'FLEET'].includes(postRole)) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     try {
         const body = await request.json();
-        const { projectId, modelConfigId, allModels } = body;
+        const { environment, modelConfigId, allModels } = body;
 
-        if (!projectId) {
-            return NextResponse.json({ error: 'projectId is required' }, { status: 400 });
-        }
-
-        // Verify project exists
-        const project = await prisma.project.findUnique({
-            where: { id: projectId },
-            select: { id: true, name: true }
-        });
-
-        if (!project) {
-            return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+        if (!environment) {
+            return NextResponse.json({ error: 'environment is required' }, { status: 400 });
         }
 
         let jobIds: string[];
 
         if (allModels) {
             // Start evaluation for all active models
-            jobIds = await startBulkEvaluationAllModels(projectId);
+            jobIds = await startBulkEvaluationAllModels(environment);
 
             if (jobIds.length === 0) {
                 return NextResponse.json({
@@ -103,10 +93,9 @@ export async function POST(request: NextRequest) {
             await logAudit({
                 action: 'BULK_EVALUATION_STARTED',
                 entityType: 'LLM_EVALUATION_JOB',
-                projectId,
                 userId: user.id,
                 userEmail: user.email!,
-                metadata: { jobIds, allModels: true }
+                metadata: { environment, jobIds, allModels: true }
             });
 
             return NextResponse.json({
@@ -120,16 +109,15 @@ export async function POST(request: NextRequest) {
                 return NextResponse.json({ error: 'modelConfigId is required' }, { status: 400 });
             }
 
-            const jobId = await startBulkEvaluation(projectId, modelConfigId);
+            const jobId = await startBulkEvaluation(environment, modelConfigId);
 
             await logAudit({
                 action: 'BULK_EVALUATION_STARTED',
                 entityType: 'LLM_EVALUATION_JOB',
                 entityId: jobId,
-                projectId,
                 userId: user.id,
                 userEmail: user.email!,
-                metadata: { modelConfigId }
+                metadata: { environment, modelConfigId }
             });
 
             return NextResponse.json({

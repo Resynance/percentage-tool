@@ -50,7 +50,7 @@ export async function GET(req: Request) {
         }, { status: 500 })
     }
 
-    if (!profile || !profile.role || !['FLEET', 'ADMIN'].includes(profile.role)) {
+    if (!profile || !profile.role || !['FLEET', 'MANAGER', 'ADMIN'].includes(profile.role)) {
         console.warn('[Activity Over Time API] Forbidden access attempt:', {
             errorId: ERROR_IDS.AUTH_FORBIDDEN,
             userId: user.id,

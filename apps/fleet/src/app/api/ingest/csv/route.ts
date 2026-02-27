@@ -8,8 +8,8 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-// Size limit for direct upload (use chunked upload for larger files)
-const MAX_FILE_SIZE = 4 * 1024 * 1024; // 4MB (leaves room for Vercel's 4.5MB limit)
+// Size limit for direct upload (increased for local development)
+const MAX_FILE_SIZE = 150 * 1024 * 1024; // 150MB
 const VALID_TYPES: RecordType[] = ['TASK', 'FEEDBACK'];
 
 export async function POST(req: NextRequest) {
@@ -31,17 +31,12 @@ export async function POST(req: NextRequest) {
 
         const formData = await req.formData();
         const file = formData.get('file') as File | null;
-        const projectId = formData.get('projectId') as string | null;
-        const type = formData.get('type') as string | null;
         const filterKeywords = formData.get('filterKeywords')?.toString().split(',').map(s => s.trim()).filter(Boolean);
         const generateEmbeddings = formData.get('generateEmbeddings') === 'true';
 
         // Validation: Required fields
         if (!file) {
             return NextResponse.json({ error: 'File is required' }, { status: 400 });
-        }
-        if (!projectId || typeof projectId !== 'string') {
-            return NextResponse.json({ error: 'Project ID is required' }, { status: 400 });
         }
 
         // Validation: File type (check extension - MIME types are unreliable for CSV)
@@ -59,25 +54,9 @@ export async function POST(req: NextRequest) {
             }, { status: 413 });
         }
 
-        // Validation: Record type
-        if (!type || !VALID_TYPES.includes(type as RecordType)) {
-            return NextResponse.json({
-                error: `Invalid type. Must be one of: ${VALID_TYPES.join(', ')}`
-            }, { status: 400 });
-        }
-
-        // Validation: Project exists and user has access
-        const project = await prisma.project.findUnique({
-            where: { id: projectId },
-            select: { id: true, ownerId: true }
-        });
-
-        if (!project) {
-            return NextResponse.json({ error: 'Project not found' }, { status: 404 });
-        }
-
-        if (role !== 'ADMIN' && project.ownerId !== user.id) {
-            return NextResponse.json({ error: 'Forbidden: You do not own this project' }, { status: 403 });
+        // Authorization: Only FLEET and ADMIN roles can ingest data
+        if (role !== 'ADMIN' && role !== 'FLEET') {
+            return NextResponse.json({ error: 'Forbidden: Insufficient permissions' }, { status: 403 });
         }
 
         // Read file content
@@ -88,18 +67,16 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'CSV file is empty' }, { status: 400 });
         }
 
-        // Start background ingestion
+        // Start background ingestion (environment and type extracted from CSV data)
         const jobId = await startBackgroundIngest('CSV', csvContent, {
-            projectId,
             source: `csv:${file.name}`,
-            type: type as RecordType,
             filterKeywords,
             generateEmbeddings,
         });
 
         // IMPORTANT: In serverless, we must await initial processing or it gets killed
         // Status endpoint will continue processing on each poll
-        await processQueuedJobs(projectId).catch(err =>
+        await processQueuedJobs().catch(err =>
             console.error('Initial Queue Processor Error:', err)
         );
 

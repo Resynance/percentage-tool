@@ -17,7 +17,7 @@ type SortOrder = typeof VALID_SORT_ORDERS[number];
 
 interface DataRecordRow {
     id: string;
-    projectId: string;
+    environment: string;
     type: string;
     category: string;
     source: string;
@@ -51,23 +51,11 @@ export async function GET(req: NextRequest) {
         const role = profile?.role || 'USER';
 
         const { searchParams } = new URL(req.url);
-        const projectId = searchParams.get('projectId');
+        const environment = searchParams.get('environment');
         const type = searchParams.get('type');
         const category = searchParams.get('category');
         const sortByParam = searchParams.get('sortBy');
         const sortOrderParam = searchParams.get('sortOrder');
-
-        // Validate project exists if projectId is specified (read access allowed for all users)
-        if (projectId) {
-            const project = await prisma.project.findUnique({
-                where: { id: projectId },
-                select: { id: true }
-            });
-
-            if (!project) {
-                return NextResponse.json({ error: 'Project not found' }, { status: 404 });
-            }
-        }
 
         // Validate and parse pagination params (default to safe values if invalid)
         const skipParsed = parseInt(searchParams.get('skip') || '0');
@@ -94,8 +82,8 @@ export async function GET(req: NextRequest) {
         // Build WHERE clause conditions with proper parameterization
         const whereConditions: Prisma.Sql[] = [];
 
-        if (projectId) {
-            whereConditions.push(Prisma.sql`"projectId" = ${projectId}`);
+        if (environment) {
+            whereConditions.push(Prisma.sql`environment = ${environment}`);
         }
         if (type) {
             whereConditions.push(Prisma.sql`type = ${type}::"RecordType"`);
@@ -107,6 +95,18 @@ export async function GET(req: NextRequest) {
             } else {
                 whereConditions.push(Prisma.sql`category = ${category}::"RecordCategory"`);
             }
+        }
+
+        // Filter TASK records to show only version 1 (but only for "All" and "STANDARD" categories)
+        // TOP_10 and BOTTOM_10 categories show all versions
+        // Checks for version fields in multiple naming conventions (version, version_no, versionNo)
+        if (type === 'TASK' && (!category || category === 'STANDARD')) {
+            whereConditions.push(Prisma.sql`(
+                metadata->>'version' = '1'
+                OR metadata->>'version_no' = '1'
+                OR metadata->>'versionNo' = '1'
+                OR (metadata->>'version' IS NULL AND metadata->>'version_no' IS NULL AND metadata->>'versionNo' IS NULL)
+            )`);
         }
 
         const orderDirection = sortOrder === 'asc' ? 'ASC' : 'DESC';
@@ -140,7 +140,7 @@ export async function GET(req: NextRequest) {
             : Prisma.empty;
 
         const query = Prisma.sql`
-            SELECT id, "projectId", type, category, source, content, metadata, embedding,
+            SELECT id, environment, type, category, source, content, metadata, embedding,
                    "hasBeenReviewed", "isCategoryCorrect", "reviewedBy", "alignmentAnalysis",
                    "ingestJobId", "createdAt", "updatedAt"
             FROM data_records
@@ -151,20 +151,14 @@ export async function GET(req: NextRequest) {
 
         const records = await prisma.$queryRaw<DataRecordRow[]>(query);
 
-        // Use Prisma for count
-        const total = await prisma.dataRecord.count({
-            where: {
-                projectId: projectId || undefined,
-                type: (type as 'TASK' | 'FEEDBACK') || undefined,
-                // For STANDARD category, count both STANDARD and NULL records
-                ...(category === 'STANDARD'
-                    ? { OR: [{ category: RecordCategory.STANDARD }, { category: null }] }
-                    : category
-                        ? { category: category as RecordCategory }
-                        : {}
-                ),
-            }
-        });
+        // Use raw SQL for count to match the complex WHERE clause (including version filter)
+        const countQuery = Prisma.sql`
+            SELECT COUNT(*) as count
+            FROM data_records
+            ${whereClause}
+        `;
+        const countResult = await prisma.$queryRaw<{ count: bigint }[]>(countQuery);
+        const total = Number(countResult[0]?.count || 0);
 
         return NextResponse.json({ records, total });
     } catch (error: any) {
@@ -196,14 +190,11 @@ export async function POST(req: NextRequest) {
                 return NextResponse.json({ error: 'Target ID required' }, { status: 400 });
             }
 
-            // Verify user owns the project that contains the target record
+            // Verify record exists
             const targetRecord = await prisma.dataRecord.findUnique({
                 where: { id: targetId },
                 select: {
-                    projectId: true,
-                    project: {
-                        select: { ownerId: true }
-                    }
+                    environment: true,
                 }
             });
 
@@ -211,8 +202,10 @@ export async function POST(req: NextRequest) {
                 return NextResponse.json({ error: 'Record not found' }, { status: 404 });
             }
 
-            if (role !== 'ADMIN' && targetRecord.project.ownerId !== user.id) {
-                return NextResponse.json({ error: 'Forbidden: You do not own this project' }, { status: 403 });
+            // QA role and above can access similarity search
+            const allowedRoles = ['QA', 'CORE', 'FLEET', 'ADMIN'];
+            if (!allowedRoles.includes(role)) {
+                return NextResponse.json({ error: 'Forbidden: Insufficient permissions' }, { status: 403 });
             }
 
             const results = await findSimilarRecords(targetId, limit || 5);

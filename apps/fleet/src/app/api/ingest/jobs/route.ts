@@ -5,17 +5,15 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
     try {
-        const projectId = req.nextUrl.searchParams.get('projectId');
+        const environment = req.nextUrl.searchParams.get('environment');
 
-        if (!projectId) {
-            return NextResponse.json({ error: 'Project ID is required' }, { status: 400 });
-        }
+        // Fetch recent jobs (optionally filter by environment)
+        const where = environment ? { environment } : {};
 
-        // Fetch recent jobs for this project (last 5)
         const jobs = await prisma.ingestJob.findMany({
-            where: { projectId },
+            where,
             orderBy: { createdAt: 'desc' },
-            take: 5
+            take: 20 // Show more jobs since we're showing all environments
         });
 
         return NextResponse.json(jobs);

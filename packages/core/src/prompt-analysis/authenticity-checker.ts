@@ -7,20 +7,43 @@ import { generateCompletionWithUsage } from '../ai';
  * - Plain JSON: {...}
  */
 function extractJSON(text: string): string {
-  // Try to find JSON in markdown code blocks
+  // Try to find JSON in markdown code blocks first
   const codeBlockMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
   if (codeBlockMatch) {
     return codeBlockMatch[1].trim();
   }
 
-  // Try to find JSON object in the text
+  // Try to find JSON object in the text (most greedy match)
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (jsonMatch) {
-    return jsonMatch[0];
+    // Find the largest valid JSON object
+    let jsonStr = jsonMatch[0];
+
+    // Try to balance braces if needed
+    let openBraces = 0;
+    let closeBraces = 0;
+    let endIndex = 0;
+
+    for (let i = 0; i < text.length; i++) {
+      if (text[i] === '{') openBraces++;
+      if (text[i] === '}') closeBraces++;
+
+      if (openBraces > 0 && openBraces === closeBraces) {
+        endIndex = i + 1;
+        break;
+      }
+    }
+
+    if (endIndex > 0) {
+      const startIndex = text.indexOf('{');
+      jsonStr = text.substring(startIndex, endIndex);
+    }
+
+    return jsonStr;
   }
 
-  // Return original if no pattern matches
-  return text.trim();
+  // If no JSON found, throw an error with the actual response
+  throw new Error(`No JSON found in response. Response starts with: "${text.substring(0, 100)}..."`);
 }
 
 export interface PromptAuthenticityAnalysis {
@@ -39,41 +62,27 @@ export interface PromptAuthenticityAnalysis {
   llmCost?: number;
 }
 
-const AUTHENTICITY_ANALYSIS_PROMPT = `You are an expert linguistic analyst and AI content detector. Your task is to analyze a prompt/text and determine:
+const AUTHENTICITY_ANALYSIS_PROMPT = `You are an expert linguistic analyst and AI content detector.
 
-1. **Non-Native Speaker Detection**: Identify linguistic patterns that suggest the author is a non-native English speaker
-2. **AI-Generated Content Detection**: Identify patterns that suggest the text was written or heavily assisted by AI
+CRITICAL INSTRUCTION: You MUST respond with ONLY a valid JSON object. No markdown, no explanations, no text before or after. Start your response with { and end with }.
 
-For the given prompt, provide a detailed analysis with:
+Analyze the prompt for:
+1. Non-Native Speaker patterns (grammar, vocabulary, sentence structure)
+2. AI-Generated Content patterns (formal language, lack of personal voice, hedging phrases)
 
-**Non-Native Speaker Indicators:**
-- Grammar patterns (articles, prepositions, word order)
-- Vocabulary choices (false cognates, unusual word choices)
-- Idiomatic usage issues
-- Sentence structure patterns typical of specific language backgrounds
-
-**AI-Generated Content Indicators:**
-- Overly formal or stilted language
-- Lack of personal voice or authentic mistakes
-- Repetitive sentence structures
-- Generic phrasing without specific details
-- Perfect grammar with no natural speech patterns
-- Use of hedging language ("it's important to note", "it's worth mentioning")
-- Verbose explanations where brevity would be natural
-
-CRITICAL: Respond with ONLY a valid JSON object. Do not include markdown code blocks, explanations, or any text before or after the JSON.
-
-Required JSON format:
+Required JSON format (example):
 {
-  "isLikelyNonNative": boolean,
-  "nonNativeConfidence": number (0-100),
-  "nonNativeIndicators": [specific examples from the text],
-  "isLikelyAIGenerated": boolean,
-  "aiGeneratedConfidence": number (0-100),
-  "aiGeneratedIndicators": [specific examples from the text],
-  "overallAssessment": "brief summary",
-  "recommendations": [actionable suggestions]
-}`;
+  "isLikelyNonNative": false,
+  "nonNativeConfidence": 25,
+  "nonNativeIndicators": ["Minor article usage variation"],
+  "isLikelyAIGenerated": true,
+  "aiGeneratedConfidence": 85,
+  "aiGeneratedIndicators": ["Overly formal tone", "Hedging language: 'it's important to note'"],
+  "overallAssessment": "Likely AI-generated with professional editing",
+  "recommendations": ["Add natural speech patterns", "Include specific personal details"]
+}
+
+Respond ONLY with JSON matching this exact structure.`;
 
 export async function analyzePromptAuthenticity(
   promptId: string,
@@ -144,19 +153,7 @@ export async function analyzeBatchPrompts(
       }
     } catch (error) {
       console.error(`[Batch Analysis] Error analyzing prompt ${prompts[i].id}:`, error);
-      // Push error result
-      results.push({
-        promptId: prompts[i].id,
-        promptText: prompts[i].text,
-        isLikelyNonNative: false,
-        nonNativeConfidence: 0,
-        nonNativeIndicators: ['Analysis failed'],
-        isLikelyAIGenerated: false,
-        aiGeneratedConfidence: 0,
-        aiGeneratedIndicators: ['Analysis failed'],
-        overallAssessment: 'Error during analysis',
-        recommendations: [],
-      });
+      // Skip failed prompts rather than pushing fabricated confidence values
     }
   }
 

@@ -17,11 +17,11 @@ interface SimilarRecord {
 export async function GET(request: NextRequest) {
     try {
         const { searchParams } = new URL(request.url);
-        const projectId = searchParams.get('projectId');
+        const environment = searchParams.get('environment');
         const selectedRecordId = searchParams.get('recordId');
 
-        if (!projectId) {
-            return NextResponse.json({ error: 'projectId is required' }, { status: 400 });
+        if (!environment) {
+            return NextResponse.json({ error: 'environment is required' }, { status: 400 });
         }
 
         if (!selectedRecordId) {
@@ -92,7 +92,7 @@ export async function GET(request: NextRequest) {
                     "createdAt",
                     ROUND((1 - (embedding <=> ${`[${queryEmbedding.join(',')}]`}::vector)) * 100) as similarity
                 FROM public.data_records
-                WHERE "projectId" = ${projectId}
+                WHERE "environment" = ${environment}
                 AND type = 'TASK'
                 AND "createdById" = ${userId}
                 AND id != ${selectedRecordId}
@@ -110,7 +110,7 @@ export async function GET(request: NextRequest) {
                     "createdAt",
                     ROUND((1 - (embedding <=> (SELECT embedding FROM public.data_records WHERE id = ${selectedRecordId}))) * 100) as similarity
                 FROM public.data_records
-                WHERE "projectId" = ${projectId}
+                WHERE "environment" = ${environment}
                 AND type = 'TASK'
                 AND "createdById" = ${userId}
                 AND id != ${selectedRecordId}

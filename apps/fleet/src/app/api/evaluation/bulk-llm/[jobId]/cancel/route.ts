@@ -28,7 +28,7 @@ export async function POST(
         .single();
 
     const role = (profile as any)?.role;
-    if (!['ADMIN', 'FLEET'].includes(role)) {
+    if (!['ADMIN', 'MANAGER', 'FLEET'].includes(role)) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -52,10 +52,9 @@ export async function POST(
             action: 'BULK_EVALUATION_CANCELLED',
             entityType: 'LLM_EVALUATION_JOB',
             entityId: jobId,
-            projectId: job.projectId,
             userId: user.id,
             userEmail: user.email!,
-            metadata: { modelConfigId: job.modelConfigId }
+            metadata: { environment: job.environment, modelConfigId: job.modelConfigId }
         });
 
         return NextResponse.json({ success: true });
