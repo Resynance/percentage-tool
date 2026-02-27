@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { ChevronDown, ChevronUp, Filter, TrendingDown, AlertTriangle, Users, Search, X, Upload, CheckCircle2, XCircle } from 'lucide-react'
 
@@ -26,6 +26,7 @@ interface EnvStats {
 
 type SortField = 'qaEmail' | 'totalRatings' | 'negativePercent' | 'negativePerFeedbackRatio' | 'disputes'
 type SortDirection = 'asc' | 'desc'
+type QuickRange = 7 | 30 | 90 | null
 
 export default function QAFeedbackAnalysisPage() {
     const router = useRouter()
@@ -37,6 +38,7 @@ export default function QAFeedbackAnalysisPage() {
     const [minNegativePercent, setMinNegativePercent] = useState<number>(0)
     const [searchQuery, setSearchQuery] = useState<string>('')
     const [environments, setEnvironments] = useState<string[]>([])
+    const [activeRange, setActiveRange] = useState<QuickRange>(30)
 
     // State for data
     const [workers, setWorkers] = useState<WorkerStats[]>([])
@@ -131,17 +133,16 @@ export default function QAFeedbackAnalysisPage() {
     }
 
     // Fetch worker data
-    const fetchData = async () => {
-        if (!startDate || !endDate) return
+    const fetchData = useCallback(async (overrideStart?: string, overrideEnd?: string) => {
+        const s = overrideStart || startDate
+        const e = overrideEnd || endDate
+        if (!s || !e) return
 
         setIsLoading(true)
         setError(null)
 
         try {
-            const params = new URLSearchParams({
-                startDate,
-                endDate,
-            })
+            const params = new URLSearchParams({ startDate: s, endDate: e })
 
             if (environment) params.set('environment', environment)
             if (minNegativePercent > 0) params.set('minNegativePercent', minNegativePercent.toString())
@@ -160,7 +161,7 @@ export default function QAFeedbackAnalysisPage() {
         } finally {
             setIsLoading(false)
         }
-    }
+    }, [startDate, endDate, environment, minNegativePercent])
 
     // Fetch environment stats for a worker when expanded
     const fetchWorkerEnvStats = async (qaEmail: string) => {
@@ -194,18 +195,23 @@ export default function QAFeedbackAnalysisPage() {
         router.push(url)
     }
 
-    // Handle quick date range selection
-    const setQuickRange = (days: number | null) => {
+    // Handle quick date range selection — auto-fetches
+    const setQuickRange = (days: QuickRange) => {
+        setActiveRange(days)
         const end = new Date()
-        setEndDate(end.toISOString().split('T')[0])
+        const newEnd = end.toISOString().split('T')[0]
+        setEndDate(newEnd)
 
+        let newStart: string
         if (days === null) {
-            setStartDate('2020-01-01')
+            newStart = '2020-01-01'
         } else {
             const start = new Date()
             start.setDate(start.getDate() - (days - 1))
-            setStartDate(start.toISOString().split('T')[0])
+            newStart = start.toISOString().split('T')[0]
         }
+        setStartDate(newStart)
+        fetchData(newStart, newEnd)
     }
 
     // Handle sorting
@@ -221,7 +227,6 @@ export default function QAFeedbackAnalysisPage() {
     // Helper function to extract last name
     const getLastName = (worker: WorkerStats): string => {
         if (worker.qaName) {
-            // Extract last name (assumes "First Last" format)
             const nameParts = worker.qaName.trim().split(/\s+/)
             return nameParts[nameParts.length - 1].toLowerCase()
         }
@@ -389,98 +394,23 @@ export default function QAFeedbackAnalysisPage() {
                 </div>
 
                 <div className="flex flex-wrap gap-2 mb-4">
-                    <button
-                        onClick={() => setQuickRange(7)}
-                        style={{
-                            padding: '6px 12px',
-                            borderRadius: '8px',
-                            border: '1px solid rgba(255, 255, 255, 0.2)',
-                            background: 'rgba(255, 255, 255, 0.1)',
-                            color: 'white',
-                            fontSize: '14px',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s',
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'}
-                        onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
-                    >
-                        Last 7 Days
-                    </button>
-                    <button
-                        onClick={() => setQuickRange(30)}
-                        style={{
-                            padding: '6px 12px',
-                            borderRadius: '8px',
-                            border: '1px solid rgba(255, 255, 255, 0.2)',
-                            background: 'rgba(255, 255, 255, 0.1)',
-                            color: 'white',
-                            fontSize: '14px',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s',
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'}
-                        onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
-                    >
-                        Last 30 Days
-                    </button>
-                    <button
-                        onClick={() => setQuickRange(90)}
-                        style={{
-                            padding: '6px 12px',
-                            borderRadius: '8px',
-                            border: '1px solid rgba(255, 255, 255, 0.2)',
-                            background: 'rgba(255, 255, 255, 0.1)',
-                            color: 'white',
-                            fontSize: '14px',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s',
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'}
-                        onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
-                    >
-                        Last 90 Days
-                    </button>
-                    <button
-                        onClick={() => setQuickRange(null)}
-                        style={{
-                            padding: '6px 12px',
-                            borderRadius: '8px',
-                            border: '1px solid rgba(255, 255, 255, 0.2)',
-                            background: 'rgba(255, 255, 255, 0.1)',
-                            color: 'white',
-                            fontSize: '14px',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s',
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'}
-                        onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
-                    >
-                        All Time
-                    </button>
+                    {([7, 30, 90, null] as QuickRange[]).map((days) => (
+                        <button
+                            key={days ?? 'all'}
+                            onClick={() => setQuickRange(days)}
+                            className={activeRange === days ? 'btn-primary text-sm' : 'btn-secondary text-sm'}
+                        >
+                            {days === null ? 'All Time' : `Last ${days} Days`}
+                        </button>
+                    ))}
                 </div>
 
                 <div className="flex gap-3">
                     <button
-                        onClick={fetchData}
+                        onClick={() => fetchData()}
                         disabled={isLoading}
-                        style={{
-                            padding: '8px 16px',
-                            borderRadius: '8px',
-                            border: 'none',
-                            background: 'var(--accent)',
-                            color: 'white',
-                            fontSize: '14px',
-                            fontWeight: '500',
-                            cursor: isLoading ? 'not-allowed' : 'pointer',
-                            opacity: isLoading ? 0.6 : 1,
-                            transition: 'all 0.2s',
-                        }}
-                        onMouseEnter={(e) => {
-                            if (!isLoading) e.currentTarget.style.opacity = '0.9'
-                        }}
-                        onMouseLeave={(e) => {
-                            e.currentTarget.style.opacity = isLoading ? '0.6' : '1'
-                        }}
+                        className="btn-primary"
+                        style={{ opacity: isLoading ? 0.6 : undefined, cursor: isLoading ? 'not-allowed' : undefined }}
                     >
                         {isLoading ? 'Loading...' : 'Apply Filters'}
                     </button>
@@ -491,29 +421,25 @@ export default function QAFeedbackAnalysisPage() {
                             setSearchQuery('')
                             setQuickRange(30)
                         }}
-                        style={{
-                            padding: '8px 16px',
-                            borderRadius: '8px',
-                            border: '1px solid rgba(255, 255, 255, 0.2)',
-                            background: 'rgba(255, 255, 255, 0.1)',
-                            color: 'white',
-                            fontSize: '14px',
-                            fontWeight: '500',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s',
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'}
-                        onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+                        className="btn-secondary"
                     >
                         Clear Filters
                     </button>
                 </div>
             </div>
 
+            {/* Loading State */}
+            {isLoading && workers.length === 0 && (
+                <div className="glass-card text-center py-12">
+                    <div className="animate-spin h-8 w-8 border-4 border-[var(--accent)] border-t-transparent rounded-full mx-auto mb-4" />
+                    <p className="text-[var(--text-secondary)]">Loading worker data...</p>
+                </div>
+            )}
+
             {/* Summary Stats */}
             {workers.length > 0 && (
-                <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
-                    <div className="glass-card" style={{ flex: 1 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' }}>
+                    <div className="glass-card">
                         <div className="flex items-center gap-3">
                             <Users className="w-8 h-8 text-blue-500" />
                             <div>
@@ -523,7 +449,7 @@ export default function QAFeedbackAnalysisPage() {
                         </div>
                     </div>
 
-                    <div className="glass-card" style={{ flex: 1 }}>
+                    <div className="glass-card">
                         <div className="flex items-center gap-3">
                             <TrendingDown className="w-8 h-8 text-orange-500" />
                             <div>
@@ -533,7 +459,7 @@ export default function QAFeedbackAnalysisPage() {
                         </div>
                     </div>
 
-                    <div className="glass-card" style={{ flex: 1 }}>
+                    <div className="glass-card">
                         <div className="flex items-center gap-3">
                             <AlertTriangle className="w-8 h-8 text-red-500" />
                             <div>
@@ -543,7 +469,7 @@ export default function QAFeedbackAnalysisPage() {
                         </div>
                     </div>
 
-                    <div className="glass-card" style={{ flex: 1 }}>
+                    <div className="glass-card">
                         <div className="flex items-center gap-3">
                             <AlertTriangle className="w-8 h-8 text-yellow-500" />
                             <div>
@@ -686,100 +612,32 @@ export default function QAFeedbackAnalysisPage() {
                                 <button
                                     onClick={() => setCurrentPage(1)}
                                     disabled={currentPage === 1}
-                                    style={{
-                                        padding: '8px 16px',
-                                        borderRadius: '8px',
-                                        border: '1px solid rgba(255, 255, 255, 0.2)',
-                                        background: 'rgba(255, 255, 255, 0.1)',
-                                        color: 'white',
-                                        fontSize: '14px',
-                                        cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-                                        opacity: currentPage === 1 ? 0.5 : 1,
-                                        transition: 'all 0.2s',
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        if (currentPage !== 1) {
-                                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'
-                                        }
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'
-                                    }}
+                                    className="btn-secondary text-sm"
+                                    style={{ opacity: currentPage === 1 ? 0.5 : undefined, cursor: currentPage === 1 ? 'not-allowed' : undefined }}
                                 >
                                     First
                                 </button>
                                 <button
                                     onClick={() => setCurrentPage(currentPage - 1)}
                                     disabled={currentPage === 1}
-                                    style={{
-                                        padding: '8px 16px',
-                                        borderRadius: '8px',
-                                        border: '1px solid rgba(255, 255, 255, 0.2)',
-                                        background: 'rgba(255, 255, 255, 0.1)',
-                                        color: 'white',
-                                        fontSize: '14px',
-                                        cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-                                        opacity: currentPage === 1 ? 0.5 : 1,
-                                        transition: 'all 0.2s',
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        if (currentPage !== 1) {
-                                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'
-                                        }
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'
-                                    }}
+                                    className="btn-secondary text-sm"
+                                    style={{ opacity: currentPage === 1 ? 0.5 : undefined, cursor: currentPage === 1 ? 'not-allowed' : undefined }}
                                 >
                                     Prev
                                 </button>
                                 <button
                                     onClick={() => setCurrentPage(currentPage + 1)}
                                     disabled={currentPage === totalPages}
-                                    style={{
-                                        padding: '8px 16px',
-                                        borderRadius: '8px',
-                                        border: '1px solid rgba(255, 255, 255, 0.2)',
-                                        background: 'rgba(255, 255, 255, 0.1)',
-                                        color: 'white',
-                                        fontSize: '14px',
-                                        cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
-                                        opacity: currentPage === totalPages ? 0.5 : 1,
-                                        transition: 'all 0.2s',
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        if (currentPage !== totalPages) {
-                                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'
-                                        }
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'
-                                    }}
+                                    className="btn-secondary text-sm"
+                                    style={{ opacity: currentPage === totalPages ? 0.5 : undefined, cursor: currentPage === totalPages ? 'not-allowed' : undefined }}
                                 >
                                     Next
                                 </button>
                                 <button
                                     onClick={() => setCurrentPage(totalPages)}
                                     disabled={currentPage === totalPages}
-                                    style={{
-                                        padding: '8px 16px',
-                                        borderRadius: '8px',
-                                        border: '1px solid rgba(255, 255, 255, 0.2)',
-                                        background: 'rgba(255, 255, 255, 0.1)',
-                                        color: 'white',
-                                        fontSize: '14px',
-                                        cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
-                                        opacity: currentPage === totalPages ? 0.5 : 1,
-                                        transition: 'all 0.2s',
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        if (currentPage !== totalPages) {
-                                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'
-                                        }
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'
-                                    }}
+                                    className="btn-secondary text-sm"
+                                    style={{ opacity: currentPage === totalPages ? 0.5 : undefined, cursor: currentPage === totalPages ? 'not-allowed' : undefined }}
                                 >
                                     Last
                                 </button>
@@ -795,7 +653,7 @@ export default function QAFeedbackAnalysisPage() {
                     <p className="text-[var(--text-secondary)] mb-4">
                         No QA workers found with the selected filters.
                     </p>
-                    <button onClick={fetchData} className="btn-primary">
+                    <button onClick={() => fetchData()} className="btn-primary">
                         Reload Data
                     </button>
                 </div>
