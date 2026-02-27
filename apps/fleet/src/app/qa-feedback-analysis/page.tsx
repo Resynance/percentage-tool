@@ -298,13 +298,6 @@ export default function QAFeedbackAnalysisPage() {
         { label: 'All Time', value: null },
     ]
 
-    const quickRanges: { label: string; value: QuickRange }[] = [
-        { label: 'Last 7 Days', value: 7 },
-        { label: 'Last 30 Days', value: 30 },
-        { label: 'Last 90 Days', value: 90 },
-        { label: 'All Time', value: null },
-    ]
-
     return (
         <div className="page-container">
             {/* Header */}

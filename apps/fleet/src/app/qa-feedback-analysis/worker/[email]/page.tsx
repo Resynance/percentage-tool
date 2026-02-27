@@ -161,13 +161,6 @@ export default function WorkerDetailsPage() {
     }
 
     // Filter tasks
-    const taskFilters: { label: string; value: typeof taskFilter }[] = [
-        { label: 'All', value: 'all' },
-        { label: 'Positive', value: 'positive' },
-        { label: 'Negative', value: 'negative' },
-        { label: 'Disputed', value: 'disputed' },
-    ]
-
     const filteredTasks = workerDetails?.tasks.filter(task => {
         if (taskFilter === 'all') return true
         if (taskFilter === 'positive') return task.isHelpful
