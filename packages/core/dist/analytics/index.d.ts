@@ -1,5 +1,5 @@
 /**
  * ENTRY POINT: startBulkAlignment
  */
-export declare function startBulkAlignment(projectId: string): Promise<string | null>;
+export declare function startBulkAlignment(environment: string): Promise<string | null>;
 //# sourceMappingURL=index.d.ts.map

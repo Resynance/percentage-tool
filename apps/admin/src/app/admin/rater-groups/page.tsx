@@ -18,7 +18,7 @@ interface RaterGroup {
     id: string;
     name: string;
     description: string | null;
-    projectId: string;
+    environment: string;
     createdAt: string;
     _count: {
         members: number;
@@ -35,11 +35,6 @@ interface RaterGroup {
     }[];
 }
 
-interface Project {
-    id: string;
-    name: string;
-}
-
 interface User {
     id: string;
     email: string;
@@ -48,9 +43,8 @@ interface User {
 
 export default function RaterGroupsPage() {
     const [groups, setGroups] = useState<RaterGroup[]>([]);
-    const [projects, setProjects] = useState<Project[]>([]);
     const [users, setUsers] = useState<User[]>([]);
-    const [selectedProjectId, setSelectedProjectId] = useState<string>('');
+    const [environment, setEnvironment] = useState<string>('');
     const [loading, setLoading] = useState(true);
     const [status, setStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
@@ -66,36 +60,17 @@ export default function RaterGroupsPage() {
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
-        fetchProjects();
         fetchUsers();
+        setLoading(false);
     }, []);
 
     useEffect(() => {
-        if (selectedProjectId) {
+        if (environment) {
             fetchGroups();
         } else {
             setGroups([]);
         }
-    }, [selectedProjectId]);
-
-    const fetchProjects = async () => {
-        try {
-            const res = await fetch('/api/projects');
-            if (res.ok) {
-                const data = await res.json();
-                // Handle both wrapped { projects: [] } and direct array formats
-                const projectList = Array.isArray(data) ? data : (data.projects || []);
-                setProjects(projectList);
-                if (projectList.length > 0) {
-                    setSelectedProjectId(projectList[0].id);
-                }
-            }
-        } catch (error) {
-            console.error('Error fetching projects:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
+    }, [environment]);
 
     const fetchUsers = async () => {
         try {
@@ -111,7 +86,7 @@ export default function RaterGroupsPage() {
 
     const fetchGroups = async () => {
         try {
-            const res = await fetch(`/api/rater-groups?projectId=${selectedProjectId}`);
+            const res = await fetch(`/api/rater-groups?environment=${environment}`);
             if (res.ok) {
                 const data = await res.json();
                 setGroups(data.groups || []);
@@ -134,7 +109,7 @@ export default function RaterGroupsPage() {
                 method,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    projectId: selectedProjectId,
+                    environment,
                     name: formData.name,
                     description: formData.description
                 })
@@ -259,7 +234,7 @@ export default function RaterGroupsPage() {
                 </div>
                 <button
                     onClick={() => { setFormData({ name: '', description: '' }); setEditingGroup(null); setShowGroupModal(true); }}
-                    disabled={!selectedProjectId}
+                    disabled={!environment}
                     className="btn-primary"
                     style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
                 >
@@ -284,27 +259,24 @@ export default function RaterGroupsPage() {
                 </div>
             )}
 
-            {/* Project Selection */}
+            {/* Environment Input */}
             <div className="glass-card" style={{ padding: '20px', marginBottom: '24px' }}>
-                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500 }}>Select Project</label>
-                <select
-                    value={selectedProjectId}
-                    onChange={e => setSelectedProjectId(e.target.value)}
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500 }}>Environment</label>
+                <input
+                    type="text"
+                    value={environment}
+                    onChange={e => setEnvironment(e.target.value)}
+                    placeholder="Enter environment name (e.g., prod, staging)"
                     className="input-field"
                     style={{ maxWidth: '400px' }}
-                >
-                    <option value="">-- Select a project --</option>
-                    {projects.map(p => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
-                </select>
+                />
             </div>
 
             {/* Groups List */}
-            {!selectedProjectId ? (
+            {!environment ? (
                 <div className="glass-card" style={{ padding: '48px', textAlign: 'center' }}>
                     <Users size={48} style={{ opacity: 0.3, marginBottom: '16px' }} />
-                    <p style={{ opacity: 0.6 }}>Select a project to view rater groups</p>
+                    <p style={{ opacity: 0.6 }}>Enter an environment name to view rater groups</p>
                 </div>
             ) : groups.length === 0 ? (
                 <div className="glass-card" style={{ padding: '48px', textAlign: 'center' }}>

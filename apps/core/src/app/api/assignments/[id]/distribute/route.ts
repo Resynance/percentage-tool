@@ -114,7 +114,7 @@ export async function POST(
             action: 'ASSIGNMENT_BATCH_DISTRIBUTED',
             entityType: 'ASSIGNMENT_BATCH',
             entityId: id,
-            projectId: batch.projectId,
+            environment: batch.environment,
             userId: user.id,
             userEmail: user.email!,
             metadata: {

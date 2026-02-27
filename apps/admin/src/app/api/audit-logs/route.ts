@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
     const userId = searchParams.get('userId') || undefined;
     const action = searchParams.get('action') || undefined;
     const entityType = searchParams.get('entityType') || undefined;
-    const projectId = searchParams.get('projectId') || undefined;
+    const environment = searchParams.get('environment') || undefined;
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
 
@@ -57,8 +57,8 @@ export async function GET(request: NextRequest) {
       where.entityType = entityType;
     }
 
-    if (projectId) {
-      where.projectId = projectId;
+    if (environment) {
+      where.environment = environment;
     }
 
     if (startDate || endDate) {

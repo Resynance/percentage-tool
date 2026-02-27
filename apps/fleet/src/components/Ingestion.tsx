@@ -6,13 +6,8 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Upload, Folder, LayoutDashboard, FileText, Globe2, CheckCircle2, AlertCircle, Loader2, History, HardHat, Construction, Clock } from 'lucide-react';
+import { Upload, CheckCircle2, AlertCircle, Loader2, History, Clock } from 'lucide-react';
 import Link from 'next/link';
-
-interface Project {
-    id: string;
-    name: string;
-}
 
 /**
  * IngestJob Interface
@@ -32,12 +27,7 @@ interface IngestJob {
 }
 
 export default function IngestionPage() {
-    const [projects, setProjects] = useState<Project[]>([]);
-    const [selectedProjectId, setSelectedProjectId] = useState<string>('');
-    const [activeTab, setActiveTab] = useState<'CSV' | 'API'>('CSV');
-
     // Shared Ingest State: Tracks the visual feedback of the "Upload" action itself.
-    const [ingestType, setIngestType] = useState<'TASK' | 'FEEDBACK'>('TASK');
     const [uploading, setUploading] = useState(false);
     const [status, setStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
@@ -45,31 +35,29 @@ export default function IngestionPage() {
     const [activeJob, setActiveJob] = useState<IngestJob | null>(null);
     const [recentJobs, setRecentJobs] = useState<IngestJob[]>([]);
 
+    // Retroactive vectorization state
+    const [vectorizing, setVectorizing] = useState(false);
+
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const [apiUrl, setApiUrl] = useState('');
 
     // Refs to avoid stale closures and interval thrashing
-    const ingestTypeRef = useRef<'TASK' | 'FEEDBACK'>('TASK');
     const recentJobsRef = useRef<IngestJob[]>([]);
-    const selectedProjectIdRef = useRef<string>('');
     const activeJobRef = useRef<IngestJob | null>(null);
     const userSelectedJobRef = useRef<boolean>(false); // Track if user manually selected a job
 
     // Keep refs in sync with state
-    useEffect(() => { ingestTypeRef.current = ingestType; }, [ingestType]);
     useEffect(() => { recentJobsRef.current = recentJobs; }, [recentJobs]);
-    useEffect(() => { selectedProjectIdRef.current = selectedProjectId; }, [selectedProjectId]);
     useEffect(() => { activeJobRef.current = activeJob; }, [activeJob]);
 
     /**
      * RECOVERY LOGIC: fetchRecentJobs
-     * Pulls the last 5 jobs for the project.
+     * Pulls the most recent jobs (environment comes from ingested data).
      * Uses refs to avoid stale closure issues in intervals.
      * Only auto-switches to running jobs if user hasn't manually selected one.
      */
-    const fetchRecentJobs = useCallback(async (projectId: string) => {
+    const fetchRecentJobs = useCallback(async () => {
         try {
-            const res = await fetch(`/api/ingest/jobs?projectId=${projectId}`);
+            const res = await fetch('/api/ingest/jobs');
             const data = await res.json();
             if (res.ok) {
                 setRecentJobs(data);
@@ -109,13 +97,15 @@ export default function IngestionPage() {
      * This prevents interval thrashing that was causing performance issues.
      */
     useEffect(() => {
+        // Initial fetch on mount
+        fetchRecentJobs();
+
         const interval = setInterval(() => {
             const jobs = recentJobsRef.current;
-            const projectId = selectedProjectIdRef.current;
             const hasActive = jobs.some(j => ['PENDING', 'PROCESSING', 'QUEUED_FOR_VEC', 'VECTORIZING'].includes(j.status));
 
-            if (hasActive && projectId) {
-                fetchRecentJobs(projectId);
+            if (hasActive) {
+                fetchRecentJobs();
             }
         }, 2000);
 
@@ -124,17 +114,8 @@ export default function IngestionPage() {
 
     /**
      * TRIGGER: Opens the native file picker.
-     * Sets the intended ingestType (TASK vs FEEDBACK) before clicking the hidden input.
-     * Uses ref to ensure the correct type is used in the upload handler.
      */
-    const triggerUpload = (type: 'TASK' | 'FEEDBACK') => {
-        if (!selectedProjectId) {
-            setStatus({ type: 'error', message: 'Please select a project first.' });
-            return;
-        }
-        // Update both state and ref to avoid race condition
-        setIngestType(type);
-        ingestTypeRef.current = type;
+    const triggerUpload = () => {
         if (fileInputRef.current) {
             fileInputRef.current.click();
         }
@@ -155,15 +136,13 @@ export default function IngestionPage() {
         const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
         const uploadId = `upload_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
-        // Step 1: Initialize upload session (use ref to avoid stale closure)
+        // Step 1: Initialize upload session
         const startRes = await fetch('/api/ingest/csv/chunked', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 action: 'start',
                 uploadId,
-                projectId: selectedProjectIdRef.current,
-                type: ingestTypeRef.current,
                 fileName: file.name,
                 totalChunks,
                 generateEmbeddings: true
@@ -250,11 +229,42 @@ export default function IngestionPage() {
      * Sends the file to the server. Uses chunked upload for large files (>3MB).
      * The server responds with a jobId ALMOST IMMEDIATELY
      * because the actual processing happens in a background worker.
+     * Environment is extracted from the CSV data itself by the backend.
      */
+    /**
+     * RETROACTIVE VECTORIZATION HANDLER
+     * Creates vectorization jobs for all environments with missing embeddings.
+     * Useful when data was imported directly into the database.
+     */
+    const triggerRetroactiveVectorization = async () => {
+        setVectorizing(true);
+        try {
+            const res = await fetch('/api/ingest/retroactive-vectorization', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const data = await res.json();
+            if (res.ok) {
+                setStatus({
+                    type: 'success',
+                    message: data.message + (data.jobsCreated > 0 ? '. Check Recent Activity below for progress.' : '')
+                });
+                // Refresh jobs list to show new vectorization jobs
+                fetchRecentJobs();
+            } else {
+                setStatus({ type: 'error', message: data.error || 'Failed to trigger vectorization' });
+            }
+        } catch (error) {
+            console.error('Failed to trigger retroactive vectorization:', error);
+            setStatus({ type: 'error', message: 'Failed to trigger vectorization. Check console for details.' });
+        } finally {
+            setVectorizing(false);
+        }
+    };
+
     const handleCsvUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (!file || !selectedProjectId) {
-            if (!selectedProjectId) setStatus({ type: 'error', message: 'Please select a project first.' });
+        if (!file) {
             return;
         }
 
@@ -270,14 +280,12 @@ export default function IngestionPage() {
                 if (result.error) {
                     setStatus({ type: 'error', message: result.error });
                 } else if (result.jobId) {
-                    fetchRecentJobs(selectedProjectId);
+                    fetchRecentJobs();
                 }
             } else {
-                // Use regular FormData upload for smaller files (use refs to avoid stale closures)
+                // Use regular FormData upload for smaller files
                 const formData = new FormData();
                 formData.append('file', file);
-                formData.append('projectId', selectedProjectIdRef.current);
-                formData.append('type', ingestTypeRef.current);
                 formData.append('generateEmbeddings', 'true');
 
                 const res = await fetch('/api/ingest/csv', {
@@ -288,7 +296,7 @@ export default function IngestionPage() {
                 const data = await res.json();
                 if (res.ok && data.jobId) {
                     // Instantly refresh list so the user sees the 'Queued' state.
-                    fetchRecentJobs(selectedProjectIdRef.current);
+                    fetchRecentJobs();
                 } else {
                     setStatus({ type: 'error', message: data.error || 'Upload failed' });
                 }
@@ -299,10 +307,6 @@ export default function IngestionPage() {
             setUploading(false);
             if (fileInputRef.current) fileInputRef.current.value = '';
         }
-    };
-
-    const handleApiIngest = async () => {
-        // Feature currently under construction
     };
 
     /**
@@ -318,36 +322,10 @@ export default function IngestionPage() {
                 body: JSON.stringify({ jobId })
             });
             if (res.ok) {
-                fetchRecentJobs(selectedProjectId);
+                fetchRecentJobs();
             }
         } catch (err) {
             console.error('Failed to cancel job', err);
-        }
-    };
-
-    useEffect(() => {
-        fetchProjects();
-    }, []);
-
-    // Selection listener: When switching projects, update the job history list.
-    useEffect(() => {
-        if (selectedProjectId) {
-            fetchRecentJobs(selectedProjectId);
-        }
-    }, [selectedProjectId]);
-
-    const fetchProjects = async () => {
-        try {
-            const res = await fetch('/api/projects');
-            const data = await res.json();
-            const projectsArray = Array.isArray(data) ? data : (data.projects || []);
-            setProjects(projectsArray);
-            if (projectsArray.length > 0) {
-                setSelectedProjectId(projectsArray[0].id);
-            }
-        } catch (err) {
-            console.error('Failed to fetch projects', err);
-            setProjects([]);
         }
     };
 
@@ -355,36 +333,9 @@ export default function IngestionPage() {
         <div style={{ width: '100%', maxWidth: '1000px', margin: '0 auto' }}>
             
             <div style={{ marginBottom: '40px' }}>
-                <h1 className="premium-gradient" style={{ fontSize: '2.5rem', marginBottom: '8px' }}>Ingest</h1>
-                <p style={{ color: 'rgba(255,255,255,0.6)' }}>Choose your method to import task data</p>
+                <h1 className="premium-gradient" style={{ fontSize: '2.5rem', marginBottom: '8px' }}>Ingest Data</h1>
+                <p style={{ color: 'rgba(255,255,255,0.6)' }}>Upload CSV files to import tasks and feedback (environment extracted from data)</p>
             </div>
-
-            {/* PROJECT CONTEXT: Crucial because ingest jobs are scoped to projects */}
-            <section className="glass-card" style={{ marginBottom: '32px' }}>
-                <label style={{ fontSize: '0.8rem', opacity: 0.6, marginBottom: '12px', display: 'block' }}>Target Project</label>
-                <div className="input-field" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 20px' }}>
-                    <Folder size={20} color="#0070f3" />
-                    <select
-                        value={selectedProjectId}
-                        onChange={(e) => setSelectedProjectId(e.target.value)}
-                        style={{ 
-                          background: 'rgba(0,0,0,0.8)',
-                          color: 'rgba(255,255,255,0.9)',
-                          border: '1px solid rgba(255,255,255,0.2)',
-                          borderRadius: '6px',
-                          padding: '8px 12px',
-                          cursor: 'pointer',
-                          fontSize: '1rem',
-                          outline: 'none',
-                          width: '100%',
-                          transition: 'all 0.2s ease',
-                        }}
-                    >
-                        {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                        {projects.length === 0 && <option value="">No Projects Available</option>}
-                    </select>
-                </div>
-            </section>
 
             {/* ACTIVE JOB BANNER: Promoted view for the most relevant ongoing job */}
             {activeJob && (
@@ -437,17 +388,23 @@ export default function IngestionPage() {
 
                     {(activeJob.status === 'PROCESSING' || activeJob.status === 'VECTORIZING') && (
                         <>
-                            <div style={{ fontSize: '0.8rem', opacity: 0.6, marginBottom: '8px' }}>
-                                {activeJob.status === 'PROCESSING' ? 'Phase 1: Loading data into database...' : 'Phase 2: Generating vector embeddings...'}
+                            <div style={{ fontSize: '0.8rem', opacity: 0.6, marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span>{activeJob.status === 'PROCESSING' ? 'Phase 1: Loading data into database...' : 'Phase 2: Generating vector embeddings...'}</span>
+                                {activeJob.totalRecords > 0 && (
+                                    <span style={{ fontWeight: 600, color: 'var(--accent)' }}>
+                                        {Math.round(((activeJob.savedCount + activeJob.skippedCount) / activeJob.totalRecords) * 100)}%
+                                    </span>
+                                )}
                             </div>
-                            <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '8px', height: '8px', overflow: 'hidden', marginBottom: '16px' }}>
+                            <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '8px', height: '12px', overflow: 'hidden', marginBottom: '16px', position: 'relative' }}>
                                 <div style={{
                                     height: '100%',
                                     background: activeJob.status === 'VECTORIZING' ? 'linear-gradient(90deg, #8b5cf6, #3b82f6)' : 'var(--accent-gradient)',
                                     width: activeJob.totalRecords > 0
                                         ? `${((activeJob.savedCount + activeJob.skippedCount) / activeJob.totalRecords) * 100}%`
                                         : '5%',
-                                    transition: 'width 0.3s ease'
+                                    transition: 'width 0.3s ease',
+                                    boxShadow: '0 0 10px rgba(139, 92, 246, 0.5)'
                                 }}></div>
                             </div>
                         </>
@@ -507,37 +464,6 @@ export default function IngestionPage() {
                 </div>
             )}
 
-            {/* TAB SYSTEM */}
-            <div style={{ display: 'flex', gap: '12px', marginBottom: '32px' }}>
-                <button
-                    onClick={() => setActiveTab('CSV')}
-                    className={`glass-card ${activeTab === 'CSV' ? 'active-tab' : ''}`}
-                    style={{
-                        flex: 1, padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px',
-                        border: activeTab === 'CSV' ? '1px solid var(--accent)' : '1px solid transparent',
-                        background: activeTab === 'CSV' ? 'rgba(0, 112, 243, 0.05)' : 'rgba(255,255,255,0.02)'
-                    }}
-                >
-                    <FileText size={32} color={activeTab === 'CSV' ? 'var(--accent)' : 'rgba(255,255,255,0.4)'} />
-                    <span style={{ fontWeight: 600, fontSize: '1.1rem' }}>Ingest CSV</span>
-                    <p style={{ fontSize: '0.8rem', opacity: 0.5, textAlign: 'center' }}>Upload local datasets for analysis</p>
-                </button>
-
-                <button
-                    onClick={() => setActiveTab('API')}
-                    className={`glass-card ${activeTab === 'API' ? 'active-tab' : ''}`}
-                    style={{
-                        flex: 1, padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px',
-                        border: activeTab === 'API' ? '1px solid var(--accent)' : '1px solid transparent',
-                        background: activeTab === 'API' ? 'rgba(0, 112, 243, 0.05)' : 'rgba(255,255,255,0.02)'
-                    }}
-                >
-                    <Globe2 size={32} color={activeTab === 'API' ? 'var(--accent)' : 'rgba(255,255,255,0.4)'} />
-                    <span style={{ fontWeight: 600, fontSize: '1.1rem' }}>Ingest Via API</span>
-                    <p style={{ fontSize: '0.8rem', opacity: 0.5, textAlign: 'center' }}>Stream live data from endpoints</p>
-                </button>
-            </div>
-
             {status && (
                 <div className="glass-card" style={{
                     marginBottom: '32px', border: `1px solid ${status.type === 'success' ? 'var(--success)' : 'var(--error)'}`,
@@ -548,87 +474,87 @@ export default function IngestionPage() {
                 </div>
             )}
 
-            {/* CSV INGEST PANEL */}
-            {activeTab === 'CSV' ? (
-                <div className="glass-card" style={{ padding: '40px' }}>
-                    <h2 style={{ fontSize: '1.5rem', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <Upload size={24} color="var(--accent)" /> Configure CSV Ingest
-                    </h2>
+            {/* CSV UPLOAD SECTION */}
+            <div className="glass-card" style={{ padding: '40px' }}>
+                <h2 style={{ fontSize: '1.5rem', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <Upload size={24} color="var(--accent)" /> Upload CSV File
+                </h2>
 
-                    <input type="file" accept=".csv" ref={fileInputRef} style={{ display: 'none' }} onChange={handleCsvUpload} disabled={uploading || !selectedProjectId} />
+                <input type="file" accept=".csv" ref={fileInputRef} style={{ display: 'none' }} onChange={handleCsvUpload} disabled={uploading} />
 
-                    <div style={{ marginBottom: '24px' }}>
-                        <label style={{ fontSize: '0.9rem', opacity: 0.7, marginBottom: '16px', display: 'block' }}>Select Data Type to Upload</label>
-                        <div style={{ display: 'flex', gap: '16px', maxWidth: '500px' }}>
-                            <button
-                                onClick={() => triggerUpload('TASK')}
-                                disabled={uploading}
-                                className={`btn-primary ${uploading && ingestType === 'TASK' ? 'loading' : ''}`}
-                                style={{ flex: 1, padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}
-                            >
-                                <FileText size={28} />
-                                <span style={{ fontWeight: 600 }}>{uploading && ingestType === 'TASK' ? 'Sending...' : 'Tasks'}</span>
-                            </button>
-                            <button
-                                onClick={() => triggerUpload('FEEDBACK')}
-                                disabled={uploading}
-                                className={`btn-primary ${uploading && ingestType === 'FEEDBACK' ? 'loading' : ''}`}
-                                style={{ flex: 1, padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', background: 'var(--accent-gradient)' }}
-                            >
-                                <CheckCircle2 size={28} />
-                                <span style={{ fontWeight: 600 }}>{uploading && ingestType === 'FEEDBACK' ? 'Sending...' : 'Feedback'}</span>
-                            </button>
-                        </div>
-                    </div>
+                <button
+                    onClick={triggerUpload}
+                    disabled={uploading}
+                    className="btn-primary"
+                    style={{
+                        width: '100%',
+                        maxWidth: '400px',
+                        padding: '32px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '16px',
+                        fontSize: '1.1rem'
+                    }}
+                >
+                    <Upload size={40} />
+                    <span style={{ fontWeight: 600 }}>{uploading ? 'Uploading...' : 'Select CSV File'}</span>
+                </button>
 
-                    <p style={{ fontSize: '0.8rem', opacity: 0.4 }}>
-                        CSV files should contain a content column (e.g., `feedback`, `task_content`, `prompt`) and a quality rating column (e.g., `quality_rating`, `Top 10%`, `top_10`).
-                    </p>
-                </div>
-            ) : (
-                /* UNDER CONSTRUCTION VIEW */
-                <div className="glass-card" style={{ padding: '80px 40px', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
-                    <div style={{ position: 'absolute', top: '-20px', left: '-20px', opacity: 0.03, transform: 'rotate(-15deg)' }}>
-                        <HardHat size={200} />
-                    </div>
-                    <div style={{ position: 'absolute', bottom: '-20px', right: '-20px', opacity: 0.03, transform: 'rotate(15deg)' }}>
-                        <Construction size={200} />
-                    </div>
+                <p style={{ fontSize: '0.85rem', opacity: 0.5, marginTop: '24px', lineHeight: '1.6' }}>
+                    CSV files should contain a content column (e.g., <code>feedback</code>, <code>task_content</code>, <code>prompt</code>),
+                    a type column (e.g., <code>type</code>), and optional quality rating column (e.g., <code>quality_rating</code>, <code>Top 10%</code>).
+                    Environment will be extracted from the data automatically.
+                </p>
+            </div>
 
-                    <div style={{ position: 'relative', zIndex: 1 }}>
-                        <div style={{
-                            width: '80px',
-                            height: '80px',
-                            background: 'rgba(255, 170, 0, 0.1)',
-                            borderRadius: '20px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            margin: '0 auto 24px auto',
-                            border: '1px solid rgba(255, 170, 0, 0.2)'
-                        }}>
-                            <HardHat size={40} color="#ffaa00" />
-                        </div>
-                        <h2 className="premium-gradient" style={{ fontSize: '2rem', marginBottom: '16px', background: 'linear-gradient(135deg, #ffaa00 0%, #ff7700 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                            API Ingestion Under Construction
-                        </h2>
-                        <p style={{ color: 'rgba(255,255,255,0.6)', maxWidth: '500px', margin: '0 auto 32px auto', lineHeight: '1.6' }}>
-                            We're currently refactoring our API stream engine to support large-scale background syncs.
-                            Check back soon for enterprise-grade endpoint connectivity!
+            {/* UTILITY SECTION: Maintenance tools */}
+            <div className="glass-card" style={{
+                padding: '32px',
+                marginTop: '32px',
+                background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(59, 130, 246, 0.1))',
+                borderColor: 'rgba(139, 92, 246, 0.3)'
+            }}>
+                <h2 style={{ fontSize: '1.4rem', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <AlertCircle size={24} color="var(--accent)" />
+                    Maintenance Tools
+                </h2>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <div>
+                        <p style={{ fontSize: '0.95rem', opacity: 0.8, marginBottom: '16px', lineHeight: '1.6' }}>
+                            Generate embeddings for records that were imported directly into the database and are missing vector embeddings.
                         </p>
-                        <div style={{ display: 'flex', justifyContent: 'center', gap: '24px' }}>
-                            <div style={{ textAlign: 'center' }}>
-                                <div style={{ opacity: 0.4 }}><Construction size={24} /></div>
-                                <span style={{ fontSize: '0.7rem', opacity: 0.4, textTransform: 'uppercase', letterSpacing: '1px' }}>Building</span>
-                            </div>
-                            <div style={{ textAlign: 'center' }}>
-                                <div style={{ opacity: 0.4 }}><Loader2 className="animate-spin" size={24} /></div>
-                                <span style={{ fontSize: '0.7rem', opacity: 0.4, textTransform: 'uppercase', letterSpacing: '1px' }}>Optimizing</span>
-                            </div>
-                        </div>
+                        <button
+                            onClick={triggerRetroactiveVectorization}
+                            disabled={vectorizing}
+                            className="btn-primary"
+                            style={{
+                                padding: '16px 32px',
+                                fontSize: '1rem',
+                                fontWeight: 600,
+                                background: vectorizing ? 'rgba(139, 92, 246, 0.3)' : 'linear-gradient(135deg, #8b5cf6, #3b82f6)',
+                                border: 'none',
+                                boxShadow: '0 4px 12px rgba(139, 92, 246, 0.3)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px'
+                            }}
+                        >
+                            {vectorizing ? (
+                                <>
+                                    <Loader2 className="animate-spin" size={20} />
+                                    Checking for missing embeddings...
+                                </>
+                            ) : (
+                                <>
+                                    <CheckCircle2 size={20} />
+                                    Generate Missing Embeddings
+                                </>
+                            )}
+                        </button>
                     </div>
                 </div>
-            )}
+            </div>
 
             {/* RECENT ACTIVITY: Historical log of ingestion jobs */}
             {recentJobs.length > 0 && (

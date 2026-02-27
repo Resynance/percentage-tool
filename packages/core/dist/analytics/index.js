@@ -8,45 +8,49 @@ import { extractTextFromPDF } from '../utils/pdf';
 /**
  * ENTRY POINT: startBulkAlignment
  */
-export async function startBulkAlignment(projectId) {
-    // Check if there's already an active job for this project
+export async function startBulkAlignment(environment) {
+    // Check if there's already an active job for this environment
     const activeJob = await prisma.analyticsJob.findFirst({
-        where: { projectId, status: 'PROCESSING' }
+        where: { environment, status: 'PROCESSING' }
     });
     if (activeJob)
         return activeJob.id;
     // Identify records that need alignment analysis
     const targetCount = await prisma.dataRecord.count({
-        where: { projectId, alignmentAnalysis: null }
+        where: { environment, alignmentAnalysis: null }
     });
     if (targetCount === 0)
         return null;
     const job = await prisma.analyticsJob.create({
         data: {
-            projectId,
+            environment,
             status: 'PROCESSING',
             totalRecords: targetCount,
             processedCount: 0
         }
     });
     // Fire and forget the background worker
-    runBulkAlignment(job.id, projectId).catch(err => console.error('Bulk Alignment Error:', err));
+    runBulkAlignment(job.id, environment).catch(err => console.error('Bulk Alignment Error:', err));
     return job.id;
 }
 /**
  * BACKGROUND WORKER: runBulkAlignment
  */
-async function runBulkAlignment(jobId, projectId) {
+async function runBulkAlignment(jobId, environment) {
     try {
-        const project = await prisma.project.findUnique({
-            where: { id: projectId }
+        // TODO: Fetch system-wide guidelines from SystemSettings
+        // For now, this functionality is disabled until guidelines management is implemented
+        // See: Phase 5 of the environment refactor for guidelines management
+        // Get guidelines from system settings (GUIDELINES_PDF)
+        const guidelinesSetting = await prisma.systemSetting.findUnique({
+            where: { key: 'GUIDELINES_PDF' }
         });
-        if (!project || !project.guidelines) {
-            throw new Error('Project guidelines not found.');
+        if (!guidelinesSetting || !guidelinesSetting.value) {
+            throw new Error('System guidelines not found. Please upload guidelines in Admin settings.');
         }
         // 1. EXTRACT GUIDELINES once per job to save resources
         let guidelinesText = '';
-        const base64Data = project.guidelines.split(';base64,').pop();
+        const base64Data = guidelinesSetting.value.split(';base64,').pop();
         if (base64Data) {
             const buffer = Buffer.from(base64Data, 'base64');
             const parsed = await extractTextFromPDF(buffer);
@@ -56,10 +60,10 @@ async function runBulkAlignment(jobId, projectId) {
             throw new Error('Could not parse guidelines PDF.');
         // 2. FETCH and PROCESS in sequence (LLM is usually the bottleneck, don't overwhelm local host)
         const recordsToProcess = await prisma.dataRecord.findMany({
-            where: { projectId, alignmentAnalysis: null },
+            where: { environment, alignmentAnalysis: null },
             orderBy: { createdAt: 'desc' }
         });
-        const systemPrompt = `You are an expert AI Alignment Lead and Quality Assurance Analyst for the ${project.name} project.`;
+        const systemPrompt = `You are an expert AI Alignment Lead and Quality Assurance Analyst.`;
         for (let i = 0; i < recordsToProcess.length; i++) {
             // CHECK FOR CANCELLED STATUS periodically
             const currentJob = await prisma.analyticsJob.findUnique({

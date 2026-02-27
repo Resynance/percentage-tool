@@ -3,7 +3,6 @@
 import { useState, useEffect, useMemo, memo, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { Inbox, Check, X, ChevronDown, ChevronRight } from "lucide-react";
-import { useProjects } from "@/hooks/useProjects";
 
 interface FeedbackStats {
   userId: string;
@@ -339,10 +338,9 @@ const renderFeedback = (fb: FeedbackDetails, taskKey: string | null) => {
 
 export default function CandidateReview() {
   const searchParams = useSearchParams();
-  const { selectedProjectId, loading: projectsLoading } = useProjects({
-    autoSelectFirst: true,
-    initialProjectId: searchParams?.get("projectId") || "",
-  });
+  const [selectedEnvironment, setSelectedEnvironment] = useState<string>(
+    searchParams?.get("environment") || ""
+  );
 
   const [userStats, setUserStats] = useState<FeedbackStats[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string>("");
@@ -372,14 +370,14 @@ export default function CandidateReview() {
 
   // Fetch user stats when project changes
   useEffect(() => {
-    if (!selectedProjectId) return;
+    if (!selectedEnvironment) return;
 
     const fetchUserStats = async () => {
       setLoading(true);
       setError(null);
       try {
         const response = await fetch(
-          `/api/candidates?projectId=${selectedProjectId}`,
+          `/api/candidates?environment=${selectedEnvironment}`,
         );
 
         if (!response.ok) {
@@ -401,11 +399,11 @@ export default function CandidateReview() {
     };
 
     fetchUserStats();
-  }, [selectedProjectId]);
+  }, [selectedEnvironment]);
 
   // Fetch feedback details when user is selected
   useEffect(() => {
-    if (!selectedProjectId || !selectedUserId) {
+    if (!selectedEnvironment || !selectedUserId) {
       setFeedbackItems([]);
       return;
     }
@@ -416,7 +414,7 @@ export default function CandidateReview() {
       try {
         // Fetch feedback details
         const feedbackResponse = await fetch(
-          `/api/candidates?projectId=${selectedProjectId}&userId=${selectedUserId}&action=details`,
+          `/api/candidates?environment=${selectedEnvironment}&userId=${selectedUserId}&action=details`,
         );
 
         if (!feedbackResponse.ok) {
@@ -444,7 +442,7 @@ export default function CandidateReview() {
     };
 
     fetchFeedbackDetails();
-  }, [selectedProjectId, selectedUserId]);
+  }, [selectedEnvironment, selectedUserId]);
 
   const selectedUserStats = useMemo(
     () => userStats.find((u) => u.userId === selectedUserId),
@@ -468,12 +466,12 @@ export default function CandidateReview() {
   );
 
   useEffect(() => {
-    if (!selectedProjectId || userStats.length === 0) return;
+    if (!selectedEnvironment || userStats.length === 0) return;
 
     const fetchAllStatuses = async () => {
       try {
         const response = await fetch(
-          `/api/candidates?projectId=${selectedProjectId}&action=all-statuses`,
+          `/api/candidates?environment=${selectedEnvironment}&action=all-statuses`,
         );
         if (response.ok) {
           const data = await response.json();
@@ -489,7 +487,7 @@ export default function CandidateReview() {
     };
 
     fetchAllStatuses();
-  }, [selectedProjectId, userStats]);
+  }, [selectedEnvironment, userStats]);
 
   const filteredCandidates = useMemo(() => {
     // Helper function to extract last name from display name
@@ -549,7 +547,7 @@ export default function CandidateReview() {
   }, []);
 
   const handleCandidateStatusChange = async (newStatus: string) => {
-    if (!selectedUserId || !selectedProjectId) return;
+    if (!selectedUserId || !selectedEnvironment) return;
 
     // Cancel any pending request
     if (pendingStatusUpdateRef.current) {
@@ -579,7 +577,7 @@ export default function CandidateReview() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId: selectedUserId,
-          projectId: selectedProjectId,
+          environment: selectedEnvironment,
           status: newStatus,
           email: selectedUserStats?.userEmail || "",
         }),
@@ -607,18 +605,13 @@ export default function CandidateReview() {
     }
   };
 
-  if (projectsLoading) {
+  if (!selectedEnvironment) {
     return (
       <div style={{ textAlign: "center", padding: "100px" }}>
-        <h2>Loading projects...</h2>
-      </div>
-    );
-  }
-
-  if (!selectedProjectId) {
-    return (
-      <div style={{ textAlign: "center", padding: "100px" }}>
-        <h2>No project selected</h2>
+        <h2>No environment selected</h2>
+        <p style={{ color: "var(--text-secondary)", marginTop: "8px" }}>
+          Please select an environment from the filter to view candidate reviews.
+        </p>
       </div>
     );
   }

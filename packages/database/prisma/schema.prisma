@@ -10,32 +10,8 @@ datasource db {
 }
 
 /// *
-///  * PROJECT: The primary organizational unit.
-///  * All data records, ingestion jobs, and guidelines are scoped to a project.
-model Project {
-  id                   String         @id @default(dbgenerated("gen_random_uuid()::text"))
-  name                 String         @unique
-  ownerId              String?        @map("ownerId") @db.Uuid
-  lastTaskAnalysis     String?        @map("lastTaskAnalysis") @db.Text
-  lastFeedbackAnalysis String?        @map("lastFeedbackAnalysis") @db.Text
-  guidelines           String?        @db.Text
-  guidelinesFileName   String?        @map("guidelinesFileName")
-  createdAt            DateTime       @default(now()) @map("createdAt") @db.Timestamptz(6)
-  updatedAt            DateTime       @default(now()) @updatedAt @map("updatedAt") @db.Timestamptz(6)
-  analyticsJobs        AnalyticsJob[]
-  records              DataRecord[]
-  ingestJobs           IngestJob[]
-  candidateStatuses    CandidateStatus[]
-  owner                Profile?       @relation(fields: [ownerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-
-  // Rater management relations
-  raterGroups       RaterGroup[]
-  assignmentBatches AssignmentBatch[]
-  llmEvaluationJobs LLMEvaluationJob[]
-
-  @@map("projects")
-  @@schema("public")
-}
+///  * PROJECT MODEL REMOVED - Environment-based organization is now used instead.
+///  * All data is organized by environment TEXT field rather than projectId foreign keys.
 
 /// *
 ///  * PROFILE: Application-specific user data.
@@ -50,7 +26,6 @@ model Profile {
   createdAt         DateTime  @default(now()) @map("createdAt") @db.Timestamptz(6)
   updatedAt         DateTime  @default(now()) @updatedAt @map("updatedAt") @db.Timestamptz(6)
   users             users     @relation(fields: [id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  projects          Project[]
 
   // Rater management relations
   raterGroupMemberships RaterGroupMember[]
@@ -72,16 +47,15 @@ model Profile {
 
 model AnalyticsJob {
   id             String   @id @default(cuid())
-  projectId      String   @map("projectId")
+  environment    String
   status         String   @default("PENDING")
   totalRecords   Int      @default(0) @map("totalRecords")
   processedCount Int      @default(0) @map("processedCount")
   error          String?
   createdAt      DateTime @default(now()) @map("createdAt") @db.Timestamptz(6)
   updatedAt      DateTime @default(now()) @updatedAt @map("updatedAt") @db.Timestamptz(6)
-  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-  @@index([projectId], map: "idx_analytics_jobs_project")
+  @@index([environment], map: "idx_analytics_jobs_environment")
   @@map("analytics_jobs")
   @@schema("public")
 }
@@ -95,7 +69,7 @@ model AnalyticsJob {
 ///  * ALTER TABLE public.data_records ALTER COLUMN embedding TYPE vector(NEW_DIMENSION);
 model DataRecord {
   id                String                 @id @default(cuid())
-  projectId         String                 @map("projectId")
+  environment       String
   type              RecordType
   category          RecordCategory?
   source            String
@@ -112,7 +86,6 @@ model DataRecord {
   createdById       String?                @map("createdById")
   createdByName     String?                @map("createdByName")
   createdByEmail    String?                @map("createdByEmail")
-  project           Project                @relation(fields: [projectId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   likertScores      LikertScore[]
   assignments       AssignmentRecord[]
   qaFeedbackRatings QAFeedbackRating[]
@@ -122,8 +95,12 @@ model DataRecord {
 
   @@index([category], map: "idx_data_records_category")
   @@index([createdById], map: "idx_data_records_created_by")
-  @@index([projectId], map: "idx_data_records_project")
+  @@index([environment], map: "idx_data_records_environment")
   @@index([type], map: "idx_data_records_type")
+  @@index([type, createdAt(sort: Desc)], map: "idx_data_records_type_createdat")
+  @@index([type, environment, createdAt(sort: Desc)], map: "idx_data_records_type_env_createdat")
+  @@index([createdByName], map: "idx_data_records_created_by_name")
+  @@index([createdByEmail], map: "idx_data_records_created_by_email")
   @@map("data_records")
   @@schema("public")
 }
@@ -154,7 +131,7 @@ model CrossEncoderCache {
 ///  * Allows the UI to poll for real-time progress bars.
 model IngestJob {
   id             String     @id @default(cuid())
-  projectId      String     @map("projectId")
+  environment    String
   type           RecordType
   status         String     @default("PENDING")
   totalRecords   Int        @default(0) @map("totalRecords")
@@ -166,9 +143,8 @@ model IngestJob {
   options        Json?      // IngestOptions (source, filterKeywords, generateEmbeddings) preserved for serverless job reconstruction
   createdAt      DateTime   @default(now()) @map("createdAt") @db.Timestamptz(6)
   updatedAt      DateTime   @default(now()) @updatedAt @map("updatedAt") @db.Timestamptz(6)
-  project        Project    @relation(fields: [projectId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-  @@index([projectId], map: "idx_ingest_jobs_project")
+  @@index([environment], map: "idx_ingest_jobs_environment")
   @@map("ingest_jobs")
   @@schema("public")
 }
@@ -228,21 +204,21 @@ model BonusWindow {
 ///  * AUDIT LOG: Tracks user actions and administrative operations.
 ///  * Logs all major actions throughout the application for security and compliance.
 model AuditLog {
-  id         String   @id
-  action     String
-  entityType String   @map("entity_type")
-  entityId   String?  @map("entity_id")
-  projectId  String?  @map("project_id")
-  userId     String   @map("user_id") @db.Uuid
-  userEmail  String   @map("user_email")
-  metadata   Json?
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  users      users    @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  id          String   @id
+  action      String
+  entityType  String   @map("entity_type")
+  entityId    String?  @map("entity_id")
+  environment String?  // Nullable for non-environment-specific logs
+  userId      String   @map("user_id") @db.Uuid
+  userEmail   String   @map("user_email")
+  metadata    Json?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  users       users    @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([action, createdAt(sort: Desc)], map: "idx_audit_logs_action")
   @@index([createdAt(sort: Desc)], map: "idx_audit_logs_created_at")
   @@index([entityType, entityId], map: "idx_audit_logs_entity")
-  @@index([projectId], map: "idx_audit_logs_project")
+  @@index([environment], map: "idx_audit_logs_environment")
   @@index([userId, createdAt(sort: Desc)], map: "idx_audit_logs_user_time")
   @@map("audit_logs")
   @@schema("public")
@@ -310,9 +286,10 @@ model QAFeedbackRating {
   id String @id @default(dbgenerated("gen_random_uuid()::text"))
 
   // Core identifiers
-  ratingId   String  @unique @map("rating_id") // Unique ID from CSV
-  feedbackId String  @map("feedback_id") // ID of the feedback being rated
-  evalTaskId String? @map("eval_task_id") // FK to data_records (nullable)
+  ratingId        String  @unique @map("rating_id") // Unique ID from CSV
+  feedbackId      String  @map("feedback_id") // ID of the feedback being rated
+  feedbackContent String? @map("feedback_content") // The actual feedback text
+  evalTaskId      String? @map("eval_task_id") // FK to data_records (nullable)
 
   // Rating information
   isHelpful     Boolean @map("is_helpful") // true = positive, false = negative
@@ -751,6 +728,7 @@ model users {
   bug_reports_bug_reports_user_idTousers     BugReport[]            @relation("bug_reports_user_idTousers")
   profiles                                   Profile?
   time_entries                               TimeEntry[]
+  guidelines                                 Guideline[]
 
   @@index([instance_id])
   @@index([is_anonymous])
@@ -758,18 +736,16 @@ model users {
 }
 
 model CandidateStatus {
-  id        String   @id @default(cuid())
-  userId    String   @map("userId")
-  email     String
-  projectId String   @map("projectId")
-  status    String   // 'ACCEPTED' or 'REJECTED'
-  createdAt DateTime @default(now()) @map("createdAt") @db.Timestamptz(6)
-  updatedAt DateTime @default(now()) @updatedAt @map("updatedAt") @db.Timestamptz(6)
+  id          String   @id @default(cuid())
+  userId      String   @map("userId")
+  email       String
+  environment String
+  status      String   // 'ACCEPTED' or 'REJECTED'
+  createdAt   DateTime @default(now()) @map("createdAt") @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updatedAt") @db.Timestamptz(6)
 
-  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, projectId])
-  @@index([projectId], map: "idx_candidate_status_project")
+  @@unique([userId, environment], map: "candidate_status_userId_environment_key")
+  @@index([environment], map: "idx_candidate_status_environment")
   @@map("candidate_status")
   @@schema("public")
 }
@@ -970,7 +946,7 @@ model LLMModelConfig {
  */
 model LLMEvaluationJob {
   id            String @id @default(cuid())
-  projectId     String @map("project_id")
+  environment   String
   modelConfigId String @map("model_config_id")
 
   status         JobStatus @default(PENDING)
@@ -989,10 +965,9 @@ model LLMEvaluationJob {
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
   // Relations
-  project     Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
   modelConfig LLMModelConfig @relation(fields: [modelConfigId], references: [id], onDelete: Cascade)
 
-  @@index([projectId])
+  @@index([environment], map: "idx_llm_evaluation_jobs_environment")
   @@index([modelConfigId])
   @@index([status])
   @@map("llm_evaluation_jobs")
@@ -1011,18 +986,17 @@ model RaterGroup {
   id          String  @id @default(cuid())
   name        String
   description String? @db.Text
-  projectId   String  @map("project_id")
+  environment String
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  project     Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
   members     RaterGroupMember[]
   assignments AssignmentBatch[]
 
-  @@unique([projectId, name])
-  @@index([projectId])
+  @@unique([environment, name], map: "rater_groups_environment_name_key")
+  @@index([environment], map: "idx_rater_groups_environment")
   @@map("rater_groups")
   @@schema("public")
 }
@@ -1059,7 +1033,7 @@ model AssignmentBatch {
   id          String  @id @default(cuid())
   name        String
   description String? @db.Text
-  projectId   String  @map("project_id")
+  environment String
 
   // Assignment target (either group OR individual, not both)
   raterGroupId     String? @map("rater_group_id")
@@ -1079,13 +1053,12 @@ model AssignmentBatch {
   createdById String    @map("created_by_id") @db.Uuid
 
   // Relations
-  project        Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
   raterGroup     RaterGroup?        @relation(fields: [raterGroupId], references: [id], onDelete: SetNull)
   assignedToUser Profile?           @relation("AssignedBatches", fields: [assignedToUserId], references: [id], onDelete: SetNull)
   createdBy      Profile            @relation("CreatedBatches", fields: [createdById], references: [id])
   records        AssignmentRecord[]
 
-  @@index([projectId])
+  @@index([environment], map: "idx_assignment_batches_environment")
   @@index([raterGroupId])
   @@index([assignedToUserId])
   @@index([status])
@@ -1158,6 +1131,30 @@ model TimeReportRecord {
   @@index([workDate])
   @@index([importBatchId])
   @@map("time_report_records")
+  @@schema("public")
+}
+
+/**
+ * MEETING: Master catalog of meeting definitions for time reporting.
+ * Workers can reference these meetings when reporting time.
+ */
+model Meeting {
+  id                     String   @id @default(dbgenerated("gen_random_uuid()"))  @db.Uuid
+  title                  String
+  description            String?  @db.Text
+  isRecurring            Boolean  @default(false) @map("is_recurring")
+  recurrencePattern      String?  @map("recurrence_pattern") // 'weekly', 'biweekly', 'monthly', 'quarterly'
+  expectedDurationHours  Decimal? @map("expected_duration_hours") @db.Decimal(5, 2)
+  category               String?  // 'team-sync', 'planning', '1-on-1', 'all-hands', 'training', 'client', 'other'
+  isActive               Boolean  @default(true) @map("is_active")
+  createdAt              DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy              String   @map("created_by")
+
+  @@index([isActive])
+  @@index([category])
+  @@index([title])
+  @@map("meetings")
   @@schema("public")
 }
 
@@ -1444,5 +1441,27 @@ model PromptAuthenticityJob {
 
   @@index([status])
   @@map("prompt_authenticity_jobs")
+  @@schema("public")
+}
+
+/**
+ * GUIDELINE: PDF-based guidelines for alignment analysis.
+ * Can be associated with specific environments or left as default/global (environment = null).
+ * Used by alignment scoring system to evaluate task/feedback quality.
+ */
+model Guideline {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String   // User-friendly name: "Production Quality Guidelines v2.1"
+  content      String   @db.Text // Base64-encoded PDF content
+  environments String[] @default([]) // Array of environment associations (empty = global/all)
+  uploadedBy   String   @map("uploaded_by") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  users        users    @relation(fields: [uploadedBy], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([uploadedBy])
+  @@index([createdAt(sort: Desc)])
+  @@map("guidelines")
   @@schema("public")
 }

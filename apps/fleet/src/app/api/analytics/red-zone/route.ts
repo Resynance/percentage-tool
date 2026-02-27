@@ -43,11 +43,11 @@ function parseVector(vectorStr: string): number[] {
 export async function GET(request: NextRequest) {
     try {
         const { searchParams } = new URL(request.url);
-        const projectId = searchParams.get('projectId');
+        const environment = searchParams.get('environment');
         const threshold = parseInt(searchParams.get('threshold') || '70', 10);
 
-        if (!projectId) {
-            return NextResponse.json({ error: 'projectId is required' }, { status: 400 });
+        if (!environment) {
+            return NextResponse.json({ error: 'environment is required' }, { status: 400 });
         }
 
         // Fetch all TASK records with embeddings using raw SQL
@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
                 "createdAt",
                 embedding::text as embedding
             FROM public.data_records
-            WHERE "projectId" = ${projectId}
+            WHERE "environment" = ${environment}
             AND type = 'TASK'
             AND embedding IS NOT NULL
         `;

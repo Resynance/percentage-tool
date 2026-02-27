@@ -4,7 +4,7 @@
  * Fetches all task prompts for a project along with their creators.
  * Used by the prompt comparison and analysis features.
  *
- * GET /api/analysis/prompts?projectId={id}
+ * GET /api/analysis/prompts?environment={id}
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@repo/database';
@@ -18,8 +18,8 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const projectId = req.nextUrl.searchParams.get('projectId');
-    if (!projectId) {
+    const environment = req.nextUrl.searchParams.get('environment');
+    if (!environment) {
         return NextResponse.json({ error: 'Project ID is required' }, { status: 400 });
     }
 
@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
     try {
         prompts = await prisma.dataRecord.findMany({
             where: {
-                projectId,
+                environment,
                 type: 'TASK'
             },
             select: {
@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
         });
     } catch (dbError: any) {
         console.error('Prompts API Error: Database query failed', {
-            projectId,
+            environment,
             error: dbError.message
         });
         return NextResponse.json({
@@ -138,7 +138,7 @@ export async function GET(req: NextRequest) {
             .map(({ id, name }) => ({ id, name })); // Remove sorting fields from final output
 
         console.log('Prompts API: Fetched prompts successfully', {
-            projectId,
+            environment,
             userId: user.id,
             promptCount: prompts.length,
             userCount: users.length
@@ -147,7 +147,7 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ prompts, users });
     } catch (error: any) {
         console.error('Prompts API Error: Unexpected error during processing', {
-            projectId,
+            environment,
             error: error.message,
             stack: error.stack
         });

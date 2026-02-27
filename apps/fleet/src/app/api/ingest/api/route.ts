@@ -22,28 +22,19 @@ export async function POST(req: NextRequest) {
 
         const role = profile?.role || 'USER';
 
-        const { url, projectId, type, filterKeywords, generateEmbeddings } = await req.json();
+        const { url, environment, type, filterKeywords, generateEmbeddings } = await req.json();
 
-        if (!url || !projectId) {
-            return NextResponse.json({ error: 'URL and Project ID are required' }, { status: 400 });
+        if (!url || !environment) {
+            return NextResponse.json({ error: 'URL and Environment are required' }, { status: 400 });
         }
 
-        // Verify user owns the project
-        const project = await prisma.project.findUnique({
-            where: { id: projectId },
-            select: { ownerId: true }
-        });
-
-        if (!project) {
-            return NextResponse.json({ error: 'Project not found' }, { status: 404 });
-        }
-
-        if (role !== 'ADMIN' && project.ownerId !== user.id) {
-            return NextResponse.json({ error: 'Forbidden: You do not own this project' }, { status: 403 });
+        // Authorization: Only FLEET and ADMIN roles can ingest data
+        if (role !== 'ADMIN' && role !== 'FLEET') {
+            return NextResponse.json({ error: 'Forbidden: Insufficient permissions' }, { status: 403 });
         }
 
         const jobId = await startBackgroundIngest('API', url, {
-            projectId,
+            environment,
             source: `api:${url}`,
             type,
             filterKeywords,
@@ -52,7 +43,7 @@ export async function POST(req: NextRequest) {
 
         // IMPORTANT: In serverless, we must await initial processing or it gets killed
         // Status endpoint will continue processing on each poll
-        await processQueuedJobs(projectId).catch(err =>
+        await processQueuedJobs(environment).catch(err =>
             console.error('Initial Queue Processor Error:', err)
         );
 

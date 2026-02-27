@@ -5,7 +5,7 @@ import { LLM_SYSTEM_UUID, DEFAULT_SYSTEM_PROMPT, LLMConfig, HTTPHeaders, EnvDefa
  * Start a bulk evaluation job
  * This function creates the job record and triggers the first batch asynchronously.
  */
-export async function startBulkEvaluation(projectId, modelConfigId) {
+export async function startBulkEvaluation(environment, modelConfigId) {
     // 1. Validation
     const modelConfig = await prisma.lLMModelConfig.findUnique({
         where: { id: modelConfigId }
@@ -16,7 +16,7 @@ export async function startBulkEvaluation(projectId, modelConfigId) {
     // 2. Check for existing running job
     const existingJob = await prisma.lLMEvaluationJob.findFirst({
         where: {
-            projectId,
+            environment,
             modelConfigId,
             status: { in: ['PENDING', 'PROCESSING'] }
         }
@@ -28,14 +28,14 @@ export async function startBulkEvaluation(projectId, modelConfigId) {
         where: {
             userId: LLM_SYSTEM_UUID,
             llmModel: modelConfig.modelId,
-            record: { projectId }
+            record: { environment }
         },
         select: { recordId: true }
     });
     const evaluatedIds = new Set(existingScores.map(s => s.recordId));
     const totalRecords = await prisma.dataRecord.count({
         where: {
-            projectId,
+            environment,
             id: { notIn: Array.from(evaluatedIds) }
         }
     });
@@ -45,7 +45,7 @@ export async function startBulkEvaluation(projectId, modelConfigId) {
     // 4. Create Job
     const job = await prisma.lLMEvaluationJob.create({
         data: {
-            projectId,
+            environment,
             modelConfigId,
             status: 'PENDING',
             totalRecords
@@ -86,14 +86,14 @@ export async function processEvaluationBatch(jobId) {
         where: {
             userId: LLM_SYSTEM_UUID,
             llmModel: job.modelConfig.modelId,
-            record: { projectId: job.projectId }
+            record: { environment: job.environment }
         },
         select: { recordId: true }
     });
     const evaluatedIds = evaluated.map(e => e.recordId);
     const records = await prisma.dataRecord.findMany({
         where: {
-            projectId: job.projectId,
+            environment: job.environment,
             id: { notIn: evaluatedIds }
         },
         take: BATCH_SIZE,
@@ -266,19 +266,16 @@ export async function getEvaluationJobStatus(jobId) {
         include: {
             modelConfig: {
                 select: { name: true, modelId: true }
-            },
-            project: {
-                select: { name: true }
             }
         }
     });
 }
 /**
- * Get all evaluation jobs for a project
+ * Get all evaluation jobs for an environment
  */
-export async function getProjectEvaluationJobs(projectId, limit = 20) {
+export async function getEnvironmentEvaluationJobs(environment, limit = 20) {
     return prisma.lLMEvaluationJob.findMany({
-        where: { projectId },
+        where: { environment },
         orderBy: { createdAt: 'desc' },
         take: limit,
         include: {
@@ -291,7 +288,7 @@ export async function getProjectEvaluationJobs(projectId, limit = 20) {
 /**
  * Start bulk evaluation for all active models
  */
-export async function startBulkEvaluationAllModels(projectId) {
+export async function startBulkEvaluationAllModels(environment) {
     const activeModels = await prisma.lLMModelConfig.findMany({
         where: { isActive: true },
         orderBy: { priority: 'asc' }
@@ -299,7 +296,7 @@ export async function startBulkEvaluationAllModels(projectId) {
     const jobIds = [];
     for (const model of activeModels) {
         try {
-            const jobId = await startBulkEvaluation(projectId, model.id);
+            const jobId = await startBulkEvaluation(environment, model.id);
             jobIds.push(jobId);
         }
         catch (err) {

@@ -20,7 +20,7 @@ export default function APIStatusPage() {
     const [lastCheckTime, setLastCheckTime] = useState<Date | null>(null);
 
     const endpointList: Omit<EndpointStatus, 'status' | 'statusCode' | 'responseTime' | 'error' | 'lastChecked'>[] = [
-        // Core API endpoints
+        // Admin app endpoints
         { name: 'System Info', endpoint: '/api/admin/info', method: 'GET' },
         { name: 'AI Settings', endpoint: '/api/admin/settings', method: 'GET' },
         { name: 'Projects List', endpoint: '/api/projects', method: 'GET' },
@@ -28,8 +28,8 @@ export default function APIStatusPage() {
         { name: 'AI Balance', endpoint: '/api/ai/balance', method: 'GET' },
         { name: 'AI Status', endpoint: '/api/ai/status', method: 'GET' },
 
-        // Data endpoints
-        { name: 'Records', endpoint: '/api/records?take=1', method: 'GET' },
+        // Cross-app health checks (via proxy to avoid CORS)
+        { name: 'Records', endpoint: '/api/health?app=qa&endpoint=/api/records?take=1', method: 'GET' },
     ];
 
     useEffect(() => {
@@ -59,7 +59,31 @@ export default function APIStatusPage() {
                 const endTime = performance.now();
                 const responseTime = Math.round(endTime - startTime);
 
-                if (response.ok) {
+                // Check if this is a proxy response (from /api/health)
+                const isProxyEndpoint = endpoint.endpoint.startsWith('/api/health');
+
+                if (isProxyEndpoint && response.ok) {
+                    // Parse proxy response
+                    const proxyData = await response.json();
+                    const actualStatusCode = proxyData.statusCode || 500;
+                    const actualOk = proxyData.ok || false;
+
+                    if (actualOk) {
+                        result.status = 'success';
+                        result.statusCode = actualStatusCode;
+                        result.responseTime = responseTime;
+                    } else if (actualStatusCode === 401 || actualStatusCode === 403) {
+                        result.status = 'warning';
+                        result.statusCode = actualStatusCode;
+                        result.responseTime = responseTime;
+                        result.error = 'Authentication required';
+                    } else {
+                        result.status = 'error';
+                        result.statusCode = actualStatusCode;
+                        result.responseTime = responseTime;
+                        result.error = proxyData.data?.error || proxyData.error || 'Request failed';
+                    }
+                } else if (response.ok) {
                     result.status = 'success';
                     result.statusCode = response.status;
                     result.responseTime = responseTime;

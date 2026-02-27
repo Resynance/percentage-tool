@@ -21,33 +21,20 @@ export async function GET(req: NextRequest) {
         const role = profile?.role || 'USER';
 
         const { searchParams } = new URL(req.url);
-        const projectId = searchParams.get('projectId');
+        const environment = searchParams.get('environment');
         const category = searchParams.get('category') as RecordCategory | null;
         const includeReviewed = searchParams.get('includeReviewed') === 'true';
 
-        if (!projectId || projectId.trim() === "" || projectId === "undefined") {
-            return NextResponse.json(
-                { error: 'projectId is required' },
-                { status: 400 }
-            );
-        }
-
-        // Verify project exists (read access allowed for all users)
-        const project = await prisma.project.findUnique({
-            where: { id: projectId },
-            select: { id: true }
-        });
-
-        if (!project) {
-            return NextResponse.json({ error: 'Project not found' }, { status: 404 });
-        }
-
         const whereClause: any = {
-            projectId,
             category: {
                 in: ['TOP_10', 'BOTTOM_10']
             }
         };
+
+        // Filter by environment if provided
+        if (environment && environment.trim() !== "" && environment !== "undefined") {
+            whereClause.environment = environment;
+        }
 
         // Only filter by review status if not including reviewed records
         if (!includeReviewed) {

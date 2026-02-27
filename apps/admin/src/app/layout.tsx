@@ -9,7 +9,6 @@ import Header from "@/components/Header";
 import Sidebar from "@/components/navigation/Sidebar";
 import BugReportButton from "@/components/BugReportButton";
 import { createClient } from '@repo/auth/server'
-import { ProjectProvider } from "@/context/ProjectContext";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -42,17 +41,15 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <ProjectProvider>
-          <div className="app-container">
-            {user && <Sidebar userRole={role} />}
-            <div className="main-content">
-              <Header />
-              <main className="content-area">
-                {children}
-              </main>
-            </div>
+        <div className="app-container">
+          {user && <Sidebar userRole={role} />}
+          <div className="main-content">
+            <Header />
+            <main className="content-area">
+              {children}
+            </main>
           </div>
-        </ProjectProvider>
+        </div>
         {user && <BugReportButton />}
         <Analytics />
         <SpeedInsights />

@@ -4,7 +4,6 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { Inbox } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import RedZoneModal from "./RedZoneModal";
-import { useProjects } from "@/hooks/useProjects";
 
 interface Prompt {
   id: string;
@@ -34,9 +33,6 @@ interface User {
 
 export default function PromptSimilarityPage() {
   const searchParams = useSearchParams();
-  const { projects, selectedProjectId, setSelectedProjectId } = useProjects({
-    initialProjectId: searchParams?.get("projectId") || undefined,
-  });
 
   const [allPrompts, setAllPrompts] = useState<Prompt[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -52,12 +48,12 @@ export default function PromptSimilarityPage() {
   const [computingCrossEncoder, setComputingCrossEncoder] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    if (!selectedProjectId) return;
-
     const fetchPrompts = async () => {
       try {
         const url = new URL("/api/analysis/prompts", window.location.origin);
-        url.searchParams.set("projectId", selectedProjectId);
+        if (selectedEnvironment) {
+          url.searchParams.set("environment", selectedEnvironment);
+        }
 
         const response = await fetch(url.toString());
         const data = await response.json();
@@ -76,7 +72,7 @@ export default function PromptSimilarityPage() {
     };
 
     fetchPrompts();
-  }, [selectedProjectId]);
+  }, [selectedEnvironment]);
 
   const filteredUsers = useMemo(() => {
     if (!userSearch) return users;
@@ -118,7 +114,7 @@ export default function PromptSimilarityPage() {
   }, [selectedUserId, selectedEnvironment, allPrompts]);
 
   useEffect(() => {
-    if (!selectedPrompt || !selectedProjectId) {
+    if (!selectedPrompt) {
       setSimilarPrompts([]);
       return;
     }
@@ -129,9 +125,13 @@ export default function PromptSimilarityPage() {
       setError(null);
 
       try {
-        const response = await fetch(
-          `/api/analysis/prompt-similarity?projectId=${selectedProjectId}&recordId=${selectedPrompt.id}`,
-        );
+        const url = new URL("/api/analysis/prompt-similarity", window.location.origin);
+        url.searchParams.set("recordId", selectedPrompt.id);
+        if (selectedEnvironment) {
+          url.searchParams.set("environment", selectedEnvironment);
+        }
+
+        const response = await fetch(url.toString());
         const data = await response.json();
 
         if (data.error) {
@@ -173,7 +173,7 @@ export default function PromptSimilarityPage() {
     };
 
     fetchSimilarity();
-  }, [selectedPrompt, selectedProjectId]);
+  }, [selectedPrompt, selectedEnvironment]);
 
   // Scroll ref for the left prompts list so we can reset scroll when user filter changes
   const promptsListRef = useRef<HTMLDivElement | null>(null);
@@ -342,17 +342,11 @@ export default function PromptSimilarityPage() {
         </div>
       </div>
 
-      {projects.length === 0 ? (
+      {allPrompts.length === 0 ? (
         <div style={{ padding: '80px', textAlign: 'center', width: '100%' }}>
           <Inbox size={48} style={{ margin: '0 auto 16px', opacity: 0.3 }} />
-          <div style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '8px', opacity: 0.6 }}>No projects available</div>
-          <div style={{ fontSize: '0.9rem', opacity: 0.4 }}>Create a project to begin using similarity analysis</div>
-        </div>
-      ) : !selectedProjectId ? (
-        <div style={{ padding: '80px', textAlign: 'center', width: '100%' }}>
-          <Inbox size={48} style={{ margin: '0 auto 16px', opacity: 0.3 }} />
-          <div style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '8px', opacity: 0.6 }}>No project selected</div>
-          <div style={{ fontSize: '0.9rem', opacity: 0.4 }}>Select a project from the dropdown above to view prompts</div>
+          <div style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '8px', opacity: 0.6 }}>No prompts available</div>
+          <div style={{ fontSize: '0.9rem', opacity: 0.4 }}>Ingest data to begin using similarity analysis</div>
         </div>
       ) : (
         <div
@@ -904,7 +898,7 @@ export default function PromptSimilarityPage() {
       <RedZoneModal
         isOpen={showRedZoneModal}
         onClose={() => setShowRedZoneModal(false)}
-        projectId={selectedProjectId}
+        environment={selectedEnvironment}
         threshold={redZoneThreshold}
       />
     </div>

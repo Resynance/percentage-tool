@@ -4,7 +4,7 @@
  * Calculates semantic similarity between prompts using vector embeddings.
  * Uses pgvector's cosine distance operator for efficient similarity search.
  *
- * GET /api/analysis/prompt-similarity?projectId={id}&recordId={id}
+ * GET /api/analysis/prompt-similarity?environment={id}&recordId={id}
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@repo/database';
@@ -26,10 +26,10 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const projectId = req.nextUrl.searchParams.get('projectId');
+    const environment = req.nextUrl.searchParams.get('environment');
     const recordId = req.nextUrl.searchParams.get('recordId');
 
-    if (!projectId || !recordId) {
+    if (!environment || !recordId) {
         return NextResponse.json({ error: 'Project ID and Record ID are required' }, { status: 400 });
     }
 
@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
         if (!targetPrompt.has_embedding) {
             console.error('Similarity API Error: Target prompt missing embedding', {
                 recordId,
-                projectId
+                environment
             });
             return NextResponse.json({
                 error: 'Target prompt does not have an embedding yet. Please wait for vectorization to complete or trigger it manually.'
@@ -67,7 +67,7 @@ export async function GET(req: NextRequest) {
                 "createdAt",
                 ROUND((1 - (embedding <=> (SELECT embedding FROM public.data_records WHERE id = ${recordId}))) * 100) as similarity
             FROM public.data_records
-            WHERE "projectId" = ${projectId}
+            WHERE "environment" = ${environment}
             AND type = 'TASK'
             AND "createdById" = ${targetPrompt.createdById}
             AND id != ${recordId}
@@ -79,7 +79,7 @@ export async function GET(req: NextRequest) {
 
         console.log('Similarity API: Calculated prompt similarities', {
             recordId,
-            projectId,
+            environment,
             userId: user.id,
             comparedCount: similarPrompts.length,
             topSimilarity: similarPrompts[0]?.similarity || 0

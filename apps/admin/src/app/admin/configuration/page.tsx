@@ -3,11 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Trash2, Database, RefreshCcw, Sparkles, AlertTriangle, Loader2, XCircle, CheckCircle2, Cloud, Server, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
-
-interface Project {
-    id: string;
-    name: string;
-}
+import { EnvironmentFilter } from '@repo/ui/components';
 
 interface AnalyticsJob {
     id: string;
@@ -29,8 +25,7 @@ interface SystemInfo {
 }
 
 export default function AdminConsole() {
-    const [projects, setProjects] = useState<Project[]>([]);
-    const [selectedProjectId, setSelectedProjectId] = useState<string>('');
+    const [environment, setEnvironment] = useState<string>('');
     const [clearing, setClearing] = useState(false);
     const [bulkAligning, setBulkAligning] = useState(false);
     const [status, setStatus] = useState<{ type: 'success' | 'error' | 'warning', message: string } | null>(null);
@@ -49,33 +44,18 @@ export default function AdminConsole() {
         }
     };
 
-    // Fetch projects and system info on load
+    // Fetch system info on load
     useEffect(() => {
-        const fetchProjects = async () => {
-            try {
-                const res = await fetch('/api/projects');
-                const data = await res.json();
-                const projectsArray = Array.isArray(data) ? data : (data.projects || []);
-                setProjects(projectsArray);
-                if (projectsArray.length > 0) {
-                    setSelectedProjectId(projectsArray[0].id);
-                }
-            } catch (err) {
-                console.error('Failed to fetch projects', err);
-            }
-        };
-
-        fetchProjects();
         fetchSystemInfo();
     }, []);
 
     // Polling for active job status
     useEffect(() => {
         let interval: NodeJS.Timeout;
-        if (selectedProjectId) {
+        if (environment) {
             // Initial fetch of jobs
             const fetchJobs = async () => {
-                const res = await fetch(`/api/admin/bulk-align?projectId=${selectedProjectId}`);
+                const res = await fetch(`/api/admin/bulk-align?environment=${environment}`);
                 const data = await res.json();
                 if (res.ok && data.length > 0) {
                     const latest = data[0];
@@ -89,7 +69,7 @@ export default function AdminConsole() {
 
             interval = setInterval(async () => {
                 try {
-                    const res = await fetch(`/api/admin/bulk-align?projectId=${selectedProjectId}`);
+                    const res = await fetch(`/api/admin/bulk-align?environment=${environment}`);
                     const data = await res.json();
                     if (res.ok && data.length > 0) {
                         const latestJob = data[0];
@@ -106,7 +86,7 @@ export default function AdminConsole() {
             }, 3000); // Poll every 3 seconds for bulk jobs (LLM work is slower than ingestion)
         }
         return () => clearInterval(interval);
-    }, [selectedProjectId]);
+    }, [environment]);
 
     const handleClear = async (target: 'ALL_DATA' | 'ANALYTICS_ONLY') => {
         const confirmMsg = target === 'ALL_DATA'
@@ -143,7 +123,7 @@ export default function AdminConsole() {
      * Starts a background process to score all records that haven't been analyzed yet.
      */
     const handleBulkAlign = async () => {
-        if (!selectedProjectId) return;
+        if (!environment) return;
 
         setBulkAligning(true);
         setStatus(null);
@@ -152,7 +132,7 @@ export default function AdminConsole() {
             const res = await fetch('/api/admin/bulk-align', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ projectId: selectedProjectId }),
+                body: JSON.stringify({ environment }),
             });
 
             const data = await res.json();
@@ -268,32 +248,21 @@ export default function AdminConsole() {
                     </div>
                 )}
 
-                {/* PROJECT SELECTION FOR BULK WORK */}
+                {/* ENVIRONMENT SELECTION FOR BULK WORK */}
                 <div className="glass-card" style={{ padding: '32px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
                         <Database size={24} color="var(--accent)" />
-                        <h2 style={{ fontSize: '1.5rem' }}>Project Context</h2>
+                        <h2 style={{ fontSize: '1.5rem' }}>Environment Context</h2>
                     </div>
 
                     <div style={{ marginBottom: '24px' }}>
-                        <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', opacity: 0.6 }}>Select Project to Manage</label>
-                        <select
-                            value={selectedProjectId}
-                            onChange={(e) => setSelectedProjectId(e.target.value)}
-                            style={{
-                                width: '100%',
-                                background: 'rgba(255,255,255,0.05)',
-                                color: 'white',
-                                border: '1px solid var(--border)',
-                                padding: '12px',
-                                borderRadius: '8px',
-                                outline: 'none'
-                            }}
-                        >
-                            {projects.map(p => (
-                                <option key={p.id} value={p.id}>{p.name}</option>
-                            ))}
-                        </select>
+                        <EnvironmentFilter
+                            value={environment}
+                            onChange={setEnvironment}
+                            apiUrl="/api/environments"
+                            label="Select Environment to Manage"
+                            includeAll={true}
+                        />
                     </div>
 
                     {/* Bulk Alignment Tool */}
@@ -303,7 +272,7 @@ export default function AdminConsole() {
                             <h3 style={{ margin: 0 }}>Bulk Alignment Scoring</h3>
                         </div>
                         <p style={{ fontSize: '0.9rem', opacity: 0.7, lineHeight: '1.6', marginBottom: '20px' }}>
-                            Iterates through all records in the selected project that do not have an alignment score and generates them using the project guidelines.
+                            Iterates through all records in the selected environment that do not have an alignment score and generates them using the system guidelines.
                         </p>
 
                         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px', padding: '16px', background: 'rgba(255,170,0,0.1)', borderRadius: '8px', border: '1px solid rgba(255,170,0,0.2)', marginBottom: '24px' }}>
@@ -341,7 +310,7 @@ export default function AdminConsole() {
                         ) : (
                             <button
                                 onClick={handleBulkAlign}
-                                disabled={bulkAligning || !selectedProjectId}
+                                disabled={bulkAligning || !environment}
                                 className="btn-primary"
                                 style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
                             >
@@ -374,7 +343,7 @@ export default function AdminConsole() {
                     <div style={{ marginBottom: '32px', paddingBottom: '32px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
                         <h3 style={{ fontSize: '1.1rem', marginBottom: '8px' }}>Clear Analytics Results</h3>
                         <p style={{ opacity: 0.6, marginBottom: '16px', lineHeight: '1.6', fontSize: '0.9rem' }}>
-                            Reset saved AI insights across all projects. This will clear the "last analysis" cache but leave your ingested records untouched.
+                            Reset saved AI insights across all environments. This will clear the "last analysis" cache but leave your ingested records untouched.
                         </p>
                         <button
                             onClick={() => handleClear('ANALYTICS_ONLY')}
@@ -398,7 +367,7 @@ export default function AdminConsole() {
                     <div>
                         <h3 style={{ fontSize: '1.1rem', marginBottom: '8px' }}>Wipe All Data</h3>
                         <p style={{ opacity: 0.6, marginBottom: '16px', lineHeight: '1.6', fontSize: '0.9rem' }}>
-                            Permanently delete all ingested Tasks, Feedback, similarity data, and Likert ratings from the database. This action is irreversible. Projects and LLM model usage stats will be preserved, but all records and ratings will be wiped.
+                            Permanently delete all ingested Tasks, Feedback, similarity data, and Likert ratings from the database. This action is irreversible. LLM model usage stats will be preserved, but all records and ratings will be wiped.
                         </p>
                         <button
                             onClick={() => handleClear('ALL_DATA')}

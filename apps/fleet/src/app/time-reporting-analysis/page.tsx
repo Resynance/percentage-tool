@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
 import { AppSwitcher } from '@repo/ui';
+import { Calendar, X, RefreshCw } from 'lucide-react';
 
 interface Flag {
   id: string;
@@ -493,41 +494,75 @@ export default function TimeReportingAnalysisPage() {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: '16px', alignItems: 'end' }}>
             <div>
-              <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-secondary)' }}>
+              <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-secondary)', fontWeight: 500 }}>
                 Start Date
               </label>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  backgroundColor: 'var(--bg-secondary)',
-                  border: '1px solid var(--border-primary)',
-                  borderRadius: '6px',
-                  color: 'var(--text-primary)',
-                }}
-              />
+              <div style={{ position: 'relative' }}>
+                <Calendar
+                  className="w-4 h-4"
+                  style={{
+                    position: 'absolute',
+                    left: '12px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    color: 'var(--accent)',
+                    pointerEvents: 'none',
+                    zIndex: 1
+                  }}
+                />
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '12px 12px 12px 36px',
+                    backgroundColor: 'rgba(var(--accent-rgb), 0.05)',
+                    border: '2px solid var(--accent)',
+                    borderRadius: '6px',
+                    color: 'var(--text-primary)',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    cursor: 'pointer'
+                  }}
+                />
+              </div>
             </div>
 
             <div>
-              <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-secondary)' }}>
+              <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-secondary)', fontWeight: 500 }}>
                 End Date
               </label>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  backgroundColor: 'var(--bg-secondary)',
-                  border: '1px solid var(--border-primary)',
-                  borderRadius: '6px',
-                  color: 'var(--text-primary)',
-                }}
-              />
+              <div style={{ position: 'relative' }}>
+                <Calendar
+                  className="w-4 h-4"
+                  style={{
+                    position: 'absolute',
+                    left: '12px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    color: 'var(--accent)',
+                    pointerEvents: 'none',
+                    zIndex: 1
+                  }}
+                />
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '12px 12px 12px 36px',
+                    backgroundColor: 'rgba(var(--accent-rgb), 0.05)',
+                    border: '2px solid var(--accent)',
+                    borderRadius: '6px',
+                    color: 'var(--text-primary)',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    cursor: 'pointer'
+                  }}
+                />
+              </div>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -561,8 +596,24 @@ export default function TimeReportingAnalysisPage() {
             </div>
 
             <div>
-              <button onClick={fetchFlags} disabled={loading} className="btn-secondary" style={{ padding: '12px' }}>
-                ⟳ Refresh
+              <button
+                onClick={fetchFlags}
+                disabled={loading}
+                className="btn-primary"
+                style={{
+                  padding: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  backgroundColor: 'rgba(var(--accent-rgb), 0.15)',
+                  borderColor: 'var(--accent)',
+                  color: 'var(--accent)',
+                  opacity: loading ? 0.5 : 1,
+                  cursor: loading ? 'not-allowed' : 'pointer'
+                }}
+              >
+                <RefreshCw className="w-4 h-4" />
+                Refresh
               </button>
             </div>
 
@@ -574,10 +625,19 @@ export default function TimeReportingAnalysisPage() {
                   setMessage({ type: 'success', text: 'Results cleared' });
                   setTimeout(() => setMessage(null), 2000);
                 }}
-                className="btn-secondary"
-                style={{ padding: '12px' }}
+                className="btn-primary"
+                style={{
+                  padding: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                  borderColor: 'rgb(239, 68, 68)',
+                  color: 'rgb(239, 68, 68)'
+                }}
               >
-                🗑️ Clear Results
+                <X className="w-4 h-4" />
+                Clear Results
               </button>
             </div>
           </div>

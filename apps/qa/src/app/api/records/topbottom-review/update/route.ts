@@ -28,14 +28,11 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    // Verify user owns the project containing this record
+    // Verify record exists
     const record = await prisma.dataRecord.findUnique({
       where: { id: recordId },
       select: {
-        projectId: true,
-        project: {
-          select: { ownerId: true }
-        }
+        environment: true
       }
     });
 
@@ -43,8 +40,9 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Record not found' }, { status: 404 });
     }
 
-    if (role !== 'ADMIN' && record.project.ownerId !== user.id) {
-      return NextResponse.json({ error: 'Forbidden: You do not own this project' }, { status: 403 });
+    // Verify user has appropriate role (FLEET or ADMIN)
+    if (!['FLEET', 'ADMIN'].includes(role)) {
+      return NextResponse.json({ error: 'Forbidden: Insufficient permissions' }, { status: 403 });
     }
 
     // Set the hasBeenReviewed flag to true and update isCategoryCorrect

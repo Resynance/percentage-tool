@@ -32,7 +32,6 @@ export async function logAudit(params) {
                 action: params.action,
                 entityType: params.entityType,
                 entityId: params.entityId,
-                projectId: params.projectId,
                 userId: params.userId,
                 userEmail: params.userEmail,
                 metadata: params.metadata,

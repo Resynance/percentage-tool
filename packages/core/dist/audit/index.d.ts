@@ -21,7 +21,6 @@ export interface LogAuditParams {
     action: AuditAction;
     entityType: EntityType;
     entityId?: string;
-    projectId?: string;
     userId: string;
     userEmail: string;
     metadata?: Record<string, unknown>;

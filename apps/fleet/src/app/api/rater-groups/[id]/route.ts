@@ -35,9 +35,6 @@ export async function GET(
         const group = await prisma.raterGroup.findUnique({
             where: { id },
             include: {
-                project: {
-                    select: { id: true, name: true }
-                },
                 members: {
                     include: {
                         user: {
@@ -117,7 +114,7 @@ export async function PATCH(
             // Check for duplicate name
             const duplicate = await prisma.raterGroup.findFirst({
                 where: {
-                    projectId: existing.projectId,
+                    environment: existing.environment,
                     name: body.name.trim(),
                     id: { not: id }
                 }
@@ -150,7 +147,7 @@ export async function PATCH(
             action: 'RATER_GROUP_UPDATED',
             entityType: 'RATER_GROUP',
             entityId: group.id,
-            projectId: group.projectId,
+            environment: group.environment,
             userId: user.id,
             userEmail: user.email!,
             metadata: { updatedFields: Object.keys(updateData) }
@@ -225,7 +222,7 @@ export async function DELETE(
             action: 'RATER_GROUP_DELETED',
             entityType: 'RATER_GROUP',
             entityId: id,
-            projectId: existing.projectId,
+            environment: existing.environment,
             userId: user.id,
             userEmail: user.email!,
             metadata: { name: existing.name }

@@ -51,104 +51,84 @@ export async function GET(request: NextRequest) {
     const endDate = searchParams.get('endDate');
     const experienceLevel = searchParams.get('experienceLevel');
     const flagStatus = searchParams.get('flagStatus');
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '50');
 
-    // Build date filter
-    const dateFilter: any = {};
+    // Build date filter for SQL
+    const dateConditions: string[] = [];
+    const dateParams: any[] = [];
     if (startDate) {
-      dateFilter.gte = new Date(startDate);
+      dateConditions.push(`work_date >= $${dateParams.length + 1}`);
+      dateParams.push(new Date(startDate));
     }
     if (endDate) {
-      dateFilter.lte = new Date(endDate);
+      dateConditions.push(`work_date <= $${dateParams.length + 1}`);
+      dateParams.push(new Date(endDate));
     }
+    const whereClause = dateConditions.length > 0 ? `WHERE ${dateConditions.join(' AND ')}` : '';
 
-    // Fetch all time reports
-    const reports = await prisma.timeReportRecord.findMany({
-      where: {
-        ...(Object.keys(dateFilter).length > 0 ? { workDate: dateFilter } : {}),
-      },
-      select: {
-        workerName: true,
-        workerEmail: true,
-        hoursWorked: true,
-        workDate: true,
-        notes: true,
-      },
-      orderBy: { workDate: 'asc' },
-    });
+    // Use database-level aggregation for performance (takes advantage of indexes)
+    const aggregationQuery = `
+      SELECT
+        worker_email,
+        worker_name,
+        SUM(hours_worked::numeric) as total_hours,
+        COUNT(*) as report_count,
+        COUNT(DISTINCT work_date) as days_active,
+        MIN(work_date) as first_date,
+        MAX(work_date) as last_date,
+        ARRAY_AGG(notes ORDER BY work_date) as all_notes
+      FROM time_report_records
+      ${whereClause}
+      GROUP BY worker_email, worker_name
+      ORDER BY worker_email
+    `;
 
-    // Aggregate by worker
-    const workerMap = new Map<string, {
-      workerName: string;
-      workerEmail: string;
-      totalHours: number;
-      taskCount: number;
-      dates: Set<string>;
-      firstDate: Date;
-      lastDate: Date;
-    }>();
+    const aggregatedData: any[] = await prisma.$queryRawUnsafe(
+      aggregationQuery,
+      ...dateParams
+    );
 
-    for (const report of reports) {
-      const key = report.workerEmail;
-      if (!workerMap.has(key)) {
-        workerMap.set(key, {
-          workerName: report.workerName,
-          workerEmail: report.workerEmail,
-          totalHours: 0,
-          taskCount: 0,
-          dates: new Set(),
-          firstDate: report.workDate,
-          lastDate: report.workDate,
-        });
-      }
-
-      const worker = workerMap.get(key)!;
-      worker.totalHours += Number(report.hoursWorked);
-
-      // Count tasks from notes (parse activities)
-      const notes = report.notes || '';
-      const activities = notes.split(/[\n|]/).filter(line => line.trim().length > 10);
-      worker.taskCount += activities.length || 1; // Minimum 1 task per report
-
-      worker.dates.add(report.workDate.toISOString().split('T')[0]);
-
-      if (report.workDate < worker.firstDate) {
-        worker.firstDate = report.workDate;
-      }
-      if (report.workDate > worker.lastDate) {
-        worker.lastDate = report.workDate;
-      }
-    }
-
-    // Calculate metrics for each worker
+    // Calculate metrics for each worker (with task counting from notes)
     const workerMetrics: WorkerMetrics[] = [];
-    for (const [email, data] of workerMap.entries()) {
-      const avgHoursPerTask = data.taskCount > 0 ? data.totalHours / data.taskCount : 0;
-      const daysActive = data.dates.size;
-      const tasksPerDay = daysActive > 0 ? data.taskCount / daysActive : 0;
+    for (const row of aggregatedData) {
+      // Count tasks from all notes
+      let totalTasks = 0;
+      const notes = row.all_notes || [];
+      for (const note of notes) {
+        if (!note) continue;
+        const activities = note.split(/[\n|]/).filter((line: string) => line.trim().length > 10);
+        totalTasks += activities.length || 1;
+      }
+
+      const totalHours = parseFloat(row.total_hours) || 0;
+      const daysActive = parseInt(row.days_active) || 0;
+      const avgHoursPerTask = totalTasks > 0 ? totalHours / totalTasks : 0;
+      const tasksPerDay = daysActive > 0 ? totalTasks / daysActive : 0;
 
       // Determine experience level
-      let experienceLevel: 'LOW' | 'MEDIUM' | 'HIGH';
-      if (data.taskCount < 50) {
-        experienceLevel = 'LOW';
-      } else if (data.taskCount < 200) {
-        experienceLevel = 'MEDIUM';
+      let experienceLevelValue: 'LOW' | 'MEDIUM' | 'HIGH';
+      if (totalTasks < 50) {
+        experienceLevelValue = 'LOW';
+      } else if (totalTasks < 200) {
+        experienceLevelValue = 'MEDIUM';
       } else {
-        experienceLevel = 'HIGH';
+        experienceLevelValue = 'HIGH';
       }
 
       workerMetrics.push({
-        workerName: data.workerName,
-        workerEmail: data.workerEmail,
-        totalTasks: data.taskCount,
-        totalHours: data.totalHours,
+        workerName: row.worker_name,
+        workerEmail: row.worker_email,
+        totalTasks,
+        totalHours,
         avgHoursPerTask,
         daysActive,
         tasksPerDay,
-        experienceLevel,
+        experienceLevel: experienceLevelValue,
         flagStatus: 'NORMAL', // Will calculate below
         flagReason: null,
-        firstReportDate: data.firstDate,
-        lastReportDate: data.lastDate,
+        firstReportDate: new Date(row.first_date),
+        lastReportDate: new Date(row.last_date),
       });
     }
 
@@ -196,7 +176,7 @@ export async function GET(request: NextRequest) {
       filteredWorkers = filteredWorkers.filter(w => w.flagStatus === flagStatus);
     }
 
-    // Calculate summary stats
+    // Calculate summary stats (before pagination)
     const summary = {
       totalWorkers: workerMetrics.length,
       teamAvgAHT,
@@ -210,9 +190,23 @@ export async function GET(request: NextRequest) {
       inconsistentWorkers: workerMetrics.filter(w => w.flagStatus === 'INCONSISTENT').length,
     };
 
+    // Apply pagination
+    const totalFiltered = filteredWorkers.length;
+    const totalPages = Math.ceil(totalFiltered / limit);
+    const offset = (page - 1) * limit;
+    const paginatedWorkers = filteredWorkers.slice(offset, offset + limit);
+
     return NextResponse.json({
-      workers: filteredWorkers,
+      workers: paginatedWorkers,
       summary,
+      pagination: {
+        page,
+        limit,
+        totalPages,
+        totalRecords: totalFiltered,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1,
+      },
     });
   } catch (error: any) {
     console.error('Error in screening analysis:', error);

@@ -147,7 +147,7 @@ export async function PATCH(
             action: 'ASSIGNMENT_BATCH_UPDATED',
             entityType: 'ASSIGNMENT_BATCH',
             entityId: batch.id,
-            projectId: batch.projectId,
+            environment: batch.environment,
             userId: user.id,
             userEmail: user.email!,
             metadata: { updatedFields: Object.keys(updateData) }
@@ -190,7 +190,7 @@ export async function DELETE(
     try {
         const existing = await prisma.assignmentBatch.findUnique({
             where: { id },
-            select: { id: true, name: true, projectId: true, status: true }
+            select: { id: true, name: true, environment: true, status: true }
         });
 
         if (!existing) {
@@ -205,7 +205,7 @@ export async function DELETE(
             action: 'ASSIGNMENT_BATCH_DELETED',
             entityType: 'ASSIGNMENT_BATCH',
             entityId: id,
-            projectId: existing.projectId,
+            environment: existing.environment,
             userId: user.id,
             userEmail: user.email!,
             metadata: { name: existing.name }

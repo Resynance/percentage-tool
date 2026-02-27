@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { EnvironmentFilter } from '@repo/ui/components';
 
 interface Task {
   id: string;
@@ -8,11 +9,6 @@ interface Task {
   environment: string;
   createdBy: string;
   createdAt: string;
-}
-
-interface Project {
-  id: string;
-  name: string;
 }
 
 interface SimilarityResult {
@@ -39,12 +35,10 @@ interface SimilarityResult {
 }
 
 export default function FullSimilarityCheckPage() {
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
+  const [environment, setEnvironment] = useState<string>('');
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [environmentFilter, setEnvironmentFilter] = useState<string>('');
   const [userFilter, setUserFilter] = useState<string>('');
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [selectedTaskIdForComparison, setSelectedTaskIdForComparison] = useState<string | null>(null);
@@ -52,7 +46,10 @@ export default function FullSimilarityCheckPage() {
   const [comparing, setComparing] = useState(false);
   const [similarityResults, setSimilarityResults] = useState<SimilarityResult[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
   const pageSize = 25;
+  const [similarityThreshold, setSimilarityThreshold] = useState(50);
   const [comparisonView, setComparisonView] = useState<{
     source: { id: string; content: string; environment: string; createdBy: string; createdAt: string };
     target: { id: string; content: string; environment: string; createdBy: string; createdAt: string; similarity: number };
@@ -61,102 +58,63 @@ export default function FullSimilarityCheckPage() {
   const [aiAnalysisLoading, setAiAnalysisLoading] = useState(false);
   const [aiAnalysisCost, setAiAnalysisCost] = useState<string | null>(null);
 
-  // Fetch projects on mount
+  // Fetch tasks when environment, page, or user filter changes
   useEffect(() => {
-    fetchProjects();
-  }, []);
+    fetchTasks();
+  }, [environment, currentPage, userFilter]);
 
-  // Fetch tasks when project is selected
-  useEffect(() => {
-    if (selectedProjectId) {
-      fetchTasks();
-    }
-  }, [selectedProjectId]);
-
-  // Reset to page 1 when filters change
+  // Reset to page 1 when filters change (but not page itself)
   useEffect(() => {
     setCurrentPage(1);
-  }, [environmentFilter, userFilter]);
-
-  const fetchProjects = async () => {
-    try {
-      const res = await fetch('/api/projects');
-      const data = await res.json();
-      if (data.error) {
-        setError(data.error);
-      } else {
-        setProjects(data.projects || []);
-        if (data.projects && data.projects.length > 0) {
-          setSelectedProjectId(data.projects[0].id);
-        }
-      }
-    } catch (err) {
-      console.error('Failed to fetch projects', err);
-      setError('Failed to load projects');
-    }
-  };
+  }, [environment, userFilter]);
 
   const fetchTasks = async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/full-similarity-check?projectId=${selectedProjectId}`);
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: pageSize.toString(),
+      });
+
+      if (environment) {
+        params.append('environment', environment);
+      }
+
+      if (userFilter) {
+        params.append('user', userFilter);
+      }
+
+      const res = await fetch(`/api/full-similarity-check?${params.toString()}`);
       const data = await res.json();
       if (data.error) {
         setError(data.error);
         setTasks([]);
+        setTotalPages(1);
+        setTotalCount(0);
       } else {
         setTasks(data.tasks || []);
-        // Reset filters when new data is loaded
-        setEnvironmentFilter('');
-        setUserFilter('');
+        setTotalPages(data.pagination?.totalPages || 1);
+        setTotalCount(data.pagination?.totalCount || 0);
       }
     } catch (err) {
       console.error('Failed to fetch tasks', err);
       setError('Failed to load tasks');
       setTasks([]);
+      setTotalPages(1);
+      setTotalCount(0);
     } finally {
       setLoading(false);
     }
   };
 
-  // Get unique environments and users for filter dropdowns
-  const uniqueEnvironments = Array.from(new Set(tasks.map(t => t.environment))).sort();
-  const uniqueUsers = Array.from(new Set(tasks.map(t => t.createdBy))).sort((a, b) => {
-    // Helper to extract last name from display name
-    const getLastName = (name: string) => {
-      // If it's an email, return it as-is (will be sorted to end)
-      if (name.includes('@')) return `zzz${name}`;
+  // Since pagination is now server-side, we don't need client-side filtering
+  // Tasks are already filtered and paginated from the API
+  const paginatedTasks = tasks;
 
-      // Split name into parts
-      const parts = name.trim().split(/\s+/);
-
-      // If only one part, return it
-      if (parts.length === 1) return parts[0];
-
-      // Return the last part (assumed to be last name)
-      return parts[parts.length - 1];
-    };
-
-    const lastNameA = getLastName(a);
-    const lastNameB = getLastName(b);
-
-    // Sort by last name (case-insensitive)
-    return lastNameA.localeCompare(lastNameB, undefined, { sensitivity: 'base' });
-  });
-
-  // Filter tasks based on selected filters
-  const filteredTasks = tasks.filter(task => {
-    const matchesEnvironment = !environmentFilter || task.environment === environmentFilter;
-    const matchesUser = !userFilter || task.createdBy === userFilter;
-    return matchesEnvironment && matchesUser;
-  });
-
-  // Pagination calculations
-  const totalPages = Math.ceil(filteredTasks.length / pageSize);
+  // Calculate display indices for "Showing X-Y of Z"
   const startIndex = (currentPage - 1) * pageSize;
-  const endIndex = startIndex + pageSize;
-  const paginatedTasks = filteredTasks.slice(startIndex, endIndex);
+  const endIndex = startIndex + paginatedTasks.length;
 
   const goToPage = (page: number) => {
     setCurrentPage(Math.max(1, Math.min(page, totalPages)));
@@ -165,6 +123,13 @@ export default function FullSimilarityCheckPage() {
   const comparePrompts = async (scope: 'environment' | 'all') => {
     if (!selectedTaskIdForComparison) return;
 
+    // Get the selected task to retrieve its environment
+    const selectedTask = tasks.find(t => t.id === selectedTaskIdForComparison);
+    if (!selectedTask) {
+      setError('Selected task not found');
+      return;
+    }
+
     setComparing(true);
     setShowCompareOptions(false);
     try {
@@ -172,9 +137,10 @@ export default function FullSimilarityCheckPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          projectId: selectedProjectId,
+          environment: selectedTask.environment,
           taskIds: [selectedTaskIdForComparison],
-          scope
+          scope,
+          threshold: similarityThreshold
         })
       });
       const data = await res.json();
@@ -227,133 +193,120 @@ export default function FullSimilarityCheckPage() {
       <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
         <h1 style={{ marginBottom: '1.5rem' }}>Full Similarity Check</h1>
 
-      {/* Project Selector */}
-      <div style={{ marginBottom: '2rem' }}>
-        <label htmlFor="project-select" style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>
-          Select Project:
-        </label>
-        <select
-          id="project-select"
-          value={selectedProjectId}
-          onChange={(e) => setSelectedProjectId(e.target.value)}
-          style={{
-            padding: '0.5rem',
-            fontSize: '1rem',
-            borderRadius: '4px',
-            border: '1px solid rgba(255, 255, 255, 0.2)',
-            backgroundColor: 'rgba(255, 255, 255, 0.05)',
-            color: 'inherit',
-            minWidth: '300px'
-          }}
-        >
-          <option value="">-- Select a project --</option>
-          {projects.map((project) => (
-            <option key={project.id} value={project.id}>
-              {project.name}
-            </option>
-          ))}
-        </select>
+      {/* Filters Grid */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+        gap: '2rem',
+        marginBottom: '2rem'
+      }}>
+        {/* Environment Selector */}
+        <div>
+          <EnvironmentFilter
+            value={environment}
+            onChange={setEnvironment}
+            apiUrl="/api/environments"
+            label="Select Environment"
+            includeAll={true}
+          />
+        </div>
+
+        {/* User Filter */}
+        <div>
+          <label htmlFor="user-filter" style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>
+            Filter by User (optional):
+          </label>
+          <input
+            id="user-filter"
+            type="text"
+            placeholder="Enter user name or email..."
+            value={userFilter}
+            onChange={(e) => setUserFilter(e.target.value)}
+            style={{
+              padding: '0.5rem',
+              fontSize: '1rem',
+              borderRadius: '4px',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              backgroundColor: 'rgba(255, 255, 255, 0.05)',
+              color: 'inherit',
+              width: '100%'
+            }}
+          />
+          <div style={{
+            marginTop: '0.5rem',
+            fontSize: '0.875rem',
+            color: 'rgba(255, 255, 255, 0.6)'
+          }}>
+            Filter tasks by creator name or email
+          </div>
+        </div>
+
+        {/* Similarity Threshold */}
+        <div>
+          <label htmlFor="similarity-threshold" style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>
+            Similarity Threshold: {similarityThreshold}%
+          </label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <span style={{ fontSize: '0.875rem', color: 'rgba(255, 255, 255, 0.6)', minWidth: '30px' }}>0%</span>
+            <input
+              id="similarity-threshold"
+              type="range"
+              min="0"
+              max="100"
+              step="5"
+              value={similarityThreshold}
+              onChange={(e) => setSimilarityThreshold(Number(e.target.value))}
+              style={{
+                flex: 1,
+                height: '6px',
+                borderRadius: '3px',
+                background: `linear-gradient(to right, rgba(100, 200, 255, 0.3) 0%, rgba(100, 200, 255, 0.3) ${similarityThreshold}%, rgba(255, 255, 255, 0.1) ${similarityThreshold}%, rgba(255, 255, 255, 0.1) 100%)`,
+                outline: 'none',
+                cursor: 'pointer'
+              }}
+            />
+            <span style={{ fontSize: '0.875rem', color: 'rgba(255, 255, 255, 0.6)', minWidth: '40px' }}>100%</span>
+          </div>
+          <div style={{
+            marginTop: '0.5rem',
+            fontSize: '0.875rem',
+            color: 'rgba(255, 255, 255, 0.6)'
+          }}>
+            Only show matches with similarity at or above this threshold
+          </div>
+        </div>
       </div>
 
-      {/* Filters */}
-      {!loading && tasks.length > 0 && (
-        <div style={{
-          display: 'flex',
-          gap: '1rem',
-          marginBottom: '1.5rem',
-          padding: '1rem',
-          backgroundColor: 'rgba(255, 255, 255, 0.03)',
-          borderRadius: '8px',
-          border: '1px solid rgba(255, 255, 255, 0.1)'
-        }}>
-          <div style={{ flex: 1 }}>
-            <label htmlFor="environment-filter" style={{
-              display: 'block',
-              marginBottom: '0.5rem',
+      {/* Clear Filters Button */}
+      {(environment || userFilter || similarityThreshold !== 50) && (
+        <div style={{ marginBottom: '2rem' }}>
+          <button
+            onClick={() => {
+              setEnvironment('');
+              setUserFilter('');
+              setSimilarityThreshold(50);
+            }}
+            style={{
+              padding: '0.5rem 1rem',
               fontSize: '0.875rem',
-              fontWeight: 500,
-              color: 'rgba(255, 255, 255, 0.7)'
-            }}>
-              Filter by Environment:
-            </label>
-            <select
-              id="environment-filter"
-              value={environmentFilter}
-              onChange={(e) => setEnvironmentFilter(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.5rem',
-                fontSize: '0.875rem',
-                borderRadius: '4px',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
-                backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                color: 'inherit'
-              }}
-            >
-              <option value="">All Environments</option>
-              {uniqueEnvironments.map((env) => (
-                <option key={env} value={env}>
-                  {env}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div style={{ flex: 1 }}>
-            <label htmlFor="user-filter" style={{
-              display: 'block',
-              marginBottom: '0.5rem',
-              fontSize: '0.875rem',
-              fontWeight: 500,
-              color: 'rgba(255, 255, 255, 0.7)'
-            }}>
-              Filter by User:
-            </label>
-            <select
-              id="user-filter"
-              value={userFilter}
-              onChange={(e) => setUserFilter(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.5rem',
-                fontSize: '0.875rem',
-                borderRadius: '4px',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
-                backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                color: 'inherit'
-              }}
-            >
-              <option value="">All Users</option>
-              {uniqueUsers.map((user) => (
-                <option key={user} value={user}>
-                  {user}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {(environmentFilter || userFilter) && (
-            <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-              <button
-                onClick={() => {
-                  setEnvironmentFilter('');
-                  setUserFilter('');
-                }}
-                style={{
-                  padding: '0.5rem 1rem',
-                  fontSize: '0.875rem',
-                  borderRadius: '4px',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                  color: 'rgba(255, 255, 255, 0.7)',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                Clear Filters
-              </button>
-            </div>
-          )}
+              borderRadius: '4px',
+              border: '1px solid rgba(255, 100, 100, 0.3)',
+              backgroundColor: 'rgba(255, 100, 100, 0.1)',
+              color: '#ff6b6b',
+              cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(255, 100, 100, 0.2)';
+              e.currentTarget.style.borderColor = 'rgba(255, 100, 100, 0.5)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(255, 100, 100, 0.1)';
+              e.currentTarget.style.borderColor = 'rgba(255, 100, 100, 0.3)';
+            }}
+          >
+            ✕ Clear All Filters
+          </button>
         </div>
       )}
 
@@ -386,8 +339,7 @@ export default function FullSimilarityCheckPage() {
             fontSize: '0.875rem',
             color: 'rgba(255, 255, 255, 0.6)'
           }}>
-            Showing {startIndex + 1}-{Math.min(endIndex, filteredTasks.length)} of {filteredTasks.length} tasks
-            {filteredTasks.length !== tasks.length && ` (filtered from ${tasks.length})`}
+            Showing {startIndex + 1}-{endIndex} of {totalCount} tasks
           </div>
         </div>
       )}
@@ -549,7 +501,7 @@ export default function FullSimilarityCheckPage() {
       )}
 
       {/* Pagination Controls */}
-      {!loading && filteredTasks.length > 0 && totalPages > 1 && (
+      {!loading && tasks.length > 0 && totalPages > 1 && (
         <div style={{
           display: 'flex',
           justifyContent: 'center',
@@ -673,7 +625,7 @@ export default function FullSimilarityCheckPage() {
       )}
 
       {/* No Results After Filtering */}
-      {!loading && tasks.length > 0 && filteredTasks.length === 0 && (
+      {!loading && totalCount === 0 && (environment || userFilter) && (
         <div style={{
           padding: '2rem',
           textAlign: 'center',
@@ -686,7 +638,7 @@ export default function FullSimilarityCheckPage() {
           </p>
           <button
             onClick={() => {
-              setEnvironmentFilter('');
+              setEnvironment('');
               setUserFilter('');
             }}
             style={{
@@ -705,13 +657,8 @@ export default function FullSimilarityCheckPage() {
       )}
 
       {/* Empty State */}
-      {!loading && tasks.length === 0 && selectedProjectId && (
-        <p style={{ color: 'rgba(255, 255, 255, 0.6)' }}>No tasks found for this project.</p>
-      )}
-
-      {/* No Project Selected */}
-      {!loading && !selectedProjectId && (
-        <p style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Please select a project to view tasks.</p>
+      {!loading && totalCount === 0 && !environment && !userFilter && (
+        <p style={{ color: 'rgba(255, 255, 255, 0.6)' }}>No tasks found in the system.</p>
       )}
 
       {/* Task Detail Modal */}
@@ -974,9 +921,9 @@ export default function FullSimilarityCheckPage() {
                   e.currentTarget.style.borderColor = 'rgba(100, 200, 255, 0.3)';
                 }}
               >
-                <strong>All Prompts in Project</strong>
+                <strong>All Prompts</strong>
                 <div style={{ fontSize: '0.875rem', color: 'rgba(255, 255, 255, 0.6)', marginTop: '0.25rem' }}>
-                  Compare against all prompts in the entire project
+                  Compare against all prompts in the system
                 </div>
               </button>
 
@@ -1044,7 +991,7 @@ export default function FullSimilarityCheckPage() {
                 color: 'rgba(255, 255, 255, 0.9)',
                 margin: 0
               }}>
-                Similarity Results (≥90%)
+                Similarity Results (≥{similarityThreshold}%)
               </h2>
               <button
                 onClick={() => setSimilarityResults([])}
@@ -1221,7 +1168,7 @@ export default function FullSimilarityCheckPage() {
                     color: 'rgba(255, 255, 255, 0.5)',
                     fontSize: '0.875rem'
                   }}>
-                    No similar prompts found (≥90% threshold)
+                    No similar prompts found (≥{similarityThreshold}% threshold)
                   </div>
                 )}
               </div>

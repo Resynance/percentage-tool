@@ -40,7 +40,7 @@ export async function DELETE(
             },
             include: {
                 raterGroup: {
-                    select: { name: true, projectId: true }
+                    select: { name: true, environment: true }
                 },
                 user: {
                     select: { email: true }
@@ -77,7 +77,7 @@ export async function DELETE(
             action: 'RATER_GROUP_MEMBER_REMOVED',
             entityType: 'RATER_GROUP',
             entityId: id,
-            projectId: membership.raterGroup.projectId,
+            environment: membership.raterGroup.environment,
             userId: user.id,
             userEmail: user.email!,
             metadata: {

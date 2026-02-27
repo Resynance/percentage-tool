@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
     try {
         const searchParams = request.nextUrl.searchParams;
         const status = searchParams.get('status'); // PENDING, IN_PROGRESS, COMPLETED
-        const projectId = searchParams.get('projectId');
+        const environment = searchParams.get('environment');
 
         // Find batches where user is:
         // 1. Directly assigned (assignedToUserId)
@@ -47,8 +47,8 @@ export async function GET(request: NextRequest) {
             status: { not: 'CANCELLED' }
         };
 
-        if (projectId) {
-            batchWhere.projectId = projectId;
+        if (environment) {
+            batchWhere.environment = environment;
         }
 
         if (status) {

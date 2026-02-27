@@ -4,7 +4,7 @@
  * Fetches all task prompts for a project along with their creators.
  * Used by the prompt comparison and analysis features.
  *
- * GET /api/analysis/prompts?projectId={id}
+ * GET /api/analysis/prompts?environment={id}
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@repo/database';
@@ -18,19 +18,22 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const projectId = req.nextUrl.searchParams.get('projectId');
-    if (!projectId) {
-        return NextResponse.json({ error: 'Project ID is required' }, { status: 400 });
-    }
+    const environment = req.nextUrl.searchParams.get('environment');
+    const limit = parseInt(req.nextUrl.searchParams.get('limit') || '1000');
 
-    // Fetch prompts from database
+    // Fetch prompts from database (filter by environment if provided)
+    // Limit to most recent to prevent performance issues
     let prompts;
     try {
+        const where: any = {
+            type: 'TASK'
+        };
+        if (environment) {
+            where.environment = environment;
+        }
+
         prompts = await prisma.dataRecord.findMany({
-            where: {
-                projectId,
-                type: 'TASK'
-            },
+            where,
             select: {
                 id: true,
                 content: true,
@@ -41,11 +44,12 @@ export async function GET(req: NextRequest) {
                 createdByName: true,
                 createdAt: true,
             },
-            orderBy: { createdAt: 'desc' }
+            orderBy: { createdAt: 'desc' },
+            take: Math.min(limit, 2000) // Cap at 2000 for safety
         });
     } catch (dbError: any) {
         console.error('Prompts API Error: Database query failed', {
-            projectId,
+            environment,
             error: dbError.message
         });
         return NextResponse.json({
@@ -53,13 +57,13 @@ export async function GET(req: NextRequest) {
         }, { status: 500 });
     }
 
-    // Process user list
+    // Process user list - optimize by only fetching unique users
     try {
         // Get unique user IDs who have created prompts
         const uniqueUserIds = Array.from(new Set(prompts.map(p => p.createdById).filter(Boolean))) as string[];
 
-        // Fetch profiles from database to get firstName and lastName for sorting
-        const profiles = await prisma.profile.findMany({
+        // Fetch profiles in a single optimized query with index usage
+        const profiles = uniqueUserIds.length > 0 ? await prisma.profile.findMany({
             where: {
                 id: { in: uniqueUserIds }
             },
@@ -69,7 +73,7 @@ export async function GET(req: NextRequest) {
                 lastName: true,
                 email: true
             }
-        });
+        }) : [];
 
         // Create user list with proper names and sort by lastName, then firstName
         const users = uniqueUserIds
@@ -138,17 +142,18 @@ export async function GET(req: NextRequest) {
             })
             .map(({ id, name }) => ({ id, name })); // Remove sorting fields from final output
 
-        console.log('Prompts API: Fetched prompts successfully', {
-            projectId,
+        console.log('[Prompts API] Fetched prompts successfully', {
+            environment: environment || 'all',
             userId: user.id,
             promptCount: prompts.length,
-            userCount: users.length
+            userCount: users.length,
+            limit
         });
 
         return NextResponse.json({ prompts, users });
     } catch (error: any) {
         console.error('Prompts API Error: Unexpected error during processing', {
-            projectId,
+            environment,
             error: error.message,
             stack: error.stack
         });

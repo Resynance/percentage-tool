@@ -28,12 +28,12 @@ interface FeedbackStats {
     deniedCount: number;
 }
 
-async function getUserStats(projectId: string) {
+async function getUserStats(environment: string) {
     // Fetch all tasks and feedback in one go
     const [taskRecords, feedbackRecords] = await Promise.all([
         prisma.dataRecord.findMany({
             where: {
-                projectId,
+                environment,
                 type: 'TASK',
             },
             select: {
@@ -45,7 +45,7 @@ async function getUserStats(projectId: string) {
         }),
         prisma.dataRecord.findMany({
             where: {
-                projectId,
+                environment,
                 type: 'FEEDBACK',
             },
             select: {
@@ -113,11 +113,11 @@ async function getUserStats(projectId: string) {
     return Array.from(userStatsMap.values());
 }
 
-async function getUserFeedbackDetails(projectId: string, userId: string) {
+async function getUserFeedbackDetails(environment: string, userId: string) {
     // Fetch all tasks for this user
     const taskRecords = await prisma.dataRecord.findMany({
         where: {
-            projectId,
+            environment,
             type: 'TASK',
             createdById: userId,
         },
@@ -152,7 +152,7 @@ async function getUserFeedbackDetails(projectId: string, userId: string) {
     }>>`
         SELECT id, metadata, content, "createdAt"
         FROM data_records
-        WHERE "projectId" = ${projectId}
+        WHERE "environment" = ${environment}
           AND type = 'FEEDBACK'
           AND metadata->>'task_key' = ANY(${taskKeysArray})
     `;
@@ -191,12 +191,12 @@ async function getUserFeedbackDetails(projectId: string, userId: string) {
     });
 }
 
-async function getCandidateStatus(projectId: string, userId: string) {
+async function getCandidateStatus(environment: string, userId: string) {
     const status = await prisma.candidateStatus.findUnique({
         where: {
-            userId_projectId: {
+            userId_environment: {
                 userId,
-                projectId,
+                environment,
             },
         },
         select: {
@@ -218,19 +218,19 @@ async function getCandidateStatus(projectId: string, userId: string) {
 /**
  * GET /api/candidates
  * Query params:
- * - projectId: string (required)
+ * - environment: string (required)
  * - userId: string (optional) - if provided with action=details, returns feedback details
  * - action: string (optional) - 'details' for feedback details, 'status' for candidate status, 'all-statuses' for all statuses in project
  */
 export async function GET(req: NextRequest) {
     try {
         const { searchParams } = new URL(req.url);
-        const projectId = searchParams.get('projectId');
+        const environment = searchParams.get('environment');
         const userId = searchParams.get('userId');
         const action = searchParams.get('action') || 'stats';
 
-        if (!projectId) {
-            return NextResponse.json({ error: 'Missing projectId' }, { status: 400 });
+        if (!environment) {
+            return NextResponse.json({ error: 'Missing environment' }, { status: 400 });
         }
 
         const supabase = await createClient();
@@ -251,18 +251,10 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
-        const project = await prisma.project.findUnique({
-            where: { id: projectId },
-        });
-
-        if (!project) {
-            return NextResponse.json({ error: 'Project not found' }, { status: 404 });
-        }
-
-        // Handle all-statuses action - returns all candidate statuses for the project
+        // Handle all-statuses action - returns all candidate statuses for the environment
         if (action === 'all-statuses') {
             const statuses = await prisma.candidateStatus.findMany({
-                where: { projectId },
+                where: { environment },
                 select: {
                     userId: true,
                     status: true,
@@ -279,7 +271,7 @@ export async function GET(req: NextRequest) {
                     { status: 400 }
                 );
             }
-            const status = await getCandidateStatus(projectId, userId);
+            const status = await getCandidateStatus(environment, userId);
             return NextResponse.json(status);
         }
 
@@ -290,12 +282,12 @@ export async function GET(req: NextRequest) {
                     { status: 400 }
                 );
             }
-            const tasks = await getUserFeedbackDetails(projectId, userId);
+            const tasks = await getUserFeedbackDetails(environment, userId);
             return NextResponse.json({ tasks });
         }
 
         // Default: return stats for all users
-        const userStats = await getUserStats(projectId);
+        const userStats = await getUserStats(environment);
         return NextResponse.json({ userStats });
     } catch (error) {
         console.error('GET /api/candidates error:', error);
@@ -313,7 +305,7 @@ export async function GET(req: NextRequest) {
  * 
  * Body:
  * - userId: string (required)
- * - projectId: string (required)
+ * - environment: string (required)
  * - status: 'ACCEPTED' | 'REJECTED' (required)
  * - email: string (optional, used for upsert)
  */
@@ -338,11 +330,11 @@ export async function POST(req: NextRequest) {
         }
 
         const body = await req.json();
-        const { userId, projectId, status, email } = body;
+        const { userId, environment, status, email } = body;
 
-        if (!userId || !projectId || !status) {
+        if (!userId || !environment || !status) {
             return NextResponse.json(
-                { error: 'userId, projectId, and status are required' },
+                { error: 'userId, environment, and status are required' },
                 { status: 400 }
             );
         }
@@ -354,20 +346,11 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        const project = await prisma.project.findUnique({
-            where: { id: projectId },
-            select: { id: true, ownerId: true }
-        });
-
-        if (!project) {
-            return NextResponse.json({ error: 'Project not found' }, { status: 404 });
-        }
-
         const candidateStatus = await prisma.candidateStatus.upsert({
             where: {
-                userId_projectId: {
+                userId_environment: {
                     userId,
-                    projectId,
+                    environment,
                 },
             },
             update: {
@@ -377,7 +360,7 @@ export async function POST(req: NextRequest) {
             },
             create: {
                 userId,
-                projectId,
+                environment,
                 status,
                 email: email || '',
             },

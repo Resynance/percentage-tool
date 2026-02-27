@@ -36,7 +36,7 @@ export async function POST(
         // Verify group exists
         const group = await prisma.raterGroup.findUnique({
             where: { id },
-            select: { id: true, name: true, projectId: true }
+            select: { id: true, name: true, environment: true }
         });
 
         if (!group) {
@@ -91,7 +91,7 @@ export async function POST(
             action: 'RATER_GROUP_MEMBERS_ADDED',
             entityType: 'RATER_GROUP',
             entityId: id,
-            projectId: group.projectId,
+            environment: group.environment,
             userId: user.id,
             userEmail: user.email!,
             metadata: { addedUserIds: newUserIds, groupName: group.name }

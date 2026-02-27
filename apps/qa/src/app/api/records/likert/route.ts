@@ -5,10 +5,10 @@ import { prisma } from '@repo/database';
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const projectId = searchParams.get('projectId');
+    const environment = searchParams.get('environment');
     const userId = searchParams.get('userId');
 
-    if (!projectId) {
+    if (!environment) {
       return NextResponse.json({ error: 'Project ID is required' }, { status: 400 });
     }
 
@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
     // Fetch records that haven't been rated by this user
     const unratedRecords = await prisma.dataRecord.findMany({
       where: {
-        projectId,
+        environment,
         type: 'TASK',
         id: {
           notIn: ratedIds,

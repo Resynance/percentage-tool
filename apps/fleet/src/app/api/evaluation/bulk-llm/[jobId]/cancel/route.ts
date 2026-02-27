@@ -52,7 +52,7 @@ export async function POST(
             action: 'BULK_EVALUATION_CANCELLED',
             entityType: 'LLM_EVALUATION_JOB',
             entityId: jobId,
-            projectId: job.projectId,
+            environment: job.environment,
             userId: user.id,
             userEmail: user.email!,
             metadata: { modelConfigId: job.modelConfigId }

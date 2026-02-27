@@ -172,10 +172,47 @@ export async function GET(req: Request) {
             }))
         }
 
-        // Get all feedbacks for this task (using task_key from metadata)
+        // Get all feedbacks for this task from two sources:
+        // 1. Feedback records in data_records (legacy)
+        // 2. Ratings in qa_feedback_ratings (new import)
         const taskKey = metadata?.task_key
         const allFeedbacks: FeedbackWithRating[] = []
 
+        // First, get ratings directly linked to this task
+        const directRatings = await prisma.qAFeedbackRating.findMany({
+            where: { evalTaskId: taskId },
+            select: {
+                feedbackId: true,
+                feedbackContent: true,
+                ratingId: true,
+                isHelpful: true,
+                isDispute: true,
+                ratedAt: true,
+                raterEmail: true,
+                qaEmail: true,
+                qaName: true,
+                createdAt: true,
+            },
+            orderBy: { ratedAt: 'desc' }
+        })
+
+        // Add direct ratings to feedback list
+        for (const rating of directRatings) {
+            allFeedbacks.push({
+                feedbackId: rating.feedbackId,
+                feedbackContent: rating.feedbackContent || 'No feedback content',
+                feedbackCreatedAt: rating.ratedAt,
+                qaEmail: rating.qaEmail,
+                qaName: rating.qaName,
+                ratingId: rating.ratingId,
+                isHelpful: rating.isHelpful,
+                isDispute: rating.isDispute,
+                ratedAt: rating.ratedAt,
+                raterEmail: rating.raterEmail,
+            })
+        }
+
+        // Then, get feedback records from data_records (if any)
         if (taskKey) {
             // Use Prisma JSON filtering to query at database level (avoid full table scan)
             const matchingFeedbacks = await prisma.dataRecord.findMany({

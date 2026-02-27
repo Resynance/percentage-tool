@@ -78,7 +78,6 @@ export interface LogAuditParams {
   action: AuditAction;
   entityType: EntityType;
   entityId?: string;
-  projectId?: string;
   userId: string;
   userEmail: string;
   metadata?: Record<string, unknown>;
@@ -102,7 +101,6 @@ export async function logAudit(params: LogAuditParams): Promise<LogAuditResult> 
         action: params.action,
         entityType: params.entityType,
         entityId: params.entityId,
-        projectId: params.projectId,
         userId: params.userId,
         userEmail: params.userEmail,
         metadata: params.metadata as any,

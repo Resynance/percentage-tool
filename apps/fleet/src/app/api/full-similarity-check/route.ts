@@ -24,21 +24,43 @@ export async function GET(req: NextRequest) {
         }
 
         const { searchParams } = new URL(req.url);
-        const projectId = searchParams.get('projectId');
+        const environment = searchParams.get('environment');
+        const page = parseInt(searchParams.get('page') || '1', 10);
+        const limit = parseInt(searchParams.get('limit') || '25', 10);
+        const userFilter = searchParams.get('user');
 
-        if (!projectId) {
-            return NextResponse.json({ error: 'projectId is required' }, { status: 400 });
+        // Build where clause - if environment is empty/null, return all environments
+        const whereClause: any = {
+            type: 'TASK'
+        };
+
+        if (environment) {
+            whereClause.environment = environment;
         }
 
-        // Fetch tasks for the specified project
+        if (userFilter) {
+            whereClause.OR = [
+                { createdByName: userFilter },
+                { createdByEmail: userFilter }
+            ];
+        }
+
+        // Get total count for pagination
+        const totalCount = await prisma.dataRecord.count({
+            where: whereClause
+        });
+
+        // Calculate pagination
+        const skip = (page - 1) * limit;
+        const totalPages = Math.ceil(totalCount / limit);
+
+        // Fetch paginated tasks (filtered by environment if specified)
         const tasks = await prisma.dataRecord.findMany({
-            where: {
-                projectId,
-                type: 'TASK'
-            },
+            where: whereClause,
             select: {
                 id: true,
                 content: true,
+                environment: true,
                 metadata: true,
                 createdByName: true,
                 createdByEmail: true,
@@ -46,19 +68,30 @@ export async function GET(req: NextRequest) {
             },
             orderBy: {
                 createdAt: 'desc'
-            }
+            },
+            skip,
+            take: limit
         });
 
-        // Format the response to extract environment from metadata
+        // Format the response
         const formattedTasks = tasks.map(task => ({
             id: task.id,
             content: task.content,
-            environment: (task.metadata as any)?.environment_name || 'N/A',
+            environment: task.environment || 'N/A',
             createdBy: task.createdByName || task.createdByEmail || 'Unknown',
             createdAt: task.createdAt,
         }));
 
-        return NextResponse.json({ tasks: formattedTasks });
+        return NextResponse.json({
+            tasks: formattedTasks,
+            pagination: {
+                page,
+                limit,
+                totalCount,
+                totalPages,
+                hasMore: page < totalPages
+            }
+        });
     } catch (error: any) {
         console.error('Error fetching tasks:', error);
         return NextResponse.json({ error: error.message }, { status: 500 });

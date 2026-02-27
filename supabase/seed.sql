@@ -59,19 +59,7 @@ END $$;
 -- Clean up existing seed users if they exist
 DO $$
 BEGIN
-    -- Delete projects owned by seed users first (to avoid FK constraint issues)
-    DELETE FROM public.projects
-    WHERE "ownerId" IN (
-        SELECT id FROM public.profiles
-        WHERE email IN (
-            'user@test.com',
-            'qa@test.com',
-            'core@test.com',
-            'fleet@test.com',
-            'admin@test.com',
-            'manager@test.com'  -- Keep for backward compatibility
-        )
-    );
+    -- Note: Projects table has been removed in favor of environment-based organization
 
     -- Delete profiles
     DELETE FROM public.profiles

@@ -27,7 +27,8 @@ import {
     Bug,
     Clock,
     ScanSearch,
-    SearchCheck
+    SearchCheck,
+    CalendarCheck
 } from 'lucide-react';
 import { useState } from 'react';
 import { AppSwitcher } from '@repo/ui/components';
@@ -57,8 +58,16 @@ export default function Sidebar({ userRole }: { userRole?: string }) {
             items: [
                 { label: 'Analytics', href: '/analytics', icon: BarChart3 },
                 { label: 'Ingest Data', href: '/ingest', icon: Database },
-                { label: 'Project Management', href: '/manage', icon: Settings },
+                { label: 'Guidelines', href: '/guidelines', icon: FileCheck },
+            ]
+        },
+        {
+            title: 'Tasks & Feedback Tools',
+            role: ['FLEET', 'ADMIN'],
+            items: [
                 { label: 'Full Similarity Check', href: '/full-similarity-check', icon: ScanSearch },
+                { label: 'Prompt Authenticity Checker', href: '/prompt-authenticity', icon: SearchCheck },
+                { label: 'QA Feedback Analysis', href: '/qa-feedback-analysis', icon: MessageSquare },
             ]
         },
         {
@@ -69,8 +78,7 @@ export default function Sidebar({ userRole }: { userRole?: string }) {
                 { label: 'Bonus Windows', href: '/bonus-windows', icon: Target },
                 { label: 'Time Reporting - Quick Screen', href: '/time-reporting-screening', icon: Clock },
                 { label: 'Time Reporting - Deep Analysis', href: '/time-reporting-analysis', icon: Clock },
-                { label: 'QA Feedback Analysis', href: '/qa-feedback-analysis', icon: MessageSquare },
-                { label: 'Prompt Authenticity Checker', href: '/prompt-authenticity', icon: SearchCheck },
+                { label: 'Time Reporting - Meetings', href: '/time-reporting-meetings', icon: CalendarCheck },
             ]
         },
         {

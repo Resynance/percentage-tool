@@ -31,28 +31,18 @@ export async function GET(request: NextRequest) {
 
     try {
         const searchParams = request.nextUrl.searchParams;
-        const projectId = searchParams.get('projectId');
+        const environment = searchParams.get('environment');
         const format = searchParams.get('format') || 'csv';
         const includeContent = searchParams.get('includeContent') === 'true';
 
-        if (!projectId) {
-            return NextResponse.json({ error: 'projectId is required' }, { status: 400 });
-        }
-
-        // Get project info
-        const project = await prisma.project.findUnique({
-            where: { id: projectId },
-            select: { name: true }
-        });
-
-        if (!project) {
-            return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+        if (!environment) {
+            return NextResponse.json({ error: 'environment is required' }, { status: 400 });
         }
 
         // Get all scores with related data
         const scores = await prisma.likertScore.findMany({
             where: {
-                record: { projectId }
+                record: { environment }
             },
             include: {
                 record: {
@@ -90,7 +80,7 @@ export async function GET(request: NextRequest) {
 
         if (format === 'json') {
             return NextResponse.json({
-                project: project.name,
+                environment,
                 exportedAt: new Date().toISOString(),
                 totalScores: exportData.length,
                 data: exportData
@@ -127,7 +117,7 @@ export async function GET(request: NextRequest) {
         ];
 
         const csv = csvRows.join('\n');
-        const filename = `likert-scores-${project.name.replace(/[^a-z0-9]/gi, '-')}-${new Date().toISOString().split('T')[0]}.csv`;
+        const filename = `likert-scores-${environment.replace(/[^a-z0-9]/gi, '-')}-${new Date().toISOString().split('T')[0]}.csv`;
 
         return new NextResponse(csv, {
             headers: {

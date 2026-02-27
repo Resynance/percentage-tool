@@ -1,9 +1,9 @@
 import { Prisma } from '@repo/database';
 import { RecordType } from '@repo/types';
 export interface IngestOptions {
-    projectId: string;
+    environment?: string;
     source: string;
-    type: RecordType;
+    type?: RecordType;
     filterKeywords?: string[];
     generateEmbeddings?: boolean;
 }
@@ -13,6 +13,8 @@ export interface IngestOptions {
  * NOTE: Stores payload and options in database instead of memory for serverless compatibility.
  * Vercel functions are stateless and terminate after sending HTTP response,
  * so in-memory caches don't persist across invocations.
+ *
+ * Environment and type can be extracted from CSV data if not provided.
  */
 export declare function startBackgroundIngest(type: 'CSV' | 'API', payload: string, options: IngestOptions): Promise<string>;
 /**
@@ -23,15 +25,18 @@ export declare function startBackgroundIngest(type: 'CSV' | 'API', payload: stri
  * SERVERLESS COMPATIBILITY: This function is called by the status endpoint on each poll
  * to ensure jobs actually get processed (since background triggers get killed when the
  * serverless function terminates after returning the HTTP response).
+ *
+ * If environment is provided, only processes jobs for that environment.
+ * If not provided, processes jobs for all environments.
  */
-export declare function processQueuedJobs(projectId: string): Promise<void>;
+export declare function processQueuedJobs(environment?: string): Promise<void>;
 /**
  * Phase 1: Data Loading
  * Parses records, filters by content/keywords, detects categories, and prevents duplicates.
  *
  * New Feature: Detailed Skip Tracking
  * - Tracks 'Keyword Mismatch' (filtered out by user keywords)
- * - Tracks 'Duplicate ID' (existing Task ID or Feedback ID in project)
+ * - Tracks 'Duplicate ID' (existing Task ID or Feedback ID in environment)
  * - Updates `IngestJob.skippedDetails` JSON for UI visibility.
  */
 export declare function processAndStore(records: any[], options: IngestOptions, jobId: string): Promise<{
@@ -46,18 +51,18 @@ export declare function processAndStore(records: any[], options: IngestOptions, 
 export declare function cancelIngest(jobId: string): Promise<void>;
 export declare function getIngestStatus(jobId: string): Promise<{
     id: string;
-    type: import("@prisma/client").$Enums.RecordType;
+    environment: string;
+    createdAt: Date;
+    error: string | null;
+    updatedAt: Date;
     status: string;
     totalRecords: number;
+    type: import("@prisma/client").$Enums.RecordType;
     savedCount: number;
     skippedCount: number;
     skippedDetails: Prisma.JsonValue | null;
-    error: string | null;
     payload: string | null;
     options: Prisma.JsonValue | null;
-    createdAt: Date;
-    updatedAt: Date;
-    projectId: string;
 } | null>;
 export declare function deleteIngestedData(jobId: string): Promise<void>;
 //# sourceMappingURL=index.d.ts.map

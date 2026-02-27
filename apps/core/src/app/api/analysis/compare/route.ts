@@ -47,7 +47,6 @@ export async function POST(req: NextRequest) {
     try {
         record = await prisma.dataRecord.findUnique({
             where: { id: recordId },
-            include: { project: true }
         });
     } catch (dbError: any) {
         console.error('Compare API Error: Database query failed', {
@@ -65,16 +64,17 @@ export async function POST(req: NextRequest) {
 
     try {
 
-        // Verify user owns the project (write operation - ownership required)
+        // Verify user has appropriate permissions (CORE role and above can generate alignment analysis)
         const profile = await prisma.profile.findUnique({
             where: { id: user.id },
             select: { role: true }
         });
         const role = profile?.role || 'USER';
 
-        if (role !== 'ADMIN' && record.project.ownerId !== user.id) {
+        const allowedRoles = ['CORE', 'FLEET', 'ADMIN'];
+        if (!allowedRoles.includes(role)) {
             return NextResponse.json({
-                error: 'Forbidden: Only project owners can generate alignment analysis'
+                error: 'Forbidden: Insufficient permissions to generate alignment analysis'
             }, { status: 403 });
         }
 
@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
         if (record.alignmentAnalysis && !forceRegenerate) {
             console.log('Compare API: Returned cached alignment analysis', {
                 recordId: record.id,
-                projectId: record.projectId,
+                environment: record.environment,
                 userId: user.id,
                 cached: true
             });
@@ -105,7 +105,7 @@ export async function POST(req: NextRequest) {
 
         if (!base64Data) {
             console.error('Compare API Error: Guidelines data is not in expected base64 format', {
-                projectId: record.projectId,
+                environment: record.environment,
                 recordId: record.id
             });
             return NextResponse.json({
@@ -120,7 +120,7 @@ export async function POST(req: NextRequest) {
 
             if (!guidelinesText || guidelinesText.trim().length === 0) {
                 console.error('Compare API Error: PDF parsed successfully but contains no text content', {
-                    projectId: record.projectId,
+                    environment: record.environment,
                     recordId: record.id
                 });
                 return NextResponse.json({
@@ -129,7 +129,7 @@ export async function POST(req: NextRequest) {
             }
         } catch (pdfError: any) {
             console.error('Compare API Error: PDF parsing failed', {
-                projectId: record.projectId,
+                environment: record.environment,
                 recordId: record.id,
                 error: pdfError.message,
                 stack: pdfError.stack
@@ -163,7 +163,7 @@ export async function POST(req: NextRequest) {
             result = await generateCompletionWithUsage(prompt, systemPrompt);
         } catch (aiError: any) {
             console.error('Compare API Error: AI service failed', {
-                projectId: record.projectId,
+                environment: record.environment,
                 recordId: record.id,
                 error: aiError.message,
                 stack: aiError.stack
@@ -181,7 +181,7 @@ export async function POST(req: NextRequest) {
             });
         } catch (updateError: any) {
             console.error('Compare API Error: Failed to save analysis to database', {
-                projectId: record.projectId,
+                environment: record.environment,
                 recordId: record.id,
                 error: updateError.message
             });
@@ -192,7 +192,7 @@ export async function POST(req: NextRequest) {
         // Log successful operation
         console.log('Compare API: Alignment analysis generated', {
             recordId: record.id,
-            projectId: record.projectId,
+            environment: record.environment,
             userId: user.id,
             wasRegenerated: forceRegenerate,
             cached: false,

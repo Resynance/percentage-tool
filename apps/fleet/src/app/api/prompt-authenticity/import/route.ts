@@ -183,8 +183,8 @@ export async function POST(request: NextRequest) {
     const promptIdx = header.findIndex(h => h === 'prompt');
     const versionNoIdx = header.findIndex(h => h === 'version_no');
     const isActiveIdx = header.findIndex(h => h === 'is_active');
-    const createdByNameIdx = header.findIndex(h => h === 'author_name');
-    const createdByEmailIdx = header.findIndex(h => h === 'author_email');
+    const createdByNameIdx = header.findIndex(h => h === 'created_by_name' || h === 'author_name');
+    const createdByEmailIdx = header.findIndex(h => h === 'created_by_email' || h === 'author_email');
     const createdAtIdx = header.findIndex(h => h === 'task_created_at');
     const envKeyIdx = header.findIndex(h => h === 'env_key');
     const taskLifecycleStatusIdx = header.findIndex(h => h === 'task_lifecycle_status');

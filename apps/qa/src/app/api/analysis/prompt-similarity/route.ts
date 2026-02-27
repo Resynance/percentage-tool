@@ -4,7 +4,7 @@
  * Calculates semantic similarity between prompts using vector embeddings.
  * Uses pgvector's cosine distance operator for efficient similarity search.
  *
- * GET /api/analysis/prompt-similarity?projectId={id}&recordId={id}
+ * GET /api/analysis/prompt-similarity?environment={id}&recordId={id}
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@repo/database';
@@ -27,11 +27,11 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const projectId = req.nextUrl.searchParams.get('projectId');
+    const environment = req.nextUrl.searchParams.get('environment');
     const recordId = req.nextUrl.searchParams.get('recordId');
 
-    if (!projectId || !recordId) {
-        return NextResponse.json({ error: 'Project ID and Record ID are required' }, { status: 400 });
+    if (!recordId) {
+        return NextResponse.json({ error: 'Record ID is required' }, { status: 400 });
     }
 
     try {
@@ -51,7 +51,7 @@ export async function GET(req: NextRequest) {
         if (!targetPrompt.has_embedding) {
             console.error('Similarity API Error: Target prompt missing embedding', {
                 recordId,
-                projectId
+                environment
             });
             return NextResponse.json({
                 error: 'Target prompt does not have an embedding yet. Please wait for vectorization to complete or trigger it manually.'
@@ -60,28 +60,47 @@ export async function GET(req: NextRequest) {
 
         // 2. Get similar prompts from the same user using pgvector's cosine distance
         // Also exclude prompts with identical content (handles duplicate records)
-        const similarPrompts: SimilarPrompt[] = await prisma.$queryRaw`
-            SELECT
-                id,
-                content,
-                category,
-                metadata,
-                "createdAt",
-                ROUND((1 - (embedding <=> (SELECT embedding FROM public.data_records WHERE id = ${recordId}))) * 100) as similarity
-            FROM public.data_records
-            WHERE "projectId" = ${projectId}
-            AND type = 'TASK'
-            AND "createdById" = ${targetPrompt.createdById}
-            AND id != ${recordId}
-            AND embedding IS NOT NULL
-            AND TRIM(content) != (SELECT TRIM(content) FROM public.data_records WHERE id = ${recordId})
-            ORDER BY embedding <=> (SELECT embedding FROM public.data_records WHERE id = ${recordId})
-            LIMIT 50
-        `;
+        // Filter by environment if provided
+        const similarPrompts: SimilarPrompt[] = environment
+            ? await prisma.$queryRaw`
+                SELECT
+                    id,
+                    content,
+                    category,
+                    metadata,
+                    "createdAt",
+                    ROUND((1 - (embedding <=> (SELECT embedding FROM public.data_records WHERE id = ${recordId}))) * 100) as similarity
+                FROM public.data_records
+                WHERE "environment" = ${environment}
+                AND type = 'TASK'
+                AND "createdById" = ${targetPrompt.createdById}
+                AND id != ${recordId}
+                AND embedding IS NOT NULL
+                AND TRIM(content) != (SELECT TRIM(content) FROM public.data_records WHERE id = ${recordId})
+                ORDER BY embedding <=> (SELECT embedding FROM public.data_records WHERE id = ${recordId})
+                LIMIT 50
+            `
+            : await prisma.$queryRaw`
+                SELECT
+                    id,
+                    content,
+                    category,
+                    metadata,
+                    "createdAt",
+                    ROUND((1 - (embedding <=> (SELECT embedding FROM public.data_records WHERE id = ${recordId}))) * 100) as similarity
+                FROM public.data_records
+                WHERE type = 'TASK'
+                AND "createdById" = ${targetPrompt.createdById}
+                AND id != ${recordId}
+                AND embedding IS NOT NULL
+                AND TRIM(content) != (SELECT TRIM(content) FROM public.data_records WHERE id = ${recordId})
+                ORDER BY embedding <=> (SELECT embedding FROM public.data_records WHERE id = ${recordId})
+                LIMIT 50
+            `;
 
         console.log('Similarity API: Calculated prompt similarities', {
             recordId,
-            projectId,
+            environment,
             userId: user.id,
             comparedCount: similarPrompts.length,
             topSimilarity: similarPrompts[0]?.similarity || 0
