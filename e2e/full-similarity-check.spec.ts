@@ -23,27 +23,27 @@ test.describe('Full Similarity Check (FLEET/ADMIN Access)', () => {
     });
 });
 
-test.describe('Full Similarity Check - Project Selection', () => {
-    test('should display project selector', async ({ page }) => {
+test.describe('Full Similarity Check - Environment Selection', () => {
+    test('should display environment selector', async ({ page }) => {
         await page.goto('http://localhost:3004/full-similarity-check');
 
-        // Wait for project selector
-        await page.waitForSelector('select#project-select', { timeout: 5000 });
+        // Wait for environment selector
+        await page.waitForSelector('select#environment-filter', { timeout: 5000 });
 
-        // Should have project dropdown
-        await expect(page.locator('label:has-text("Select Project")')).toBeVisible();
-        await expect(page.locator('select#project-select')).toBeVisible();
+        // Should have environment dropdown
+        await expect(page.locator('label:has-text("Select Environment")')).toBeVisible();
+        await expect(page.locator('select#environment-filter')).toBeVisible();
     });
 
-    test('should load tasks when project is selected', async ({ page }) => {
+    test('should load tasks when environment is selected', async ({ page }) => {
         await page.goto('http://localhost:3004/full-similarity-check');
 
-        // Wait for project selector
-        await page.waitForSelector('select#project-select', { timeout: 5000 });
+        // Wait for environment selector
+        await page.waitForSelector('select#environment-filter', { timeout: 5000 });
 
-        // Select first project
-        const projectSelect = page.locator('select#project-select');
-        await projectSelect.selectOption({ index: 1 }); // Select first non-empty option
+        // Select first environment
+        const envSelect = page.locator('select#environment-filter');
+        await envSelect.selectOption({ index: 0 }); // Select first environment
 
         // Wait for tasks table to appear
         await page.waitForSelector('table', { timeout: 5000 });
@@ -58,44 +58,33 @@ test.describe('Full Similarity Check - Project Selection', () => {
 });
 
 test.describe('Full Similarity Check - Filtering', () => {
-    test('should show filter controls', async ({ page }) => {
+    test('should show filter controls after selecting an environment', async ({ page }) => {
         await page.goto('http://localhost:3004/full-similarity-check');
 
-        // Select a project
-        await page.waitForSelector('select#project-select', { timeout: 5000 });
-        const projectSelect = page.locator('select#project-select');
-        await projectSelect.selectOption({ index: 1 });
+        // Select an environment to load tasks
+        await page.waitForSelector('select#environment-filter', { timeout: 5000 });
+        const envSelect = page.locator('select#environment-filter');
+        await envSelect.selectOption({ index: 0 });
 
-        // Wait for filters to appear
+        // Wait for tasks to load
         await page.waitForTimeout(1000);
 
-        // Check for filter dropdowns
-        await expect(page.locator('label:has-text("Filter by Environment")')).toBeVisible();
+        // Check for user filter dropdown
         await expect(page.locator('label:has-text("Filter by User")')).toBeVisible();
     });
 
     test('should filter by environment', async ({ page }) => {
         await page.goto('http://localhost:3004/full-similarity-check');
 
-        // Select a project
-        await page.waitForSelector('select#project-select', { timeout: 5000 });
-        const projectSelect = page.locator('select#project-select');
-        await projectSelect.selectOption({ index: 1 });
-
-        // Wait for environment filter
+        // Select an environment
         await page.waitForSelector('select#environment-filter', { timeout: 5000 });
-
-        // Get initial task count
-        const initialRows = await page.locator('tbody tr').count();
-
-        // Select an environment filter
         const envFilter = page.locator('select#environment-filter');
-        await envFilter.selectOption({ index: 1 });
+        await envFilter.selectOption({ index: 0 });
 
-        // Wait for filter to apply
+        // Wait for tasks to load
         await page.waitForTimeout(500);
 
-        // Task count should change (or stay the same if all tasks are from that environment)
+        // Task count should be present
         const filteredRows = await page.locator('tbody tr').count();
         expect(filteredRows).toBeGreaterThanOrEqual(0);
     });
@@ -103,10 +92,10 @@ test.describe('Full Similarity Check - Filtering', () => {
     test('should filter by user', async ({ page }) => {
         await page.goto('http://localhost:3004/full-similarity-check');
 
-        // Select a project
-        await page.waitForSelector('select#project-select', { timeout: 5000 });
-        const projectSelect = page.locator('select#project-select');
-        await projectSelect.selectOption({ index: 1 });
+        // Select an environment first
+        await page.waitForSelector('select#environment-filter', { timeout: 5000 });
+        const envFilter = page.locator('select#environment-filter');
+        await envFilter.selectOption({ index: 0 });
 
         // Wait for user filter
         await page.waitForSelector('select#user-filter', { timeout: 5000 });
@@ -128,9 +117,9 @@ test.describe('Full Similarity Check - Task List', () => {
         await page.goto('http://localhost:3004/full-similarity-check');
 
         // Select a project
-        await page.waitForSelector('select#project-select', { timeout: 5000 });
-        const projectSelect = page.locator('select#project-select');
-        await projectSelect.selectOption({ index: 1 });
+        await page.waitForSelector('select#environment-filter', { timeout: 5000 });
+        const envSelect = page.locator('select#environment-filter');
+        await envSelect.selectOption({ index: 0 });
 
         // Wait for table to load
         await page.waitForSelector('tbody tr', { timeout: 5000 });
@@ -148,9 +137,9 @@ test.describe('Full Similarity Check - Task List', () => {
         await page.goto('http://localhost:3004/full-similarity-check');
 
         // Select a project
-        await page.waitForSelector('select#project-select', { timeout: 5000 });
-        const projectSelect = page.locator('select#project-select');
-        await projectSelect.selectOption({ index: 1 });
+        await page.waitForSelector('select#environment-filter', { timeout: 5000 });
+        const envSelect = page.locator('select#environment-filter');
+        await envSelect.selectOption({ index: 0 });
 
         // Wait for pagination info
         await page.waitForTimeout(1000);
@@ -163,9 +152,9 @@ test.describe('Full Similarity Check - Task List', () => {
         await page.goto('http://localhost:3004/full-similarity-check');
 
         // Select a project
-        await page.waitForSelector('select#project-select', { timeout: 5000 });
-        const projectSelect = page.locator('select#project-select');
-        await projectSelect.selectOption({ index: 1 });
+        await page.waitForSelector('select#environment-filter', { timeout: 5000 });
+        const envSelect = page.locator('select#environment-filter');
+        await envSelect.selectOption({ index: 0 });
 
         // Wait for table
         await page.waitForSelector('tbody tr', { timeout: 5000 });
@@ -179,9 +168,9 @@ test.describe('Full Similarity Check - Task List', () => {
         await page.goto('http://localhost:3004/full-similarity-check');
 
         // Select a project
-        await page.waitForSelector('select#project-select', { timeout: 5000 });
-        const projectSelect = page.locator('select#project-select');
-        await projectSelect.selectOption({ index: 1 });
+        await page.waitForSelector('select#environment-filter', { timeout: 5000 });
+        const envSelect = page.locator('select#environment-filter');
+        await envSelect.selectOption({ index: 0 });
 
         // Wait for table
         await page.waitForSelector('tbody tr', { timeout: 5000 });
@@ -204,9 +193,9 @@ test.describe('Full Similarity Check - Comparison Flow', () => {
         await page.goto('http://localhost:3004/full-similarity-check');
 
         // Select a project
-        await page.waitForSelector('select#project-select', { timeout: 5000 });
-        const projectSelect = page.locator('select#project-select');
-        await projectSelect.selectOption({ index: 1 });
+        await page.waitForSelector('select#environment-filter', { timeout: 5000 });
+        const envSelect = page.locator('select#environment-filter');
+        await envSelect.selectOption({ index: 0 });
 
         // Wait for table
         await page.waitForSelector('tbody tr', { timeout: 5000 });
@@ -223,9 +212,9 @@ test.describe('Full Similarity Check - Comparison Flow', () => {
         await page.goto('http://localhost:3004/full-similarity-check');
 
         // Select a project
-        await page.waitForSelector('select#project-select', { timeout: 5000 });
-        const projectSelect = page.locator('select#project-select');
-        await projectSelect.selectOption({ index: 1 });
+        await page.waitForSelector('select#environment-filter', { timeout: 5000 });
+        const envSelect = page.locator('select#environment-filter');
+        await envSelect.selectOption({ index: 0 });
 
         // Wait for table
         await page.waitForSelector('tbody tr', { timeout: 5000 });
@@ -247,13 +236,13 @@ test.describe('Full Similarity Check - Comparison Flow', () => {
         }
     });
 
-    test('should allow comparing across all project', async ({ page }) => {
+    test('should allow comparing across all environments', async ({ page }) => {
         await page.goto('http://localhost:3004/full-similarity-check');
 
         // Select a project
-        await page.waitForSelector('select#project-select', { timeout: 5000 });
-        const projectSelect = page.locator('select#project-select');
-        await projectSelect.selectOption({ index: 1 });
+        await page.waitForSelector('select#environment-filter', { timeout: 5000 });
+        const envSelect = page.locator('select#environment-filter');
+        await envSelect.selectOption({ index: 0 });
 
         // Wait for table
         await page.waitForSelector('tbody tr', { timeout: 5000 });
@@ -281,9 +270,9 @@ test.describe('Full Similarity Check - Results Display', () => {
         await page.goto('http://localhost:3004/full-similarity-check');
 
         // Select a project and run comparison
-        await page.waitForSelector('select#project-select', { timeout: 5000 });
-        const projectSelect = page.locator('select#project-select');
-        await projectSelect.selectOption({ index: 1 });
+        await page.waitForSelector('select#environment-filter', { timeout: 5000 });
+        const envSelect = page.locator('select#environment-filter');
+        await envSelect.selectOption({ index: 0 });
 
         await page.waitForSelector('tbody tr', { timeout: 5000 });
         await page.locator('button:has-text("Use for comparison")').first().click();
@@ -303,9 +292,9 @@ test.describe('Full Similarity Check - Results Display', () => {
         await page.goto('http://localhost:3004/full-similarity-check');
 
         // Run comparison
-        await page.waitForSelector('select#project-select', { timeout: 5000 });
-        const projectSelect = page.locator('select#project-select');
-        await projectSelect.selectOption({ index: 1 });
+        await page.waitForSelector('select#environment-filter', { timeout: 5000 });
+        const envSelect = page.locator('select#environment-filter');
+        await envSelect.selectOption({ index: 0 });
 
         await page.waitForSelector('tbody tr', { timeout: 5000 });
         await page.locator('button:has-text("Use for comparison")').first().click();
@@ -334,9 +323,9 @@ test.describe('Full Similarity Check - AI Analysis', () => {
         await page.goto('http://localhost:3004/full-similarity-check');
 
         // Navigate through comparison flow
-        await page.waitForSelector('select#project-select', { timeout: 5000 });
-        const projectSelect = page.locator('select#project-select');
-        await projectSelect.selectOption({ index: 1 });
+        await page.waitForSelector('select#environment-filter', { timeout: 5000 });
+        const envSelect = page.locator('select#environment-filter');
+        await envSelect.selectOption({ index: 0 });
 
         await page.waitForSelector('tbody tr', { timeout: 5000 });
         await page.locator('button:has-text("Use for comparison")').first().click();
@@ -368,9 +357,9 @@ test.describe('Full Similarity Check - AI Analysis', () => {
         await page.goto('http://localhost:3004/full-similarity-check');
 
         // Navigate to side-by-side view (assuming OpenRouter is configured)
-        await page.waitForSelector('select#project-select', { timeout: 5000 });
-        const projectSelect = page.locator('select#project-select');
-        await projectSelect.selectOption({ index: 1 });
+        await page.waitForSelector('select#environment-filter', { timeout: 5000 });
+        const envSelect = page.locator('select#environment-filter');
+        await envSelect.selectOption({ index: 0 });
 
         await page.waitForSelector('tbody tr', { timeout: 5000 });
         await page.locator('button:has-text("Use for comparison")').first().click();
@@ -400,7 +389,6 @@ test.describe('Full Similarity Check - Navigation', () => {
 
         // Check for other Fleet Management links
         await expect(page.locator('a:has-text("Ingest Data")')).toBeVisible();
-        await expect(page.locator('a:has-text("Project Management")')).toBeVisible();
         await expect(page.locator('a:has-text("Analytics")')).toBeVisible();
 
         // Navigate to another page and back

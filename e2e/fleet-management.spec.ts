@@ -95,14 +95,14 @@ test.describe('Fleet Management - API Access', () => {
       // Get cookies
       const cookies = await page.context().cookies();
 
-      // Try to fetch rater groups (requires projectId but should not return 403)
-      const response = await request.get('/api/rater-groups?projectId=test-project-id', {
+      // Try to fetch rater groups (should not return 403)
+      const response = await request.get('/api/rater-groups', {
         headers: {
           Cookie: cookies.map(c => `${c.name}=${c.value}`).join('; '),
         },
       });
 
-      // Should not be forbidden (might be 404 for missing project, but not 403)
+      // Should not be forbidden (might be 404 if no groups exist, but not 403)
       expect(response.status()).not.toBe(403);
     } finally {
       await cleanupTestUser(fleetUser.id);

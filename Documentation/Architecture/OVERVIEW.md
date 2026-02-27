@@ -27,7 +27,7 @@ graph TD
 ## Tech Stack
 
 ### Frontend
-- **Framework**: Next.js 15 (App Router)
+- **Framework**: Next.js 16 (App Router)
 - **Styling**: Premium Glassmorphism UI (Vanilla CSS + Lucide Icons).
 - **Features**: Real-time progress polling, background job management.
 
@@ -43,8 +43,8 @@ graph TD
 
 ## Core Data Models
 
-1. **Project**: Organizational container holding Guidelines (PDF grounding data).
-2. **DataRecord**: Individual tasks/feedback containing raw content and generated embeddings.
-3. **IngestJob**: Lifecycle tracker for background processes. Supports parallel loading and sequential vectorization across jobs.
-4. **BonusWindow**: Time-bounded performance tracking for collective team bonus qualification.
-5. **AuditLog**: Security and compliance trail tracking all administrative and user actions across the system.
+1. **DataRecord**: Individual tasks/feedback with raw content, vector embeddings, and an `environment` string for grouping (replaces the former Project model).
+2. **IngestJob**: Lifecycle tracker for background ingestion processes. Supports parallel loading and sequential vectorization per environment.
+3. **BonusWindow**: Time-bounded performance tracking for collective team bonus qualification.
+4. **AuditLog**: Security and compliance trail tracking all administrative and user actions across the system.
+5. **Meeting**: Master catalog of meeting definitions referenced by time-reporting tools.

@@ -42,15 +42,15 @@ Unlike typical sequential queues, this system allows **Phase 1 (Data Loading)** 
 - **Result**: Users see their new records in the dashboard almost instantly, while AI enrichment happens in the background.
 
 ### 2. Multi-Stage Status Lifecycle
-- **PENDING**: Job is in the project queue waiting for its turn to load data.
+- **PENDING**: Job is queued, waiting for its turn to load data.
 - **PROCESSING**: The system is currently parsing the source and saving records to PostgreSQL.
 - **QUEUED_FOR_VEC**: Data is safely stored, but the AI server is currently busy with another job.
 - **VECTORIZING**: The AI server is actively generating embeddings for this job.
 - **COMPLETED/FAILED/CANCELLED**: Terminal states.
 
 ### 3. Queue Locking & Stability
-- **Data Lock**: Only one job per project can be in `PROCESSING` at a time to ensure database write order and prevent primary key collisions.
-- **AI Lock**: Only one job per project can be in `VECTORIZING` at a time to prevent overlapping requests from crashing local AI hosts (like LM Studio).
+- **Data Lock**: Only one job per environment can be in `PROCESSING` at a time to ensure database write order and prevent primary key collisions.
+- **AI Lock**: Only one job per environment can be in `VECTORIZING` at a time to prevent overlapping requests from crashing local AI hosts (like LM Studio).
 
 ### 4. Recovery & Resumption
 - **Zombie Cleanup**: On server restart, any jobs left in `PROCESSING` (where the memory payload is lost) are automatically failed.
