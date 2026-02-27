@@ -22,7 +22,7 @@ export async function GET(req: Request) {
         .eq('id', user.id)
         .single()
 
-    if (!profile || !profile.role || !['FLEET', 'ADMIN'].includes(profile.role)) {
+    if (!profile || !profile.role || !['FLEET', 'MANAGER', 'ADMIN'].includes(profile.role)) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 

@@ -19,7 +19,7 @@ async function requireFleetAuth(request: NextRequest) {
     .eq('id', user.id)
     .single();
 
-  if (profileError || !profile || !['FLEET', 'ADMIN'].includes(profile.role)) {
+  if (profileError || !profile || !['FLEET', 'MANAGER', 'ADMIN'].includes(profile.role)) {
     return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
   }
 
@@ -53,6 +53,14 @@ export async function GET(request: NextRequest) {
     const flagStatus = searchParams.get('flagStatus');
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '50');
+
+    // Validate date params before use
+    if (startDate && isNaN(Date.parse(startDate))) {
+      return NextResponse.json({ error: 'Invalid startDate format' }, { status: 400 });
+    }
+    if (endDate && isNaN(Date.parse(endDate))) {
+      return NextResponse.json({ error: 'Invalid endDate format' }, { status: 400 });
+    }
 
     // Build date filter for SQL
     const dateConditions: string[] = [];

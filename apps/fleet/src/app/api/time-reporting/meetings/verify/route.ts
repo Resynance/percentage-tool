@@ -19,7 +19,7 @@ async function requireFleetAuth(request: NextRequest) {
     .eq('id', user.id)
     .single();
 
-  if (profileError || !profile || !['FLEET', 'ADMIN'].includes(profile.role)) {
+  if (profileError || !profile || !['FLEET', 'MANAGER', 'ADMIN'].includes(profile.role)) {
     return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
   }
 
@@ -32,18 +32,17 @@ export async function POST(request: NextRequest) {
   if (authResult.error) return authResult.error;
 
   try {
-    const { meetingId, verifiedHours, notes } = await request.json();
+    const { meetingId, verifiedHours } = await request.json();
 
     if (!meetingId) {
       return NextResponse.json({ error: 'Missing meetingId' }, { status: 400 });
     }
 
-    // Update the meeting verification
+    // Update the meeting verification (preserve existing notes)
     const updated = await prisma.timeReportRecord.update({
       where: { id: meetingId },
       data: {
         meetingHoursVerified: verifiedHours || 0,
-        notes: notes || null,
       },
     });
 
@@ -53,6 +52,9 @@ export async function POST(request: NextRequest) {
     });
   } catch (error: any) {
     console.error('Error verifying meeting:', error);
+    if (error.code === 'P2025') {
+      return NextResponse.json({ error: 'Record not found' }, { status: 404 });
+    }
     return NextResponse.json(
       { error: 'Failed to verify meeting', details: error.message },
       { status: 500 }
@@ -72,12 +74,11 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Missing meetingId' }, { status: 400 });
     }
 
-    // Clear verification
+    // Clear verification (preserve existing notes)
     const updated = await prisma.timeReportRecord.update({
       where: { id: meetingId },
       data: {
         meetingHoursVerified: 0,
-        notes: null,
       },
     });
 
@@ -87,6 +88,9 @@ export async function DELETE(request: NextRequest) {
     });
   } catch (error: any) {
     console.error('Error unverifying meeting:', error);
+    if (error.code === 'P2025') {
+      return NextResponse.json({ error: 'Record not found' }, { status: 404 });
+    }
     return NextResponse.json(
       { error: 'Failed to unverify meeting', details: error.message },
       { status: 500 }

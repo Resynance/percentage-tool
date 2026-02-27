@@ -225,15 +225,14 @@ test.describe('Full Similarity Check - Comparison Flow', () => {
         // Click "Compare within same environment" or similar button
         await page.waitForTimeout(500);
         const envButton = page.locator('button:has-text("environment")').first();
-        if (await envButton.count() > 0) {
-            await envButton.click();
+        await expect(envButton).toBeVisible();
+        await envButton.click();
 
-            // Wait for results
-            await page.waitForTimeout(2000);
+        // Wait for results
+        await page.waitForTimeout(2000);
 
-            // Should show results section
-            await expect(page.locator('text=/Similar Prompts/i').or(page.locator('text=/Results/'))).toBeVisible();
-        }
+        // Should show results section
+        await expect(page.locator('text=/Similar Prompts/i').or(page.locator('text=/Results/'))).toBeVisible();
     });
 
     test('should allow comparing across all environments', async ({ page }) => {
@@ -253,15 +252,14 @@ test.describe('Full Similarity Check - Comparison Flow', () => {
         // Click "Compare with all prompts" or similar button
         await page.waitForTimeout(500);
         const allButton = page.locator('button:has-text("all")').first();
-        if (await allButton.count() > 0) {
-            await allButton.click();
+        await expect(allButton).toBeVisible();
+        await allButton.click();
 
-            // Wait for results
-            await page.waitForTimeout(2000);
+        // Wait for results
+        await page.waitForTimeout(2000);
 
-            // Should show results section
-            await expect(page.locator('text=/Similar Prompts/i').or(page.locator('text=/Results/'))).toBeVisible();
-        }
+        // Should show results section
+        await expect(page.locator('text=/Similar Prompts/i').or(page.locator('text=/Results/'))).toBeVisible();
     });
 });
 
@@ -279,13 +277,12 @@ test.describe('Full Similarity Check - Results Display', () => {
 
         await page.waitForTimeout(500);
         const compareButton = page.locator('button:has-text("all")').first();
-        if (await compareButton.count() > 0) {
-            await compareButton.click();
-            await page.waitForTimeout(2000);
+        await expect(compareButton).toBeVisible();
+        await compareButton.click();
+        await page.waitForTimeout(2000);
 
-            // Should show similarity percentages
-            await expect(page.locator('text=/%/')).toBeVisible();
-        }
+        // Should show similarity percentages
+        await expect(page.locator('text=/%/')).toBeVisible();
     });
 
     test('should allow viewing side-by-side comparison', async ({ page }) => {

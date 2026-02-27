@@ -72,7 +72,7 @@ export async function GET(req: Request) {
         }, { status: 500 })
     }
 
-    if (!profile || !['FLEET', 'ADMIN'].includes(profile.role)) {
+    if (!profile || !['FLEET', 'MANAGER', 'ADMIN'].includes(profile.role)) {
         console.warn('[Task History API] Forbidden access attempt:', {
             errorId: ERROR_IDS.AUTH_FORBIDDEN,
             userId: user.id,

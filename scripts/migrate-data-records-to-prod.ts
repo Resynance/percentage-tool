@@ -2,6 +2,13 @@
 /**
  * Migration Script: Move Data Records to Production
  *
+ * DEPRECATED: This script queries the `projects` table which was removed in the
+ * project→environment refactor (Feb 2026). Do NOT run this script against a
+ * database that has already been migrated; it will fail at the project mapping step.
+ *
+ * If you need to migrate data records between databases after the refactor,
+ * write a new script that uses the `environment` field on `data_records` directly.
+ *
  * This script copies data records from a source database to a production database
  * in batches with progress logging. Ensures project keys match between databases.
  *

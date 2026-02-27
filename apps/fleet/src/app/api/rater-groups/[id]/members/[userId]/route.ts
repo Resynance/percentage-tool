@@ -27,7 +27,7 @@ export async function DELETE(
         .eq('id', user.id)
         .single();
 
-    if (!profile || !['ADMIN', 'FLEET'].includes((profile as any)?.role)) {
+    if (!profile || !['ADMIN', 'MANAGER', 'FLEET'].includes((profile as any)?.role)) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

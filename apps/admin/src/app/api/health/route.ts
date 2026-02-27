@@ -39,6 +39,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Missing app or endpoint parameter' }, { status: 400 });
     }
 
+    // Validate endpoint starts with /api/ to prevent SSRF to arbitrary paths
+    if (!endpoint.startsWith('/api/')) {
+      return NextResponse.json({ error: 'Invalid endpoint: must start with /api/' }, { status: 400 });
+    }
+
     // Map app names to URLs
     const appUrls: Record<string, string> = {
       qa: process.env.NEXT_PUBLIC_QA_APP_URL || 'http://localhost:3002',

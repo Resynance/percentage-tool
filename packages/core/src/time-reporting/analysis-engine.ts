@@ -127,10 +127,12 @@ export async function analyzeTimeReport(reportId: string, forceReanalyze: boolea
   }
 
   // Delete existing analysis records before re-analyzing
-  await prisma.timeEstimate.deleteMany({ where: { timeReportId: reportId } });
-  await prisma.qualityScore.deleteMany({ where: { timeReportId: reportId } });
-  await prisma.meetingClaim.deleteMany({ where: { timeReportId: reportId } });
-  await prisma.timeAnalysisFlag.deleteMany({ where: { timeReportId: reportId } });
+  await prisma.$transaction([
+    prisma.timeEstimate.deleteMany({ where: { timeReportId: reportId } }),
+    prisma.qualityScore.deleteMany({ where: { timeReportId: reportId } }),
+    prisma.meetingClaim.deleteMany({ where: { timeReportId: reportId } }),
+    prisma.timeAnalysisFlag.deleteMany({ where: { timeReportId: reportId } }),
+  ]);
 
   const config = await getActiveConfig();
   const activities = parseworkActivities(report.notes || '');
@@ -188,11 +190,17 @@ export async function analyzeTimeReport(reportId: string, forceReanalyze: boolea
     }
   }
 
-  const meetingResult = await detectAndVerifyMeetings(
-    report.notes || '',
-    report.workerEmail,
-    report.workDate,
-  );
+  let meetingResult;
+  try {
+    meetingResult = await detectAndVerifyMeetings(
+      report.notes || '',
+      report.workerEmail,
+      report.workDate,
+    );
+  } catch (error) {
+    console.error(`[Analysis] Error detecting meetings for report ${reportId}:`, error);
+    meetingResult = { verifiedClaims: [], detectionResult: { totalClaimedMinutes: 0, llmModel: null, llmProvider: null, llmCost: null }, totalVerifiedMinutes: 0 };
+  }
 
   for (const claim of meetingResult.verifiedClaims) {
     await prisma.meetingClaim.create({
@@ -298,8 +306,9 @@ export async function analyzeBatchTimeReports(
   reportIds: string[],
   onProgress?: (current: number, total: number) => void,
   forceReanalyze: boolean = false,
-): Promise<TimeReportAnalysis[]> {
+): Promise<{ results: TimeReportAnalysis[]; failedIds: string[] }> {
   const results: TimeReportAnalysis[] = [];
+  const failedIds: string[] = [];
 
   for (let i = 0; i < reportIds.length; i++) {
     try {
@@ -311,10 +320,11 @@ export async function analyzeBatchTimeReports(
       }
     } catch (error) {
       console.error(`[Batch Analysis] Error analyzing report ${reportIds[i]}:`, error);
+      failedIds.push(reportIds[i]);
     }
   }
 
-  return results;
+  return { results, failedIds };
 }
 
 export async function analyzeAllTimeReports(
@@ -326,7 +336,7 @@ export async function analyzeAllTimeReports(
     onProgress?: (current: number, total: number) => void;
     forceReanalyze?: boolean;
   },
-): Promise<TimeReportAnalysis[]> {
+): Promise<{ results: TimeReportAnalysis[]; failedIds: string[] }> {
   const where: any = {};
 
   if (options?.startDate) {

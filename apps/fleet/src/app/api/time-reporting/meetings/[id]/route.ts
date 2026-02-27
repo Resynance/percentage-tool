@@ -19,7 +19,7 @@ async function requireFleetAuth(request: NextRequest) {
     .eq('id', user.id)
     .single();
 
-  if (profileError || !profile || !['FLEET', 'ADMIN'].includes(profile.role)) {
+  if (profileError || !profile || !['FLEET', 'MANAGER', 'ADMIN'].includes(profile.role)) {
     return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
   }
 
@@ -29,10 +29,12 @@ async function requireFleetAuth(request: NextRequest) {
 // PUT: Update a meeting
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const authResult = await requireFleetAuth(request);
   if (authResult.error) return authResult.error;
+
+  const { id } = await params;
 
   try {
     const body = await request.json();
@@ -43,7 +45,7 @@ export async function PUT(
     }
 
     const meeting = await prisma.meeting.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         title: title.trim(),
         description: description?.trim() || null,
@@ -76,14 +78,16 @@ export async function PUT(
 // DELETE: Delete a meeting
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const authResult = await requireFleetAuth(request);
   if (authResult.error) return authResult.error;
 
+  const { id } = await params;
+
   try {
     await prisma.meeting.delete({
-      where: { id: params.id },
+      where: { id },
     });
 
     return NextResponse.json({

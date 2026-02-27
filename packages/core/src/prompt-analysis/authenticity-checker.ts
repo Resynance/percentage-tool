@@ -153,19 +153,7 @@ export async function analyzeBatchPrompts(
       }
     } catch (error) {
       console.error(`[Batch Analysis] Error analyzing prompt ${prompts[i].id}:`, error);
-      // Push error result
-      results.push({
-        promptId: prompts[i].id,
-        promptText: prompts[i].text,
-        isLikelyNonNative: false,
-        nonNativeConfidence: 0,
-        nonNativeIndicators: ['Analysis failed'],
-        isLikelyAIGenerated: false,
-        aiGeneratedConfidence: 0,
-        aiGeneratedIndicators: ['Analysis failed'],
-        overallAssessment: 'Error during analysis',
-        recommendations: [],
-      });
+      // Skip failed prompts rather than pushing fabricated confidence values
     }
   }
 

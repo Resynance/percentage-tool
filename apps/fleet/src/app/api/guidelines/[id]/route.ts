@@ -33,14 +33,16 @@ async function checkAuth() {
  */
 export async function GET(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     const auth = await checkAuth();
     if (!auth.authorized) return auth.error;
 
+    const { id } = await params;
+
     try {
         const guideline = await prisma.guideline.findUnique({
-            where: { id: params.id },
+            where: { id },
             include: {
                 users: {
                     select: {
@@ -74,10 +76,12 @@ export async function GET(
  */
 export async function PATCH(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     const auth = await checkAuth();
     if (!auth.authorized) return auth.error;
+
+    const { id } = await params;
 
     try {
         const body = await request.json();
@@ -85,7 +89,7 @@ export async function PATCH(
 
         // Check if guideline exists
         const existing = await prisma.guideline.findUnique({
-            where: { id: params.id }
+            where: { id }
         });
 
         if (!existing) {
@@ -102,7 +106,7 @@ export async function PATCH(
         }
 
         const guideline = await prisma.guideline.update({
-            where: { id: params.id },
+            where: { id },
             data: updateData,
             include: {
                 users: {
@@ -130,15 +134,17 @@ export async function PATCH(
  */
 export async function DELETE(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     const auth = await checkAuth();
     if (!auth.authorized) return auth.error;
 
+    const { id } = await params;
+
     try {
         // Check if guideline exists
         const existing = await prisma.guideline.findUnique({
-            where: { id: params.id }
+            where: { id }
         });
 
         if (!existing) {
@@ -149,7 +155,7 @@ export async function DELETE(
         }
 
         await prisma.guideline.delete({
-            where: { id: params.id }
+            where: { id }
         });
 
         return NextResponse.json({ success: true });

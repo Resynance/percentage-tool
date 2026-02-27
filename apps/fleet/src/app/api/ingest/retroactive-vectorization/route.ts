@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
         select: { role: true }
     });
 
-    if (!profile || !['FLEET', 'ADMIN'].includes(profile.role)) {
+    if (!profile || !['FLEET', 'MANAGER', 'ADMIN'].includes(profile.role)) {
         return NextResponse.json({ error: 'Forbidden - FLEET or ADMIN role required' }, { status: 403 });
     }
 

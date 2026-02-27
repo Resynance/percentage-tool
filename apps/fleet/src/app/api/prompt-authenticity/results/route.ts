@@ -19,7 +19,7 @@ async function requireFleetAuth(request: NextRequest) {
     .eq('id', user.id)
     .single();
 
-  if (profileError || !profile || !['FLEET', 'ADMIN'].includes(profile.role)) {
+  if (profileError || !profile || !['FLEET', 'MANAGER', 'ADMIN'].includes(profile.role)) {
     return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
   }
 

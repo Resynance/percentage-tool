@@ -67,7 +67,7 @@ async function verify() {
       console.log('');
       console.log('To fix:');
       console.log('1. Open Supabase Dashboard showing the tables');
-      console.log('2. Note the project name/URL (should be urgravakgxllrpsumgtz)');
+      console.log('2. Note the project name/URL in Supabase Dashboard');
       console.log('3. In THAT SAME window, go to Settings → Database');
       console.log('4. Copy the Connection Pooling string');
     }

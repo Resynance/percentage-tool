@@ -32,7 +32,10 @@ END $$;
 ALTER TABLE public.data_records
 ALTER COLUMN environment DROP NOT NULL;
 
-RAISE NOTICE 'Removed NOT NULL constraint from environment column';
+DO $$
+BEGIN
+    RAISE NOTICE 'Removed NOT NULL constraint from environment column';
+END $$;
 
 -- Step 3: Restore environment values from backup
 -- ============================================================================

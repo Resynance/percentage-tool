@@ -247,7 +247,7 @@ export async function GET(req: NextRequest) {
             .eq('id', user.id)
             .single();
 
-        if (!profile || !['FLEET', 'ADMIN'].includes(profile.role)) {
+        if (!profile || !['FLEET', 'MANAGER', 'ADMIN'].includes(profile.role)) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
@@ -325,7 +325,7 @@ export async function POST(req: NextRequest) {
             .eq('id', user.id)
             .single();
 
-        if (!profile || !['FLEET', 'ADMIN'].includes(profile.role)) {
+        if (!profile || !['FLEET', 'MANAGER', 'ADMIN'].includes(profile.role)) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 

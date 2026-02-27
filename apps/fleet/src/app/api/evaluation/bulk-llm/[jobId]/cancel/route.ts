@@ -28,7 +28,7 @@ export async function POST(
         .single();
 
     const role = (profile as any)?.role;
-    if (!['ADMIN', 'FLEET'].includes(role)) {
+    if (!['ADMIN', 'MANAGER', 'FLEET'].includes(role)) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

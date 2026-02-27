@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
         });
         const role = profile?.role || 'USER';
 
-        if (!['FLEET', 'ADMIN'].includes(role)) {
+        if (!['FLEET', 'MANAGER', 'ADMIN'].includes(role)) {
             return NextResponse.json({
                 error: 'Forbidden: Only FLEET and ADMIN users can generate alignment analysis'
             }, { status: 403 });

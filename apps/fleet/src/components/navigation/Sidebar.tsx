@@ -54,7 +54,7 @@ export default function Sidebar({ userRole }: { userRole?: string }) {
     const sections: NavSection[] = [
         {
             title: 'Fleet Management',
-            role: ['FLEET', 'ADMIN'],
+            role: ['FLEET', 'MANAGER', 'ADMIN'],
             items: [
                 { label: 'Analytics', href: '/analytics', icon: BarChart3 },
                 { label: 'Ingest Data', href: '/ingest', icon: Database },
@@ -63,7 +63,7 @@ export default function Sidebar({ userRole }: { userRole?: string }) {
         },
         {
             title: 'Tasks & Feedback Tools',
-            role: ['FLEET', 'ADMIN'],
+            role: ['FLEET', 'MANAGER', 'ADMIN'],
             items: [
                 { label: 'Full Similarity Check', href: '/full-similarity-check', icon: ScanSearch },
                 { label: 'Prompt Authenticity Checker', href: '/prompt-authenticity', icon: SearchCheck },
@@ -72,7 +72,7 @@ export default function Sidebar({ userRole }: { userRole?: string }) {
         },
         {
             title: 'Operations',
-            role: ['FLEET', 'ADMIN'],
+            role: ['FLEET', 'MANAGER', 'ADMIN'],
             items: [
                 { label: 'Activity Over Time', href: '/activity-over-time', icon: BarChart3 },
                 { label: 'Bonus Windows', href: '/bonus-windows', icon: Target },
@@ -83,7 +83,7 @@ export default function Sidebar({ userRole }: { userRole?: string }) {
         },
         {
             title: 'Management',
-            role: ['FLEET', 'ADMIN'],
+            role: ['FLEET', 'MANAGER', 'ADMIN'],
             items: [
                 { label: 'Assignments', href: '/assignments', icon: ClipboardList },
                 { label: 'Rater Groups', href: '/rater-groups', icon: Users },

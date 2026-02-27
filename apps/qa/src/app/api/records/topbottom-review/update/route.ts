@@ -41,7 +41,7 @@ export async function PUT(req: NextRequest) {
     }
 
     // Verify user has appropriate role (FLEET or ADMIN)
-    if (!['FLEET', 'ADMIN'].includes(role)) {
+    if (!['FLEET', 'MANAGER', 'ADMIN'].includes(role)) {
       return NextResponse.json({ error: 'Forbidden: Insufficient permissions' }, { status: 403 });
     }
 
