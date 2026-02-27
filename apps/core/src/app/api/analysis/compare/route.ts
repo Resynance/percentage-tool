@@ -94,14 +94,24 @@ export async function POST(req: NextRequest) {
             });
         }
 
-        const project = record.project;
-        if (!project.guidelines) {
-            return NextResponse.json({ error: 'Project guidelines not found. Please upload them in Project Management.' }, { status: 400 });
+        // Look up guideline for this record's environment (environment-specific first, then global)
+        const guideline = await prisma.guideline.findFirst({
+            where: {
+                OR: [
+                    { environments: { has: record.environment } },
+                    { environments: { isEmpty: true } }
+                ]
+            },
+            orderBy: { createdAt: 'desc' }
+        });
+
+        if (!guideline) {
+            return NextResponse.json({ error: 'No guidelines found for this environment. Please upload guidelines in the Fleet app.' }, { status: 400 });
         }
 
         // Parse PDF guidelines
         let guidelinesText = '';
-        const base64Data = project.guidelines.split(';base64,').pop();
+        const base64Data = guideline.content.split(';base64,').pop() || guideline.content;
 
         if (!base64Data) {
             console.error('Compare API Error: Guidelines data is not in expected base64 format', {
@@ -139,7 +149,7 @@ export async function POST(req: NextRequest) {
             }, { status: 400 });
         }
 
-        const systemPrompt = `You are an expert AI Alignment Lead and Quality Assurance Analyst for the ${project.name} project.`;
+        const systemPrompt = `You are an expert AI Alignment Lead and Quality Assurance Analyst for the ${record.environment} environment.`;
         const prompt = `
             Evaluate the following ${record.type === 'TASK' ? 'prompt' : 'feedback'} against the provided project guidelines.
 

@@ -251,15 +251,7 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
-        const project = await prisma.project.findUnique({
-            where: { id: environment },
-        });
-
-        if (!project) {
-            return NextResponse.json({ error: 'Project not found' }, { status: 404 });
-        }
-
-        // Handle all-statuses action - returns all candidate statuses for the project
+        // Handle all-statuses action - returns all candidate statuses for the environment
         if (action === 'all-statuses') {
             const statuses = await prisma.candidateStatus.findMany({
                 where: { environment },
@@ -352,15 +344,6 @@ export async function POST(req: NextRequest) {
                 { error: "status must be 'ACCEPTED' or 'REJECTED'" },
                 { status: 400 }
             );
-        }
-
-        const project = await prisma.project.findUnique({
-            where: { id: environment },
-            select: { id: true, ownerId: true }
-        });
-
-        if (!project) {
-            return NextResponse.json({ error: 'Project not found' }, { status: 404 });
         }
 
         const candidateStatus = await prisma.candidateStatus.upsert({

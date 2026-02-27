@@ -48,10 +48,7 @@ export async function GET(
                         tokensUsed: true,
                         cost: true,
                         createdAt: true,
-                        completedAt: true,
-                        project: {
-                            select: { id: true, name: true }
-                        }
+                        completedAt: true
                     }
                 }
             }

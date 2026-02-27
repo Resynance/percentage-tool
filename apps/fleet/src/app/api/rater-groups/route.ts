@@ -118,10 +118,9 @@ export async function POST(request: NextRequest) {
             action: 'RATER_GROUP_CREATED',
             entityType: 'RATER_GROUP',
             entityId: group.id,
-            environment,
             userId: user.id,
             userEmail: user.email!,
-            metadata: { name: group.name }
+            metadata: { environment, name: group.name }
         });
 
         return NextResponse.json({ group }, { status: 201 });

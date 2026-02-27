@@ -77,10 +77,10 @@ export async function DELETE(
             action: 'RATER_GROUP_MEMBER_REMOVED',
             entityType: 'RATER_GROUP',
             entityId: id,
-            environment: membership.raterGroup.environment,
             userId: user.id,
             userEmail: user.email!,
             metadata: {
+                environment: membership.raterGroup.environment,
                 removedUserId: userId,
                 removedUserEmail: membership.user.email,
                 groupName: membership.raterGroup.name

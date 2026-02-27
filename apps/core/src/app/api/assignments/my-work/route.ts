@@ -62,9 +62,6 @@ export async function GET(request: NextRequest) {
                 { createdAt: 'desc' }
             ],
             include: {
-                project: {
-                    select: { id: true, name: true }
-                },
                 raterGroup: {
                     select: { id: true, name: true }
                 },

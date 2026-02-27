@@ -57,18 +57,6 @@ export async function GET(req: NextRequest) {
         const sortByParam = searchParams.get('sortBy');
         const sortOrderParam = searchParams.get('sortOrder');
 
-        // Validate project exists if environment is specified (read access allowed for all users)
-        if (environment) {
-            const project = await prisma.project.findUnique({
-                where: { id: environment },
-                select: { id: true }
-            });
-
-            if (!project) {
-                return NextResponse.json({ error: 'Project not found' }, { status: 404 });
-            }
-        }
-
         // Validate and parse pagination params (default to safe values if invalid)
         const skipParsed = parseInt(searchParams.get('skip') || '0');
         const takeParsed = parseInt(searchParams.get('take') || '50');

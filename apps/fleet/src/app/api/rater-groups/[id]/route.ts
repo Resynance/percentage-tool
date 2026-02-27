@@ -147,10 +147,9 @@ export async function PATCH(
             action: 'RATER_GROUP_UPDATED',
             entityType: 'RATER_GROUP',
             entityId: group.id,
-            environment: group.environment,
             userId: user.id,
             userEmail: user.email!,
-            metadata: { updatedFields: Object.keys(updateData) }
+            metadata: { environment: group.environment, updatedFields: Object.keys(updateData) }
         });
 
         return NextResponse.json({ group });
@@ -222,10 +221,9 @@ export async function DELETE(
             action: 'RATER_GROUP_DELETED',
             entityType: 'RATER_GROUP',
             entityId: id,
-            environment: existing.environment,
             userId: user.id,
             userEmail: user.email!,
-            metadata: { name: existing.name }
+            metadata: { environment: existing.environment, name: existing.name }
         });
 
         return NextResponse.json({ success: true });

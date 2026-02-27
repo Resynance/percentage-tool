@@ -51,10 +51,10 @@ export declare function processAndStore(records: any[], options: IngestOptions, 
 export declare function cancelIngest(jobId: string): Promise<void>;
 export declare function getIngestStatus(jobId: string): Promise<{
     id: string;
-    environment: string;
     createdAt: Date;
-    error: string | null;
     updatedAt: Date;
+    environment: string;
+    error: string | null;
     status: string;
     totalRecords: number;
     type: import("@prisma/client").$Enums.RecordType;

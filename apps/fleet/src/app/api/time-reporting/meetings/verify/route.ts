@@ -32,17 +32,18 @@ export async function POST(request: NextRequest) {
   if (authResult.error) return authResult.error;
 
   try {
-    const { meetingId, verifiedHours } = await request.json();
+    const { meetingId } = await request.json();
 
     if (!meetingId) {
       return NextResponse.json({ error: 'Missing meetingId' }, { status: 400 });
     }
 
-    // Update the meeting verification (preserve existing notes)
-    const updated = await prisma.timeReportRecord.update({
+    // Update the meeting claim verification status
+    const updated = await prisma.meetingClaim.update({
       where: { id: meetingId },
       data: {
-        meetingHoursVerified: verifiedHours || 0,
+        verified: true,
+        verifiedAt: new Date(),
       },
     });
 
@@ -74,11 +75,12 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Missing meetingId' }, { status: 400 });
     }
 
-    // Clear verification (preserve existing notes)
-    const updated = await prisma.timeReportRecord.update({
+    // Clear verification status
+    const updated = await prisma.meetingClaim.update({
       where: { id: meetingId },
       data: {
-        meetingHoursVerified: 0,
+        verified: false,
+        verifiedAt: null,
       },
     });
 

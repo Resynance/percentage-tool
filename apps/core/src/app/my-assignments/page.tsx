@@ -21,7 +21,7 @@ interface AssignmentBatch {
     completedCount: number;
     dueDate: string | null;
     createdAt: string;
-    project: { id: string; name: string };
+    environment: string;
     raterGroup: { id: string; name: string } | null;
     userProgress: {
         total: number;
@@ -185,7 +185,7 @@ export default function MyAssignmentsPage() {
                                         </div>
 
                                         <div style={{ fontSize: '0.85rem', opacity: 0.6, marginBottom: '12px' }}>
-                                            {batch.project.name}
+                                            {batch.environment}
                                             {batch.raterGroup && ` • ${batch.raterGroup.name}`}
                                         </div>
 

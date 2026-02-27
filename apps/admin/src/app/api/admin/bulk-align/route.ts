@@ -39,10 +39,9 @@ export async function POST(req: NextRequest) {
         await logAudit({
             action: 'BULK_ALIGNMENT_STARTED',
             entityType: 'DATA_RECORD',
-            environment,
             userId: user.id,
             userEmail: user.email!,
-            metadata: { jobId }
+            metadata: { environment, jobId }
         });
 
         return NextResponse.json({ success: true, jobId });

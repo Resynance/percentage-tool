@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
 
         // Total records in project
         const totalRecords = await prisma.dataRecord.count({
-            where: { environment }
+            where: environment ? { environment } : {}
         });
 
         return NextResponse.json({

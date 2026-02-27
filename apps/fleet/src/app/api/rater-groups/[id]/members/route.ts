@@ -91,10 +91,9 @@ export async function POST(
             action: 'RATER_GROUP_MEMBERS_ADDED',
             entityType: 'RATER_GROUP',
             entityId: id,
-            environment: group.environment,
             userId: user.id,
             userEmail: user.email!,
-            metadata: { addedUserIds: newUserIds, groupName: group.name }
+            metadata: { environment: group.environment, addedUserIds: newUserIds, groupName: group.name }
         });
 
         // Return updated group with members

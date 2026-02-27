@@ -6,9 +6,10 @@
 
 export function useProjects({ initialProjectId, autoSelectFirst }: { initialProjectId?: string; autoSelectFirst?: boolean } = {}) {
   return {
-    projects: [],
-    selectedProjectId: null,
-    setSelectedProjectId: () => {},
+    projects: [] as Array<{ id: string; name: string }>,
+    selectedProjectId: null as string | null,
+    setSelectedProjectId: (_id: string | null) => {},
     loading: false,
+    error: null as string | null,
   };
 }

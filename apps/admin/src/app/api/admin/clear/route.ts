@@ -27,19 +27,11 @@ export async function POST(req: NextRequest) {
         const { target, environment } = await req.json();
 
         if (target === 'ALL_DATA') {
-            // Delete all records, Likert scores, and reset project analysis
+            // Delete all records and Likert scores
             await prisma.$transaction([
                 prisma.likertScore.deleteMany({}),
                 prisma.dataRecord.deleteMany({}),
-                prisma.project.updateMany({
-                    data: {
-                        lastTaskAnalysis: null,
-                        lastFeedbackAnalysis: null
-                    }
-                })
-            ], {
-                timeout: 60000 // 60 seconds - increased for large datasets
-            });
+            ]);
 
             // Log audit event (critical operation)
             const auditResult = await logAudit({
@@ -58,12 +50,9 @@ export async function POST(req: NextRequest) {
         }
 
         if (target === 'ANALYTICS_ONLY') {
-            // Reset project analysis only
-            await prisma.project.updateMany({
-                data: {
-                    lastTaskAnalysis: null,
-                    lastFeedbackAnalysis: null
-                }
+            // Clear alignment analysis from all data records
+            await prisma.dataRecord.updateMany({
+                data: { alignmentAnalysis: null }
             });
 
             // Log audit event (critical operation)
@@ -99,7 +88,6 @@ export async function POST(req: NextRequest) {
                 const auditResult = await logAudit({
                     action: 'LIKERT_SCORES_CLEARED',
                     entityType: 'LIKERT_SCORE',
-                    environment,
                     userId: user.id,
                     userEmail: user.email!,
                     metadata: { environment, count: result.count }
@@ -157,23 +145,17 @@ export async function POST(req: NextRequest) {
                 prisma.dataRecord.deleteMany({
                     where: { environment }
                 })
-            ], {
-                timeout: 60000 // 60 seconds - increased for large datasets
-            });
+            ]);
 
-            // Reset project analysis
-            await prisma.project.update({
-                where: { id: environment },
-                data: {
-                    lastTaskAnalysis: null,
-                    lastFeedbackAnalysis: null
-                }
+            // Clear alignment analysis for records in this environment
+            await prisma.dataRecord.updateMany({
+                where: { environment },
+                data: { alignmentAnalysis: null }
             });
 
             const auditResult = await logAudit({
                 action: 'PROJECT_RECORDS_CLEARED',
                 entityType: 'DATA_RECORD',
-                environment,
                 userId: user.id,
                 userEmail: user.email!,
                 metadata: {

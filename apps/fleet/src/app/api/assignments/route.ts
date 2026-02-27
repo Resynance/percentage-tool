@@ -53,9 +53,6 @@ export async function GET(request: NextRequest) {
             orderBy: { createdAt: 'desc' },
             take: limit,
             include: {
-                project: {
-                    select: { id: true, name: true }
-                },
                 raterGroup: {
                     select: { id: true, name: true }
                 },
@@ -131,17 +128,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Cannot assign to both group and individual' }, { status: 400 });
         }
 
-        // Verify project exists
-        const project = await prisma.project.findUnique({
-            where: { id: environment },
-            select: { id: true }
-        });
-
-        if (!project) {
-            return NextResponse.json({ error: 'Project not found' }, { status: 404 });
-        }
-
-        // Verify records exist and belong to the project
+        // Verify records exist and belong to the environment
         const records = await prisma.dataRecord.findMany({
             where: {
                 id: { in: recordIds },
@@ -215,10 +202,10 @@ export async function POST(request: NextRequest) {
             action: 'ASSIGNMENT_BATCH_CREATED',
             entityType: 'ASSIGNMENT_BATCH',
             entityId: batch.id,
-            environment,
             userId: user.id,
             userEmail: user.email!,
             metadata: {
+                environment,
                 name: batch.name,
                 recordCount: recordIds.length,
                 raterGroupId,

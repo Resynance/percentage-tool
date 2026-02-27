@@ -93,10 +93,9 @@ export async function POST(request: NextRequest) {
             await logAudit({
                 action: 'BULK_EVALUATION_STARTED',
                 entityType: 'LLM_EVALUATION_JOB',
-                environment,
                 userId: user.id,
                 userEmail: user.email!,
-                metadata: { jobIds, allModels: true }
+                metadata: { environment, jobIds, allModels: true }
             });
 
             return NextResponse.json({
@@ -116,10 +115,9 @@ export async function POST(request: NextRequest) {
                 action: 'BULK_EVALUATION_STARTED',
                 entityType: 'LLM_EVALUATION_JOB',
                 entityId: jobId,
-                environment,
                 userId: user.id,
                 userEmail: user.email!,
-                metadata: { modelConfigId }
+                metadata: { environment, modelConfigId }
             });
 
             return NextResponse.json({
