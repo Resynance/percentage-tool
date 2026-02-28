@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@repo/database';
+import { Prisma } from '@prisma/client';
 import { createClient } from '@repo/auth/server';
 
 export const dynamic = 'force-dynamic';
@@ -29,49 +30,46 @@ export async function GET(req: NextRequest) {
         const limit = parseInt(searchParams.get('limit') || '25', 10);
         const userFilter = searchParams.get('user');
 
-        // Build where clause - if environment is empty/null, return all environments
-        const whereClause: any = {
-            type: 'TASK'
-        };
+        // Build environment/user filter fragments for raw queries
+        const envFilter = environment ? Prisma.sql`AND environment = ${environment}` : Prisma.empty;
+        const userFilterSql = userFilter
+            ? Prisma.sql`AND ("createdByName" = ${userFilter} OR "createdByEmail" = ${userFilter})`
+            : Prisma.empty;
 
-        if (environment) {
-            whereClause.environment = environment;
-        }
-
-        if (userFilter) {
-            whereClause.OR = [
-                { createdByName: userFilter },
-                { createdByEmail: userFilter }
-            ];
-        }
-
-        // Get total count for pagination
-        const totalCount = await prisma.dataRecord.count({
-            where: whereClause
-        });
+        // Count only tasks with embeddings (these are the only ones comparable)
+        const countResult = await prisma.$queryRaw<Array<{ count: bigint }>>`
+            SELECT COUNT(*) as count
+            FROM data_records
+            WHERE type = 'TASK'
+            AND embedding IS NOT NULL
+            ${envFilter}
+            ${userFilterSql}
+        `;
+        const totalCount = Number(countResult[0]?.count ?? 0);
 
         // Calculate pagination
         const skip = (page - 1) * limit;
         const totalPages = Math.ceil(totalCount / limit);
 
-        // Fetch paginated tasks (filtered by environment if specified)
-        const tasks = await prisma.dataRecord.findMany({
-            where: whereClause,
-            select: {
-                id: true,
-                content: true,
-                environment: true,
-                metadata: true,
-                createdByName: true,
-                createdByEmail: true,
-                createdAt: true,
-            },
-            orderBy: {
-                createdAt: 'desc'
-            },
-            skip,
-            take: limit
-        });
+        // Fetch paginated tasks that have embeddings
+        const tasks = await prisma.$queryRaw<Array<{
+            id: string;
+            content: string;
+            environment: string;
+            metadata: any;
+            createdByName: string | null;
+            createdByEmail: string | null;
+            createdAt: Date;
+        }>>`
+            SELECT id, content, environment, metadata, "createdByName", "createdByEmail", "createdAt"
+            FROM data_records
+            WHERE type = 'TASK'
+            AND embedding IS NOT NULL
+            ${envFilter}
+            ${userFilterSql}
+            ORDER BY "createdAt" DESC
+            LIMIT ${limit} OFFSET ${skip}
+        `;
 
         // Format the response
         const formattedTasks = tasks.map(task => ({

@@ -488,6 +488,7 @@ export default function ExemplarTasksPage() {
         totalTasks: number;
         totalExemplars: number;
         missingEmbeddings: number;
+        tasksSkippedNoParse: number;
     } | null>(null);
     const [compareError, setCompareError] = useState('');
     const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
@@ -1054,7 +1055,7 @@ export default function ExemplarTasksPage() {
                             Similarity threshold
                             <input
                                 type="number"
-                                min={50}
+                                min={1}
                                 max={100}
                                 value={threshold}
                                 onChange={e => setThreshold(Number(e.target.value))}
@@ -1136,6 +1137,11 @@ export default function ExemplarTasksPage() {
                                         {compareResult.missingEmbeddings} exemplar{compareResult.missingEmbeddings !== 1 ? 's' : ''} skipped (no embedding).
                                     </span>
                                 )}
+                                {compareResult.tasksSkippedNoParse > 0 && (
+                                    <span style={{ color: 'rgba(255,180,0,0.7)', marginLeft: '8px' }}>
+                                        {compareResult.tasksSkippedNoParse} task{compareResult.tasksSkippedNoParse !== 1 ? 's' : ''} skipped (bad vector).
+                                    </span>
+                                )}
                                 {' '}Found <strong style={{ color: 'var(--text)' }}>{compareResult.matches.length}</strong> match{compareResult.matches.length !== 1 ? 'es' : ''} above {threshold}%.
                             </div>
 
@@ -1148,7 +1154,12 @@ export default function ExemplarTasksPage() {
                                     border: '1px dashed var(--border)',
                                     borderRadius: '10px',
                                 }}>
-                                    No tasks matched above {threshold}% threshold.
+                                    {compareResult.totalTasks === 0
+                                        ? 'No tasks with embeddings found in this environment. Make sure data has been ingested and vectorized.'
+                                        : compareResult.tasksSkippedNoParse === compareResult.totalTasks
+                                            ? 'All task vectors failed to parse. Try re-vectorizing your data records.'
+                                            : `No tasks matched above ${threshold}% threshold.`
+                                    }
                                 </div>
                             ) : (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
