@@ -1445,6 +1445,65 @@ model PromptAuthenticityJob {
 }
 
 /**
+ * AI QUALITY JOB: Background job for AI-powered task quality rating.
+ * Scores tasks 0-100 for quality (clarity, specificity, complexity, usefulness).
+ */
+model AIQualityJob {
+  id             String            @id
+  environment    String
+  status         String            @default("PENDING") // PENDING, PROCESSING, COMPLETED, FAILED
+  totalRecords   Int?              @map("totalRecords")
+  processedCount Int               @default(0) @map("processedCount")
+  errorCount     Int               @default(0) @map("errorCount")
+  errorMessage   String?           @map("errorMessage")
+  createdAt      DateTime          @default(now()) @map("createdAt") @db.Timestamptz(6)
+  updatedAt      DateTime          @default(now()) @updatedAt @map("updatedAt") @db.Timestamptz(6)
+  ratings        AIQualityRating[]
+
+  @@index([environment])
+  @@map("ai_quality_jobs")
+  @@schema("public")
+}
+
+/**
+ * AI QUALITY RATING: Individual task quality score from an AI quality job.
+ * Cascades delete when parent job is deleted.
+ */
+model AIQualityRating {
+  id        String       @id
+  jobId     String       @map("jobId")
+  recordId  String       @map("recordId")
+  content   String       @db.Text
+  score     Int
+  reasoning String?      @db.Text
+  createdAt DateTime     @default(now()) @map("createdAt") @db.Timestamptz(6)
+  job       AIQualityJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+  @@map("ai_quality_ratings")
+  @@schema("public")
+}
+
+/**
+ * EXEMPLAR TASK: Fleet-managed "golden standard" reference tasks per environment.
+ * Used for cosine similarity scanning to detect near-duplicates in real task data.
+ */
+model ExemplarTask {
+  id          String                 @id
+  environment String
+  title       String?
+  content     String                 @db.Text
+  embedding   Unsupported("vector")?
+  createdById String?                @map("created_by_id") @db.Uuid
+  createdAt   DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime               @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([environment])
+  @@map("exemplar_tasks")
+  @@schema("public")
+}
+
+/**
  * GUIDELINE: PDF-based guidelines for alignment analysis.
  * Can be associated with specific environments or left as default/global (environment = null).
  * Used by alignment scoring system to evaluate task/feedback quality.

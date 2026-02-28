@@ -29,6 +29,10 @@ Documentation/
 │   ├── User Management            → ./USER_MANAGEMENT.md
 │   └── Bug Reports                → ./BUG_REPORTS.md
 │
+├── Feature Guides/
+│   ├── Exemplar Tasks             → ./EXEMPLAR_TASKS.md
+│   └── Task Search                → ./TASK_SEARCH.md
+│
 ├── Development/
 │   ├── Local Development          → ./LOCAL_DEVELOPMENT.md
 │   ├── Testing Guide              → ./TESTING.md
@@ -75,6 +79,8 @@ Documentation/
 → [User Role Reference](./USER_ROLE_REFERENCE.md) (for USER role)
 → [User Management](./USER_MANAGEMENT.md)
 → [Bug Reports](./BUG_REPORTS.md)
+→ [Exemplar Tasks](./EXEMPLAR_TASKS.md) (Fleet)
+→ [Task Search](./TASK_SEARCH.md) (Core)
 
 #### **Develop Features**
 → [Local Development](./LOCAL_DEVELOPMENT.md)
@@ -317,4 +323,4 @@ Can't find what you're looking for?
 
 ---
 
-*Last Updated: 2024-02-02*
+*Last Updated: 2026-02-27*
