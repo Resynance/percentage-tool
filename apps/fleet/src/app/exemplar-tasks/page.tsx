@@ -16,6 +16,8 @@ interface ExemplarTask {
 interface CompareMatch {
     taskId: string;
     taskContent: string;
+    taskAuthor: string | null;
+    taskEmail: string | null;
     exemplarId: string;
     exemplarContent: string;
     similarity: number;
@@ -1178,6 +1180,21 @@ export default function ExemplarTasksPage() {
                                                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
                                                     <ScoreBadge score={match.similarity} />
                                                     <div style={{ flex: 1, minWidth: 0 }}>
+                                                        {/* Author / email / ID metadata */}
+                                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: '6px', fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)' }}>
+                                                            {(match.taskAuthor || match.taskEmail) && (
+                                                                <span>
+                                                                    {match.taskAuthor || match.taskEmail}
+                                                                    {match.taskAuthor && match.taskEmail && (
+                                                                        <span style={{ marginLeft: '4px', opacity: 0.6 }}>({match.taskEmail})</span>
+                                                                    )}
+                                                                </span>
+                                                            )}
+                                                            <span style={{ fontFamily: 'monospace', opacity: 0.6 }} title={match.taskId}>
+                                                                ID: {match.taskId.length > 16 ? match.taskId.slice(0, 16) + '…' : match.taskId}
+                                                            </span>
+                                                        </div>
+
                                                         {/* Task content */}
                                                         <div
                                                             style={{

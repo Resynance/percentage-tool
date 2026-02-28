@@ -102,8 +102,10 @@ export async function POST(request: NextRequest) {
             id: string;
             content: string;
             embedding: string;
+            createdByName: string | null;
+            createdByEmail: string | null;
         }>>`
-            SELECT id, content, embedding::text
+            SELECT id, content, embedding::text, "createdByName", "createdByEmail"
             FROM data_records
             WHERE LOWER(environment) = LOWER(${environment})
             AND type = 'TASK'
@@ -126,6 +128,8 @@ export async function POST(request: NextRequest) {
         const matches: Array<{
             taskId: string;
             taskContent: string;
+            taskAuthor: string | null;
+            taskEmail: string | null;
             exemplarId: string;
             exemplarContent: string;
             similarity: number;
@@ -160,6 +164,8 @@ export async function POST(request: NextRequest) {
                 matches.push({
                     taskId: task.id,
                     taskContent: task.content,
+                    taskAuthor: task.createdByName ?? null,
+                    taskEmail: task.createdByEmail ?? null,
                     exemplarId: bestExemplar.id,
                     exemplarContent: bestExemplar.content,
                     similarity: similarityPercent,
