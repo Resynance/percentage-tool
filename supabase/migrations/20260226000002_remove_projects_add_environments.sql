@@ -1,3 +1,6 @@
+-- Disable statement timeout for this migration — bulk UPDATE on data_records can be slow
+SET statement_timeout = 0;
+
 -- ============================================================================
 -- Remove Project Concept and Replace with Environment-Based Organization
 -- ============================================================================

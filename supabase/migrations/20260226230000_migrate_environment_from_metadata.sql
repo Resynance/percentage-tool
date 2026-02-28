@@ -1,3 +1,6 @@
+-- Disable statement timeout for this migration — bulk UPDATE on data_records can be slow
+SET statement_timeout = 0;
+
 -- Migrate environment data from metadata JSON to environment column
 -- This fixes the issue where environment is stored in metadata.environment_name or metadata.env_key
 -- but the environment column has incorrect data

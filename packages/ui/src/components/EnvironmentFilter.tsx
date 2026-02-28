@@ -37,7 +37,7 @@ export function EnvironmentFilter({
                 }
 
                 const data = await response.json();
-                setEnvironments(data.environments || []);
+                setEnvironments((data.environments || []).sort((a: string, b: string) => a.localeCompare(b)));
             } catch (err) {
                 console.error('Error fetching environments:', err);
                 setError('Failed to load environments');

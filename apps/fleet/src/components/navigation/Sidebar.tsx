@@ -28,7 +28,8 @@ import {
     Clock,
     ScanSearch,
     SearchCheck,
-    CalendarCheck
+    CalendarCheck,
+    BookMarked
 } from 'lucide-react';
 import { useState } from 'react';
 import { AppSwitcher } from '@repo/ui/components';
@@ -65,6 +66,8 @@ export default function Sidebar({ userRole }: { userRole?: string }) {
             title: 'Tasks & Feedback Tools',
             role: ['FLEET', 'MANAGER', 'ADMIN'],
             items: [
+                { label: 'AI Quality Rater', href: '/ai-quality-rating', icon: Sparkles },
+                { label: 'Exemplar Tasks', href: '/exemplar-tasks', icon: BookMarked },
                 { label: 'Full Similarity Check', href: '/full-similarity-check', icon: ScanSearch },
                 { label: 'Prompt Authenticity Checker', href: '/prompt-authenticity', icon: SearchCheck },
                 { label: 'QA Feedback Analysis', href: '/qa-feedback-analysis', icon: MessageSquare },

@@ -1,3 +1,6 @@
+-- Disable statement timeout for this migration — bulk UPDATE on data_records can be slow
+SET statement_timeout = 0;
+
 -- Fix vector dimension for OpenRouter embedding model
 -- OpenRouter's openai/text-embedding-3-small returns 1536 dimensions
 -- Local models (nomic-embed) use 1024 dimensions

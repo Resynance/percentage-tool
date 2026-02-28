@@ -20,17 +20,10 @@ interface DataRecordRow {
     environment: string;
     type: string;
     category: string;
-    source: string;
     content: string;
     metadata: Record<string, unknown> | null;
-    embedding: number[] | null;
-    hasBeenReviewed: boolean;
-    isCategoryCorrect: boolean | null;
-    reviewedBy: string | null;
-    alignmentAnalysis: string | null;
-    ingestJobId: string | null;
     createdAt: Date;
-    updatedAt: Date;
+    total_count: bigint;
 }
 
 export async function GET(req: NextRequest) {
@@ -139,26 +132,19 @@ export async function GET(req: NextRequest) {
             ? Prisma.sql`WHERE ${Prisma.join(whereConditions, ' AND ')}`
             : Prisma.empty;
 
+        // Single query: fetch rows + total count in one round-trip via window function
         const query = Prisma.sql`
-            SELECT id, environment, type, category, source, content, metadata, embedding,
-                   "hasBeenReviewed", "isCategoryCorrect", "reviewedBy", "alignmentAnalysis",
-                   "ingestJobId", "createdAt", "updatedAt"
+            SELECT id, environment, type, category, content, metadata, "createdAt",
+                   COUNT(*) OVER() as total_count
             FROM data_records
             ${whereClause}
             ${orderByClause}
             OFFSET ${skip} LIMIT ${take}
         `;
 
-        const records = await prisma.$queryRaw<DataRecordRow[]>(query);
-
-        // Use raw SQL for count to match the complex WHERE clause (including version filter)
-        const countQuery = Prisma.sql`
-            SELECT COUNT(*) as count
-            FROM data_records
-            ${whereClause}
-        `;
-        const countResult = await prisma.$queryRaw<{ count: bigint }[]>(countQuery);
-        const total = Number(countResult[0]?.count || 0);
+        const rows = await prisma.$queryRaw<DataRecordRow[]>(query);
+        const total = Number(rows[0]?.total_count || 0);
+        const records = rows.map(({ total_count, ...r }) => r);
 
         return NextResponse.json({ records, total });
     } catch (error: any) {

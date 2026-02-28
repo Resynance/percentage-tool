@@ -41,6 +41,14 @@ export async function GET() {
             ingestJobs.forEach(j => envSet.add(j.environment));
         } catch (e) { /* Table might not exist */ }
 
+        try {
+            const exemplarTasks = await prisma.exemplarTask.findMany({
+                select: { environment: true },
+                distinct: ['environment']
+            });
+            exemplarTasks.forEach(e => { if (e.environment) envSet.add(e.environment); });
+        } catch (e) { /* Table might not exist */ }
+
         const environments = Array.from(envSet).sort();
 
         return NextResponse.json({ environments });
