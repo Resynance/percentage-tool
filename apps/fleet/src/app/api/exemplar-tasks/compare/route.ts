@@ -97,6 +97,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Fetch real task records (limit 2000)
+        // Use case-insensitive match so exemplar environments like "MyEnv" match data records with "myenv"
         const tasks = await prisma.$queryRaw<Array<{
             id: string;
             content: string;
@@ -104,7 +105,7 @@ export async function POST(request: NextRequest) {
         }>>`
             SELECT id, content, embedding::text
             FROM data_records
-            WHERE environment = ${environment}
+            WHERE LOWER(environment) = LOWER(${environment})
             AND type = 'TASK'
             AND embedding IS NOT NULL
             LIMIT 2000

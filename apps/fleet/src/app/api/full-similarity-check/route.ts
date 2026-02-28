@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
         const userFilter = searchParams.get('user');
 
         // Build environment/user filter fragments for raw queries
-        const envFilter = environment ? Prisma.sql`AND environment = ${environment}` : Prisma.empty;
+        const envFilter = environment ? Prisma.sql`AND LOWER(environment) = LOWER(${environment})` : Prisma.empty;
         const userFilterSql = userFilter
             ? Prisma.sql`AND ("createdByName" = ${userFilter} OR "createdByEmail" = ${userFilter})`
             : Prisma.empty;

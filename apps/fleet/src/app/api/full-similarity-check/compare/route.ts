@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
             SELECT id, content, metadata, embedding, "createdByName", "createdByEmail", "createdAt"
             FROM data_records
             WHERE id = ANY(${taskIds}::text[])
-            AND environment = ${environment}
+            AND LOWER(environment) = LOWER(${environment})
             AND type = 'TASK'
             AND embedding IS NOT NULL
         `;
@@ -94,11 +94,11 @@ export async function POST(req: NextRequest) {
             // Build query to fetch comparison tasks
             let comparisonQuery;
             if (scope === 'environment') {
-                // Compare within same environment
+                // Compare within same environment (case-insensitive)
                 comparisonQuery = Prisma.sql`
                     SELECT id, content, metadata, environment, embedding, "createdByName", "createdByEmail", "createdAt"
                     FROM data_records
-                    WHERE environment = ${environment}
+                    WHERE LOWER(environment) = LOWER(${environment})
                     AND type = 'TASK'
                     AND id != ${sourceTask.id}
                     AND embedding IS NOT NULL
