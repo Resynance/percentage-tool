@@ -17,10 +17,16 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const profile = await prisma.profile.findUnique({
-        where: { id: user.id },
-        select: { role: true },
-    });
+    let profile;
+    try {
+        profile = await prisma.profile.findUnique({
+            where: { id: user.id },
+            select: { role: true },
+        });
+    } catch (profileErr) {
+        console.error('[TaskSearch] Failed to fetch profile for user', user.id, profileErr);
+        return NextResponse.json({ error: 'Failed to verify permissions' }, { status: 500 });
+    }
 
     if (!profile || !['CORE', 'FLEET', 'MANAGER', 'ADMIN'].includes(profile.role)) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
@@ -55,7 +61,7 @@ export async function GET(request: NextRequest) {
 
         return NextResponse.json({ tasks });
     } catch (error: any) {
-        console.error('[TaskSearch] Error:', error);
+        console.error(`[TaskSearch] Search query failed. Query: "${q}"`, error);
         return NextResponse.json({ error: 'Search failed' }, { status: 500 });
     }
 }

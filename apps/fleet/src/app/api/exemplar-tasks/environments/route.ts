@@ -16,6 +16,21 @@ export async function GET() {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+
+    if (profileError) {
+        console.error('[ExemplarEnvironments] Failed to fetch profile:', profileError);
+        return NextResponse.json({ error: 'Failed to verify permissions' }, { status: 500 });
+    }
+
+    if (!profile || !['FLEET', 'MANAGER', 'ADMIN'].includes(profile.role)) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     try {
         const rows = await prisma.$queryRaw<Array<{ environment: string }>>`
             SELECT DISTINCT environment
@@ -25,8 +40,8 @@ export async function GET() {
 
         const environments = rows.map(r => r.environment);
         return NextResponse.json({ environments });
-    } catch (error: any) {
-        console.error('Error fetching exemplar environments:', error);
+    } catch (err: any) {
+        console.error('[ExemplarEnvironments] Error fetching environments:', err);
         return NextResponse.json({ error: 'Failed to fetch environments' }, { status: 500 });
     }
 }

@@ -13,11 +13,16 @@ async function requireFleetAuth(request: NextRequest) {
         return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
     }
 
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('role')
         .eq('id', user.id)
         .single();
+
+    if (profileError) {
+        console.error('[ExemplarTasks] Failed to fetch profile for user', user.id, profileError);
+        return { error: NextResponse.json({ error: 'Failed to verify permissions' }, { status: 500 }) };
+    }
 
     if (!profile || !['FLEET', 'MANAGER', 'ADMIN'].includes(profile.role)) {
         return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
@@ -50,7 +55,12 @@ export async function PATCH(
         }
 
         const updateData: { content?: string } = {};
-        if (content !== undefined) updateData.content = content.trim();
+        if (content !== undefined) {
+            if (typeof content !== 'string' || !content.trim()) {
+                return NextResponse.json({ error: 'content must be a non-empty string' }, { status: 400 });
+            }
+            updateData.content = content.trim();
+        }
 
         const exemplar = await prisma.exemplarTask.update({
             where: { id },
@@ -67,6 +77,7 @@ export async function PATCH(
 
         // Regenerate embedding if content changed
         let hasEmbedding = false;
+        let embeddingWarning: string | undefined;
         if (content !== undefined && content.trim() !== existing.content) {
             try {
                 const embedding = await getEmbedding(content.trim());
@@ -78,9 +89,12 @@ export async function PATCH(
                         WHERE id = ${id}
                     `;
                     hasEmbedding = true;
+                } else {
+                    embeddingWarning = 'Content saved but embedding generation failed. Use "Generate Missing Embeddings" to retry.';
                 }
             } catch (embeddingError) {
-                console.error('[ExemplarTasks] Failed to regenerate embedding:', embeddingError);
+                console.error('[ExemplarTasks] Failed to regenerate embedding for', id, embeddingError);
+                embeddingWarning = 'Content saved but embedding generation failed. Use "Generate Missing Embeddings" to retry.';
             }
         } else {
             // Check if it already has an embedding
@@ -90,10 +104,13 @@ export async function PATCH(
             hasEmbedding = rows.length > 0;
         }
 
-        return NextResponse.json({ exemplar: { ...exemplar, hasEmbedding } });
-    } catch (error: any) {
-        console.error('Error updating exemplar task:', error);
-        return NextResponse.json({ error: error.message || 'Failed to update exemplar task' }, { status: 500 });
+        return NextResponse.json({
+            exemplar: { ...exemplar, hasEmbedding },
+            ...(embeddingWarning && { embeddingWarning }),
+        });
+    } catch (err) {
+        console.error('[ExemplarTasks] Error updating exemplar task', id, err);
+        return NextResponse.json({ error: 'Failed to update exemplar task' }, { status: 500 });
     }
 }
 
@@ -113,11 +130,11 @@ export async function DELETE(
     try {
         await prisma.exemplarTask.delete({ where: { id } });
         return NextResponse.json({ success: true });
-    } catch (error: any) {
-        if (error.code === 'P2025') {
+    } catch (err: any) {
+        if (err.code === 'P2025') {
             return NextResponse.json({ error: 'Exemplar task not found' }, { status: 404 });
         }
-        console.error('Error deleting exemplar task:', error);
-        return NextResponse.json({ error: error.message || 'Failed to delete exemplar task' }, { status: 500 });
+        console.error('[ExemplarTasks] Error deleting exemplar task', id, err);
+        return NextResponse.json({ error: 'Failed to delete exemplar task' }, { status: 500 });
     }
 }

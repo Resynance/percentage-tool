@@ -13,11 +13,16 @@ async function requireFleetAuth(request: NextRequest) {
         return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
     }
 
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('role')
         .eq('id', user.id)
         .single();
+
+    if (profileError) {
+        console.error('[ExemplarCompare] Failed to fetch profile for user', user.id, profileError);
+        return { error: NextResponse.json({ error: 'Failed to verify permissions' }, { status: 500 }) };
+    }
 
     if (!profile || !['FLEET', 'MANAGER', 'ADMIN'].includes(profile.role)) {
         return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
@@ -37,7 +42,12 @@ function parseVector(embedding: any): number[] | null {
         try {
             const cleaned = embedding.replace(/[\[\]]/g, '');
             const values = cleaned.split(',').map((v: string) => parseFloat(v.trim()));
-            return values.filter((v: number) => !isNaN(v));
+            // Reject vectors with any NaN entries — a truncated vector produces meaningless similarity scores
+            if (values.some((v: number) => isNaN(v))) {
+                console.error(`[ExemplarCompare] Vector contained NaN entries, rejecting`);
+                return null;
+            }
+            return values;
         } catch (e) {
             console.error('[ExemplarCompare] Failed to parse vector string:', e);
             return null;
@@ -120,9 +130,14 @@ export async function POST(request: NextRequest) {
             similarity: number;
         }> = [];
 
+        let tasksSkippedNoParse = 0;
+
         for (const task of tasks) {
             const taskVector = parseVector(task.embedding);
-            if (!taskVector) continue;
+            if (!taskVector) {
+                tasksSkippedNoParse++;
+                continue;
+            }
 
             let bestSimilarity = -1;
             let bestExemplar: typeof parsedExemplars[0] | null = null;
@@ -159,12 +174,10 @@ export async function POST(request: NextRequest) {
             totalTasks,
             totalExemplars,
             missingEmbeddings,
+            tasksSkippedNoParse,
         });
-    } catch (error: any) {
-        console.error('Error running exemplar comparison:', error);
-        return NextResponse.json({
-            error: 'Internal server error',
-            details: error.message,
-        }, { status: 500 });
+    } catch (err) {
+        console.error('[ExemplarCompare] Error running exemplar comparison:', err);
+        return NextResponse.json({ error: 'Failed to run comparison' }, { status: 500 });
     }
 }

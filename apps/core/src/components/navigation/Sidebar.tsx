@@ -51,7 +51,7 @@ export default function Sidebar({ userRole }: { userRole?: string }) {
     const sections: NavSection[] = [
         {
             title: 'Scoring',
-            role: ['CORE', 'FLEET', 'ADMIN'],
+            role: ['CORE', 'FLEET', 'MANAGER', 'ADMIN'],
             items: [
                 { label: 'Alignment Scoring', href: '/alignment-scoring', icon: Sparkles },
                 { label: 'Candidate Review', href: '/candidate-review', icon: MessageSquare },

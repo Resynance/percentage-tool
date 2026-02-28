@@ -13,11 +13,16 @@ async function requireFleetAuth(request: NextRequest) {
         return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
     }
 
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('role')
         .eq('id', user.id)
         .single();
+
+    if (profileError) {
+        console.error('[ExemplarTasks] Failed to fetch profile for user', user.id, profileError);
+        return { error: NextResponse.json({ error: 'Failed to verify permissions' }, { status: 500 }) };
+    }
 
     if (!profile || !['FLEET', 'MANAGER', 'ADMIN'].includes(profile.role)) {
         return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
@@ -69,8 +74,8 @@ export async function GET(request: NextRequest) {
         }));
 
         return NextResponse.json({ exemplars: result });
-    } catch (error) {
-        console.error('Error fetching exemplar tasks:', error);
+    } catch (err) {
+        console.error('[ExemplarTasks] Error fetching exemplar tasks:', err);
         return NextResponse.json({ error: 'Failed to fetch exemplar tasks' }, { status: 500 });
     }
 }
@@ -114,6 +119,7 @@ export async function POST(request: NextRequest) {
 
         // Generate and store embedding
         let hasEmbedding = false;
+        let embeddingWarning: string | undefined;
         try {
             const embedding = await getEmbedding(content.trim());
             if (embedding && embedding.length > 0) {
@@ -124,14 +130,20 @@ export async function POST(request: NextRequest) {
                     WHERE id = ${id}
                 `;
                 hasEmbedding = true;
+            } else {
+                embeddingWarning = 'Task saved but embedding generation failed. Use "Generate Missing Embeddings" to retry.';
             }
         } catch (embeddingError) {
-            console.error('[ExemplarTasks] Failed to generate embedding:', embeddingError);
+            console.error('[ExemplarTasks] Failed to generate embedding for', id, embeddingError);
+            embeddingWarning = 'Task saved but embedding generation failed. Use "Generate Missing Embeddings" to retry.';
         }
 
-        return NextResponse.json({ exemplar: { ...exemplar, hasEmbedding } }, { status: 201 });
-    } catch (error: any) {
-        console.error('Error creating exemplar task:', error);
-        return NextResponse.json({ error: error.message || 'Failed to create exemplar task' }, { status: 500 });
+        return NextResponse.json(
+            { exemplar: { ...exemplar, hasEmbedding }, ...(embeddingWarning && { embeddingWarning }) },
+            { status: 201 }
+        );
+    } catch (err) {
+        console.error('[ExemplarTasks] Error creating exemplar task:', err);
+        return NextResponse.json({ error: 'Failed to create exemplar task' }, { status: 500 });
     }
 }

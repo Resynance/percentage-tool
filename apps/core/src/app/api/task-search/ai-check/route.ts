@@ -33,10 +33,16 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const profile = await prisma.profile.findUnique({
-        where: { id: user.id },
-        select: { role: true },
-    });
+    let profile;
+    try {
+        profile = await prisma.profile.findUnique({
+            where: { id: user.id },
+            select: { role: true },
+        });
+    } catch (profileErr) {
+        console.error('[AICheck] Failed to fetch profile for user', user.id, profileErr);
+        return NextResponse.json({ error: 'Failed to verify permissions' }, { status: 500 });
+    }
 
     if (!profile || !['CORE', 'FLEET', 'MANAGER', 'ADMIN'].includes(profile.role)) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
@@ -59,7 +65,13 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'AI returned an unexpected response format' }, { status: 502 });
         }
 
-        const result = JSON.parse(jsonMatch[0]);
+        let result;
+        try {
+            result = JSON.parse(jsonMatch[0]);
+        } catch (parseErr) {
+            console.error('[AICheck] Failed to parse JSON from LLM response. Raw response:', raw);
+            return NextResponse.json({ error: 'AI returned a malformed JSON response' }, { status: 502 });
+        }
 
         const validVerdicts = ['AI_GENERATED', 'TEMPLATED', 'AUTHENTIC'];
         const validConfidences = ['HIGH', 'MEDIUM', 'LOW'];
@@ -74,8 +86,8 @@ export async function POST(request: NextRequest) {
             reasoning: result.reasoning ?? '',
             indicators: Array.isArray(result.indicators) ? result.indicators : [],
         });
-    } catch (error: any) {
+    } catch (error) {
         console.error('[AICheck] Error:', error);
-        return NextResponse.json({ error: error.message || 'AI check failed' }, { status: 500 });
+        return NextResponse.json({ error: 'AI check failed' }, { status: 500 });
     }
 }

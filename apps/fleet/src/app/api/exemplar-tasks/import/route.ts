@@ -14,11 +14,16 @@ async function requireFleetAuth(request: NextRequest) {
         return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
     }
 
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('role')
         .eq('id', user.id)
         .single();
+
+    if (profileError) {
+        console.error('[ExemplarImport] Failed to fetch profile for user', user.id, profileError);
+        return { error: NextResponse.json({ error: 'Failed to verify permissions' }, { status: 500 }) };
+    }
 
     if (!profile || !['FLEET', 'MANAGER', 'ADMIN'].includes(profile.role)) {
         return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
@@ -75,8 +80,9 @@ function parseCSV(text: string): string[][] {
  *
  * Expected CSV columns: ENV, Prompt, (other columns ignored)
  * Optional body field: filterEnvironment — if set, only rows matching that env are imported.
+ * Rows where the Changes column contains "deleted" are skipped.
  *
- * Returns: { imported, skipped, errors }
+ * Returns: { imported, skipped, embeddingErrors, embeddingWarning? }
  */
 export async function POST(request: NextRequest) {
     const authResult = await requireFleetAuth(request);
@@ -168,6 +174,7 @@ export async function POST(request: NextRequest) {
             try {
                 const embedding = await getEmbedding(row.content);
                 if (!embedding || embedding.length === 0) {
+                    console.error(`[ExemplarImport] AI returned empty embedding for row ${row.id} (env: ${row.environment})`);
                     embeddingErrors++;
                     continue;
                 }
@@ -187,9 +194,12 @@ export async function POST(request: NextRequest) {
             imported: insertedIds.length,
             skipped,
             embeddingErrors,
+            ...(embeddingErrors > 0 && {
+                embeddingWarning: `${embeddingErrors} task${embeddingErrors > 1 ? 's were' : ' was'} imported without embeddings. Use "Generate Missing Embeddings" to retry.`,
+            }),
         });
-    } catch (error: any) {
-        console.error('Error importing exemplar tasks:', error);
-        return NextResponse.json({ error: error.message || 'Import failed' }, { status: 500 });
+    } catch (err) {
+        console.error('[ExemplarImport] Error importing exemplar tasks:', err);
+        return NextResponse.json({ error: 'Import failed' }, { status: 500 });
     }
 }

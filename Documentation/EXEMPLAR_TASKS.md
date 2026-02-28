@@ -198,7 +198,7 @@ All endpoints require FLEET, MANAGER, or ADMIN role.
 | `DELETE` | `/api/exemplar-tasks/[id]` | Delete an exemplar |
 | `POST` | `/api/exemplar-tasks/compare` | Run cosine similarity scan |
 | `POST` | `/api/exemplar-tasks/import` | Bulk CSV import with embedding generation |
-| `POST` | `/api/exemplar-tasks/embed-pending` | Regenerate embeddings for rows missing them |
+| `POST` | `/api/exemplar-tasks/embed-pending` | Regenerate embeddings for rows missing them (body: `{ environment? }`) |
 | `GET` | `/api/exemplar-tasks/environments` | List distinct environments from exemplar_tasks only |
 
 #### Compare Request Body
@@ -219,11 +219,12 @@ All endpoints require FLEET, MANAGER, or ADMIN role.
     taskContent: string;
     exemplarId: string;
     exemplarContent: string;
-    similarity: number;  // percentage, e.g. 84.2
+    similarity: number;       // percentage, e.g. 84.2
   }>;
-  totalTasks: number;
+  totalTasks: number;         // Tasks with embeddings scanned (capped at 2,000; excludes tasks without embeddings)
   totalExemplars: number;
-  missingEmbeddings: number;
+  missingEmbeddings: number;  // Exemplars whose vectors could not be parsed
+  tasksSkippedNoParse: number; // Tasks skipped due to unparseable embedding vectors
 }
 ```
 
@@ -243,6 +244,17 @@ Multipart form data:
   imported: number;
   skipped: number;
   embeddingErrors: number;
+  embeddingWarning?: string; // Present when embeddingErrors > 0
+}
+```
+
+#### Embed-Pending Response
+
+```typescript
+{
+  processed: number;  // Total rows attempted
+  succeeded: number;  // Embeddings successfully written
+  failed: number;     // Rows where embedding generation failed
 }
 ```
 
@@ -271,7 +283,7 @@ The comparison is O(tasks × exemplars) and is capped at 2,000 tasks per run. Fo
 ## Related Documentation
 
 - [Fleet Guide](./UserGuides/FLEET_GUIDE.md)
-- [Full Similarity Check](../CLAUDE.md#full-similarity-check) — per-task similarity scan (different from exemplar-based approach)
+- Full Similarity Check (`/full-similarity-check`) — a complementary tool for per-task similarity scanning across all records, without a curated exemplar library
 - [Database Schema](./Reference/DATABASE_SCHEMA.md)
 - [API Reference](./Reference/API_REFERENCE.md)
 

@@ -14,11 +14,16 @@ async function requireFleetAuth(request: NextRequest) {
         return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
     }
 
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('role')
         .eq('id', user.id)
         .single();
+
+    if (profileError) {
+        console.error('[EmbedPending] Failed to fetch profile for user', user.id, profileError);
+        return { error: NextResponse.json({ error: 'Failed to verify permissions' }, { status: 500 }) };
+    }
 
     if (!profile || !['FLEET', 'MANAGER', 'ADMIN'].includes(profile.role)) {
         return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
@@ -31,6 +36,7 @@ async function requireFleetAuth(request: NextRequest) {
  * POST /api/exemplar-tasks/embed-pending
  * Generate embeddings for all exemplar tasks that are missing one.
  * Body: { environment? } — if provided, only processes that environment.
+ * Returns: { processed, succeeded, failed }
  */
 export async function POST(request: NextRequest) {
     const authResult = await requireFleetAuth(request);
@@ -63,6 +69,7 @@ export async function POST(request: NextRequest) {
             try {
                 const embedding = await getEmbedding(row.content);
                 if (!embedding || embedding.length === 0) {
+                    console.error(`[EmbedPending] AI returned empty embedding for exemplar ${row.id}`);
                     failed++;
                     continue;
                 }
@@ -80,8 +87,8 @@ export async function POST(request: NextRequest) {
         }
 
         return NextResponse.json({ processed: pending.length, succeeded, failed });
-    } catch (error: any) {
-        console.error('Error generating pending embeddings:', error);
-        return NextResponse.json({ error: error.message || 'Failed' }, { status: 500 });
+    } catch (err) {
+        console.error('[EmbedPending] Error generating pending embeddings:', err);
+        return NextResponse.json({ error: 'Failed to generate embeddings' }, { status: 500 });
     }
 }
