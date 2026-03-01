@@ -40,6 +40,15 @@ function parseVector(vectorStr: string): number[] {
     return inner.split(',').map(Number);
 }
 
+// Cap the number of tasks fed into the O(n²) comparison to prevent timeouts.
+// At 500 records: ~125K comparisons (fast). At 1000: ~500K (slow). At 2000: ~2M (likely timeout).
+//
+// Trade-off: only the most recent RECORD_LIMIT tasks are analysed. High-similarity pairs
+// that span across this boundary (one record inside the window, one outside) will not be
+// detected. The UI surfaces "Analyzing X of Y" so users are aware when the cap is active.
+// If wider coverage is needed, consider paginating the analysis or using a pgvector ANN index.
+const RECORD_LIMIT = 500;
+
 export async function GET(request: NextRequest) {
     try {
         const { searchParams } = new URL(request.url);
@@ -50,21 +59,34 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'environment is required' }, { status: 400 });
         }
 
-        // Fetch all TASK records with embeddings using raw SQL
-        const records: RecordWithEmbedding[] = await prisma.$queryRaw`
-            SELECT
-                id,
-                content,
-                "createdById",
-                "createdByName",
-                "createdByEmail",
-                "createdAt",
-                embedding::text as embedding
-            FROM public.data_records
-            WHERE "environment" = ${environment}
-            AND type = 'TASK'
-            AND embedding IS NOT NULL
-        `;
+        // Run count and fetch in parallel — both are independent reads
+        const [countResult, records] = await Promise.all([
+            prisma.$queryRaw<[{ count: bigint }]>`
+                SELECT COUNT(*) as count
+                FROM public.data_records
+                WHERE "environment" = ${environment}
+                AND type = 'TASK'
+                AND embedding IS NOT NULL
+            `,
+            prisma.$queryRaw<RecordWithEmbedding[]>`
+                SELECT
+                    id,
+                    content,
+                    "createdById",
+                    "createdByName",
+                    "createdByEmail",
+                    "createdAt",
+                    embedding::text as embedding
+                FROM public.data_records
+                WHERE "environment" = ${environment}
+                AND type = 'TASK'
+                AND embedding IS NOT NULL
+                ORDER BY "createdAt" DESC
+                LIMIT ${RECORD_LIMIT}
+            `,
+        ]);
+
+        const totalTasksWithEmbeddings = Number(countResult[0].count);
 
         const redZonePairs: RedZonePair[] = [];
         const seenPairs = new Set<string>();
@@ -121,6 +143,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({
             pairs: redZonePairs,
             totalPrompts: recordsWithParsedEmbeddings.length,
+            totalTasksWithEmbeddings,
             redZoneCount: redZonePairs.length,
         });
     } catch (error: unknown) {

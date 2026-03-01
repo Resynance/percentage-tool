@@ -16,6 +16,19 @@ import { generateCompletionWithUsage } from '@repo/core/ai';
 import { extractTextFromPDF } from '@repo/core/utils';
 import { createClient } from '@repo/auth/server';
 
+// Module-level cache — persists across requests in the same server process.
+// Key: guideline.id, Value: { text, expiresAt }.
+// TTL: 30 minutes. Without a TTL, re-uploading a PDF (same guideline ID, new content)
+// would serve stale extracted text until the server process restarted.
+const GUIDELINE_CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
+
+interface CachedGuideline {
+    text: string;
+    expiresAt: number;
+}
+
+const guidelineTextCache = new Map<string, CachedGuideline>();
+
 export async function POST(req: NextRequest) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -109,44 +122,51 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'No guidelines found for this environment. Please upload guidelines in the Fleet app.' }, { status: 400 });
         }
 
-        // Parse PDF guidelines
-        let guidelinesText = '';
-        const base64Data = guideline.content.split(';base64,').pop() || guideline.content;
+        // Parse PDF guidelines (with in-process cache to avoid re-parsing on every request)
+        const now = Date.now();
+        const cachedGuideline = guidelineTextCache.get(guideline.id);
+        let guidelinesText = (cachedGuideline && cachedGuideline.expiresAt > now) ? cachedGuideline.text : '';
 
-        if (!base64Data) {
-            console.error('Compare API Error: Guidelines data is not in expected base64 format', {
-                environment: record.environment,
-                recordId: record.id
-            });
-            return NextResponse.json({
-                error: 'Project guidelines are corrupted. Please re-upload the guidelines PDF in Project Management.'
-            }, { status: 400 });
-        }
+        if (!guidelinesText) {
+            const base64Data = guideline.content.split(';base64,').pop() || guideline.content;
 
-        try {
-            const buffer = Buffer.from(base64Data, 'base64');
-            const parsed = await extractTextFromPDF(buffer);
-            guidelinesText = parsed.text;
-
-            if (!guidelinesText || guidelinesText.trim().length === 0) {
-                console.error('Compare API Error: PDF parsed successfully but contains no text content', {
+            if (!base64Data) {
+                console.error('Compare API Error: Guidelines data is not in expected base64 format', {
                     environment: record.environment,
                     recordId: record.id
                 });
                 return NextResponse.json({
-                    error: 'The guidelines PDF appears to be empty or contains only images. Please upload a PDF with extractable text.'
+                    error: 'Project guidelines are corrupted. Please re-upload the guidelines PDF in Project Management.'
                 }, { status: 400 });
             }
-        } catch (pdfError: any) {
-            console.error('Compare API Error: PDF parsing failed', {
-                environment: record.environment,
-                recordId: record.id,
-                error: pdfError.message,
-                stack: pdfError.stack
-            });
-            return NextResponse.json({
-                error: `Could not parse guidelines PDF: ${pdfError.message}. Please verify the PDF is not corrupted and try re-uploading.`
-            }, { status: 400 });
+
+            try {
+                const buffer = Buffer.from(base64Data, 'base64');
+                const parsed = await extractTextFromPDF(buffer);
+                guidelinesText = parsed.text;
+
+                if (!guidelinesText || guidelinesText.trim().length === 0) {
+                    console.error('Compare API Error: PDF parsed successfully but contains no text content', {
+                        environment: record.environment,
+                        recordId: record.id
+                    });
+                    return NextResponse.json({
+                        error: 'The guidelines PDF appears to be empty or contains only images. Please upload a PDF with extractable text.'
+                    }, { status: 400 });
+                }
+
+                guidelineTextCache.set(guideline.id, { text: guidelinesText, expiresAt: now + GUIDELINE_CACHE_TTL_MS });
+            } catch (pdfError: any) {
+                console.error('Compare API Error: PDF parsing failed', {
+                    environment: record.environment,
+                    recordId: record.id,
+                    error: pdfError.message,
+                    stack: pdfError.stack
+                });
+                return NextResponse.json({
+                    error: `Could not parse guidelines PDF: ${pdfError.message}. Please verify the PDF is not corrupted and try re-uploading.`
+                }, { status: 400 });
+            }
         }
 
         const systemPrompt = `You are an expert AI Alignment Lead and Quality Assurance Analyst for the ${record.environment} environment.`;

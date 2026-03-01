@@ -96,19 +96,37 @@ export async function GET(req: Request) {
             }, { status: 400 })
         }
 
-        // Get task details
-        const task = await prisma.dataRecord.findUnique({
-            where: { id: taskId },
-            select: {
-                id: true,
-                content: true,
-                metadata: true,
-                createdAt: true,
-                createdByEmail: true,
-                createdByName: true,
-                type: true,
-            }
-        })
+        // Step 1 (parallel): fetch task details and direct ratings — both only need taskId
+        const [task, directRatings] = await Promise.all([
+            prisma.dataRecord.findUnique({
+                where: { id: taskId },
+                select: {
+                    id: true,
+                    content: true,
+                    metadata: true,
+                    createdAt: true,
+                    createdByEmail: true,
+                    createdByName: true,
+                    type: true,
+                }
+            }),
+            prisma.qAFeedbackRating.findMany({
+                where: { evalTaskId: taskId },
+                select: {
+                    feedbackId: true,
+                    feedbackContent: true,
+                    ratingId: true,
+                    isHelpful: true,
+                    isDispute: true,
+                    ratedAt: true,
+                    raterEmail: true,
+                    qaEmail: true,
+                    qaName: true,
+                    createdAt: true,
+                },
+                orderBy: { ratedAt: 'desc' }
+            }),
+        ])
 
         if (!task) {
             return NextResponse.json({
@@ -120,7 +138,7 @@ export async function GET(req: Request) {
         const metadata = task.metadata as any
         const taskDetails: TaskDetails = {
             id: task.id,
-            content: metadata?.task_prompt || task.content, // Use full task_prompt from metadata if available
+            content: metadata?.task_prompt || task.content,
             environment: metadata?.scenario_title || metadata?.env_key || metadata?.environment_name || null,
             createdAt: task.createdAt,
             createdByEmail: task.createdByEmail,
@@ -128,75 +146,53 @@ export async function GET(req: Request) {
             metadata: task.metadata,
         }
 
-        // Get related tasks from the same worker within 7 days
-        const relatedTasks: RelatedTask[] = []
-
-        if (task.createdByEmail) {
-            const sevenDaysAgo = new Date(task.createdAt)
-            sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-
-            const sevenDaysAhead = new Date(task.createdAt)
-            sevenDaysAhead.setDate(sevenDaysAhead.getDate() + 7)
-
-            const related = await prisma.dataRecord.findMany({
-                where: {
-                    type: 'TASK',
-                    createdByEmail: task.createdByEmail,
-                    id: { not: taskId }, // Exclude current task
-                    createdAt: {
-                        gte: sevenDaysAgo,
-                        lte: sevenDaysAhead,
-                    }
-                },
-                select: {
-                    id: true,
-                    content: true,
-                    metadata: true,
-                    createdAt: true,
-                },
-                orderBy: {
-                    createdAt: 'desc'
-                },
-                take: 10, // Limit to 10 related tasks
-            })
-
-            relatedTasks.push(...related.map(r => {
-                const relMetadata = r.metadata as any
-                const fullContent = relMetadata?.task_prompt || r.content
-                return {
-                    id: r.id,
-                    content: fullContent.slice(0, 150) + (fullContent.length > 150 ? '...' : ''),
-                    environment: relMetadata?.scenario_title || relMetadata?.env_key || relMetadata?.environment_name || null,
-                    createdAt: r.createdAt,
-                }
-            }))
-        }
-
-        // Get all feedbacks for this task from two sources:
-        // 1. Feedback records in data_records (legacy)
-        // 2. Ratings in qa_feedback_ratings (new import)
         const taskKey = metadata?.task_key
-        const allFeedbacks: FeedbackWithRating[] = []
 
-        // First, get ratings directly linked to this task
-        const directRatings = await prisma.qAFeedbackRating.findMany({
-            where: { evalTaskId: taskId },
-            select: {
-                feedbackId: true,
-                feedbackContent: true,
-                ratingId: true,
-                isHelpful: true,
-                isDispute: true,
-                ratedAt: true,
-                raterEmail: true,
-                qaEmail: true,
-                qaName: true,
-                createdAt: true,
-            },
-            orderBy: { ratedAt: 'desc' }
+        // Step 2 (parallel): fetch related tasks and legacy feedback records — both depend on task data
+        const sevenDaysAgo = new Date(task.createdAt)
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+        const sevenDaysAhead = new Date(task.createdAt)
+        sevenDaysAhead.setDate(sevenDaysAhead.getDate() + 7)
+
+        const [relatedRaw, matchingFeedbacks] = await Promise.all([
+            task.createdByEmail
+                ? prisma.dataRecord.findMany({
+                    where: {
+                        type: 'TASK',
+                        createdByEmail: task.createdByEmail,
+                        id: { not: taskId },
+                        createdAt: { gte: sevenDaysAgo, lte: sevenDaysAhead },
+                    },
+                    select: { id: true, content: true, metadata: true, createdAt: true },
+                    orderBy: { createdAt: 'desc' },
+                    take: 10,
+                })
+                : Promise.resolve([]),
+            taskKey
+                ? prisma.dataRecord.findMany({
+                    where: {
+                        type: 'FEEDBACK',
+                        metadata: { path: ['task_key'], equals: taskKey }
+                    },
+                    select: { id: true, content: true, createdAt: true, createdByEmail: true, createdByName: true, metadata: true }
+                })
+                : Promise.resolve([]),
+        ])
+
+        const relatedTasks: RelatedTask[] = relatedRaw.map(r => {
+            const relMetadata = r.metadata as any
+            const fullContent = relMetadata?.task_prompt || r.content
+            return {
+                id: r.id,
+                content: fullContent.slice(0, 150) + (fullContent.length > 150 ? '...' : ''),
+                environment: relMetadata?.scenario_title || relMetadata?.env_key || relMetadata?.environment_name || null,
+                createdAt: r.createdAt,
+            }
         })
 
-        // Add direct ratings to feedback list
+        // Step 3: fetch ratings for legacy feedback records (depends on step 2)
+        const allFeedbacks: FeedbackWithRating[] = []
+
         for (const rating of directRatings) {
             allFeedbacks.push({
                 feedbackId: rating.feedbackId,
@@ -212,50 +208,19 @@ export async function GET(req: Request) {
             })
         }
 
-        // Then, get feedback records from data_records (if any)
-        if (taskKey) {
-            // Use Prisma JSON filtering to query at database level (avoid full table scan)
-            const matchingFeedbacks = await prisma.dataRecord.findMany({
-                where: {
-                    type: 'FEEDBACK',
-                    metadata: {
-                        path: ['task_key'],
-                        equals: taskKey
-                    }
-                },
-                select: {
-                    id: true,
-                    content: true,
-                    createdAt: true,
-                    createdByEmail: true,
-                    createdByName: true,
-                    metadata: true,
-                }
-            })
-
-            // Batch rating lookups (avoid N+1)
+        if (matchingFeedbacks.length > 0) {
             const feedbackKeys = matchingFeedbacks.map(f => {
                 const fMetadata = f.metadata as any
                 return fMetadata?.feedback_key || f.id
             })
 
-            const ratings = await prisma.qAFeedbackRating.findMany({
-                where: {
-                    feedbackId: { in: feedbackKeys }
-                },
-                select: {
-                    feedbackId: true,
-                    ratingId: true,
-                    isHelpful: true,
-                    isDispute: true,
-                    ratedAt: true,
-                    raterEmail: true,
-                }
+            const feedbackRatings = await prisma.qAFeedbackRating.findMany({
+                where: { feedbackId: { in: feedbackKeys } },
+                select: { feedbackId: true, ratingId: true, isHelpful: true, isDispute: true, ratedAt: true, raterEmail: true }
             })
 
-            const ratingMap = new Map(ratings.map(r => [r.feedbackId, r]))
+            const ratingMap = new Map(feedbackRatings.map(r => [r.feedbackId, r]))
 
-            // Build feedback list with ratings
             for (const feedback of matchingFeedbacks) {
                 const fMetadata = feedback.metadata as any
                 const feedbackKey = fMetadata?.feedback_key || feedback.id
@@ -263,7 +228,7 @@ export async function GET(req: Request) {
 
                 allFeedbacks.push({
                     feedbackId: feedback.id,
-                    feedbackContent: fMetadata?.feedback_content || feedback.content, // Use full feedback_content from metadata if available
+                    feedbackContent: fMetadata?.feedback_content || feedback.content,
                     feedbackCreatedAt: feedback.createdAt,
                     qaEmail: feedback.createdByEmail,
                     qaName: feedback.createdByName,

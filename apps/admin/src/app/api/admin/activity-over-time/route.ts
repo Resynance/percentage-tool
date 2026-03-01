@@ -104,79 +104,43 @@ export async function GET(req: Request) {
             startDate.setHours(0, 0, 0, 0)
         }
 
-        // Fetch all records in the date range
-        const records = await prisma.dataRecord.findMany({
-            where: {
-                createdAt: {
-                    gte: startDate,
-                    lte: endDate
-                }
-            },
-            select: {
-                type: true,
-                createdAt: true
-            }
-        })
+        // Aggregate counts at the database level — avoids loading every record into memory
+        const rows = await prisma.$queryRaw<Array<{
+            date: string;
+            task_count: bigint;
+            feedback_count: bigint;
+        }>>`
+            SELECT
+                TO_CHAR("createdAt"::date, 'YYYY-MM-DD') AS date,
+                COUNT(*) FILTER (WHERE type = 'TASK')     AS task_count,
+                COUNT(*) FILTER (WHERE type = 'FEEDBACK') AS feedback_count
+            FROM data_records
+            WHERE "createdAt" >= ${startDate}
+              AND "createdAt" <= ${endDate}
+            GROUP BY "createdAt"::date
+            ORDER BY "createdAt"::date
+        `
 
-        // Create a map to hold daily counts
+        // Build a map from the aggregated rows
         const dailyActivityMap = new Map<string, { taskCount: number; feedbackCount: number }>()
 
-        // Calculate the number of days in the range
-        const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
+        for (const row of rows) {
+            dailyActivityMap.set(row.date, {
+                taskCount: Number(row.task_count),
+                feedbackCount: Number(row.feedback_count),
+            })
+        }
 
-        // Initialize all days in the range with zero counts
+        // Initialize every day in the range so days with zero records still appear
+        const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
         for (let i = 0; i < daysDiff; i++) {
             const date = new Date(startDate)
             date.setDate(date.getDate() + i)
             const dateKey = date.toISOString().split('T')[0]
-            dailyActivityMap.set(dateKey, { taskCount: 0, feedbackCount: 0 })
-        }
-
-        // Count records by day
-        records.forEach((record, index) => {
-            try {
-                if (!record.createdAt || !(record.createdAt instanceof Date)) {
-                    console.error('[Activity Over Time API] Invalid createdAt date:', {
-                        errorId: ERROR_IDS.INVALID_DATE_FORMAT,
-                        recordType: record.type,
-                        createdAt: record.createdAt,
-                        recordIndex: index,
-                        userId: user.id
-                    })
-                    return // Skip this record
-                }
-
-                const dateKey = record.createdAt.toISOString().split('T')[0]
-                const counts = dailyActivityMap.get(dateKey)
-
-                if (counts) {
-                    if (record.type === 'TASK') {
-                        counts.taskCount++
-                    } else if (record.type === 'FEEDBACK') {
-                        counts.feedbackCount++
-                    }
-                } else {
-                    // Record falls outside requested range - data integrity issue
-                    console.warn('[Activity Over Time API] Record outside date range:', {
-                        errorId: ERROR_IDS.INVALID_DATE_RANGE,
-                        dateKey,
-                        requestedRange: `${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`,
-                        recordType: record.type,
-                        recordIndex: index
-                    })
-                }
-            } catch (error) {
-                console.error('[Activity Over Time API] Error processing record:', {
-                    errorId: ERROR_IDS.SYSTEM_ERROR,
-                    error: error instanceof Error ? error.message : String(error),
-                    stack: error instanceof Error ? error.stack : undefined,
-                    recordType: record.type,
-                    recordIndex: index,
-                    userId: user.id
-                })
-                // Continue processing other records
+            if (!dailyActivityMap.has(dateKey)) {
+                dailyActivityMap.set(dateKey, { taskCount: 0, feedbackCount: 0 })
             }
-        })
+        }
 
         // Convert map to sorted array
         const dailyActivity: DailyActivity[] = Array.from(dailyActivityMap.entries())

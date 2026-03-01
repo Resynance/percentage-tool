@@ -28,6 +28,7 @@ export default function RedZoneModal({ isOpen, onClose, environment, threshold =
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [totalPrompts, setTotalPrompts] = useState(0);
+  const [totalTasksWithEmbeddings, setTotalTasksWithEmbeddings] = useState(0);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -53,6 +54,7 @@ export default function RedZoneModal({ isOpen, onClose, environment, threshold =
 
         setPairs(data.pairs);
         setTotalPrompts(data.totalPrompts);
+        setTotalTasksWithEmbeddings(data.totalTasksWithEmbeddings ?? data.totalPrompts);
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : "Failed to fetch");
       } finally {
@@ -180,10 +182,15 @@ export default function RedZoneModal({ isOpen, onClose, environment, threshold =
           }}
         >
           <div>
-            <span style={{ color: "rgba(255,255,255,0.5)" }}>Total Prompts: </span>
+            <span style={{ color: "rgba(255,255,255,0.5)" }}>Prompts Analyzed: </span>
             <span style={{ color: "rgba(255,255,255,0.9)", fontWeight: 600 }}>
               {totalPrompts}
             </span>
+            {totalTasksWithEmbeddings > totalPrompts && (
+              <span style={{ color: "rgba(255,255,255,0.4)", fontSize: "12px", marginLeft: "4px" }}>
+                (of {totalTasksWithEmbeddings} — most recent {totalPrompts} used)
+              </span>
+            )}
           </div>
           <div>
             <span style={{ color: "rgba(255,255,255,0.5)" }}>Red Zone Pairs: </span>

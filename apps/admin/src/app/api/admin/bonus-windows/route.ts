@@ -33,56 +33,56 @@ export async function GET() {
             orderBy: { createdAt: 'desc' }
         })
 
-        // Calculate actual counts for each window (all users)
-        const windowsWithProgress = await Promise.all(
-            windows.map(async (window) => {
-                const taskCount = await prisma.dataRecord.count({
-                    where: {
-                        type: 'TASK',
-                        createdAt: {
-                            gte: window.startTime,
-                            lte: window.endTime
-                        }
-                    }
-                })
+        // Single JOIN query to count tasks and feedback for all windows at once
+        const counts = await prisma.$queryRaw<Array<{
+            window_id: string;
+            task_count: bigint;
+            feedback_count: bigint;
+        }>>`
+            SELECT
+                bw.id                                                       AS window_id,
+                COUNT(dr.id) FILTER (WHERE dr.type = 'TASK')     AS task_count,
+                COUNT(dr.id) FILTER (WHERE dr.type = 'FEEDBACK') AS feedback_count
+            FROM bonus_windows bw
+            LEFT JOIN data_records dr
+                ON dr."createdAt" >= bw.start_time
+               AND dr."createdAt" <= bw.end_time
+            GROUP BY bw.id
+        `
 
-                const feedbackCount = await prisma.dataRecord.count({
-                    where: {
-                        type: 'FEEDBACK',
-                        createdAt: {
-                            gte: window.startTime,
-                            lte: window.endTime
-                        }
-                    }
-                })
+        const countMap = new Map(counts.map(r => [r.window_id, r]))
 
-                const taskProgress = window.targetTaskCount > 0
-                    ? Math.min(100, Math.round((taskCount / window.targetTaskCount) * 100))
-                    : 100
+        const windowsWithProgress = windows.map((window) => {
+            const row = countMap.get(window.id)
+            const taskCount = Number(row?.task_count ?? 0)
+            const feedbackCount = Number(row?.feedback_count ?? 0)
 
-                const feedbackProgress = window.targetFeedbackCount > 0
-                    ? Math.min(100, Math.round((feedbackCount / window.targetFeedbackCount) * 100))
-                    : 100
+            const taskProgress = window.targetTaskCount > 0
+                ? Math.min(100, Math.round((taskCount / window.targetTaskCount) * 100))
+                : 100
 
-                const taskProgressTier2 = window.targetTaskCountTier2 && window.targetTaskCountTier2 > 0
-                    ? Math.min(100, Math.round((taskCount / window.targetTaskCountTier2) * 100))
-                    : 100
+            const feedbackProgress = window.targetFeedbackCount > 0
+                ? Math.min(100, Math.round((feedbackCount / window.targetFeedbackCount) * 100))
+                : 100
 
-                const feedbackProgressTier2 = window.targetFeedbackCountTier2 && window.targetFeedbackCountTier2 > 0
-                    ? Math.min(100, Math.round((feedbackCount / window.targetFeedbackCountTier2) * 100))
-                    : 100
+            const taskProgressTier2 = window.targetTaskCountTier2 && window.targetTaskCountTier2 > 0
+                ? Math.min(100, Math.round((taskCount / window.targetTaskCountTier2) * 100))
+                : 100
 
-                return {
-                    ...window,
-                    actualTaskCount: taskCount,
-                    actualFeedbackCount: feedbackCount,
-                    taskProgress,
-                    feedbackProgress,
-                    taskProgressTier2,
-                    feedbackProgressTier2
-                }
-            })
-        )
+            const feedbackProgressTier2 = window.targetFeedbackCountTier2 && window.targetFeedbackCountTier2 > 0
+                ? Math.min(100, Math.round((feedbackCount / window.targetFeedbackCountTier2) * 100))
+                : 100
+
+            return {
+                ...window,
+                actualTaskCount: taskCount,
+                actualFeedbackCount: feedbackCount,
+                taskProgress,
+                feedbackProgress,
+                taskProgressTier2,
+                feedbackProgressTier2
+            }
+        })
 
         return NextResponse.json(windowsWithProgress)
     } catch (error) {

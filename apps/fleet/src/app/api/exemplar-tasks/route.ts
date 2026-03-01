@@ -42,38 +42,35 @@ export async function GET(request: NextRequest) {
     const environment = request.nextUrl.searchParams.get('environment') || '';
 
     try {
-        const exemplars = await prisma.exemplarTask.findMany({
-            where: environment ? { environment } : undefined,
-            select: {
-                id: true,
-                environment: true,
-                content: true,
-                createdById: true,
-                createdAt: true,
-                updatedAt: true,
-            },
-            orderBy: { createdAt: 'desc' },
-        });
-
-        // Check which exemplars have embeddings via raw query
-        const ids = exemplars.map(e => e.id);
-        let embeddingIds: string[] = [];
-        if (ids.length > 0) {
-            const rows = await prisma.$queryRaw<Array<{ id: string }>>`
-                SELECT id FROM exemplar_tasks
-                WHERE id = ANY(${ids}::text[])
-                AND embedding IS NOT NULL
+        // Single query — includes embedding status to avoid a second round-trip
+        const exemplars = environment
+            ? await prisma.$queryRaw<Array<{
+                id: string; environment: string; content: string;
+                createdById: string | null; createdAt: Date; updatedAt: Date; hasEmbedding: boolean;
+            }>>`
+                SELECT id, environment, content,
+                       created_by_id AS "createdById",
+                       created_at    AS "createdAt",
+                       updated_at    AS "updatedAt",
+                       (embedding IS NOT NULL) AS "hasEmbedding"
+                FROM exemplar_tasks
+                WHERE environment = ${environment}
+                ORDER BY created_at DESC
+            `
+            : await prisma.$queryRaw<Array<{
+                id: string; environment: string; content: string;
+                createdById: string | null; createdAt: Date; updatedAt: Date; hasEmbedding: boolean;
+            }>>`
+                SELECT id, environment, content,
+                       created_by_id AS "createdById",
+                       created_at    AS "createdAt",
+                       updated_at    AS "updatedAt",
+                       (embedding IS NOT NULL) AS "hasEmbedding"
+                FROM exemplar_tasks
+                ORDER BY created_at DESC
             `;
-            embeddingIds = rows.map(r => r.id);
-        }
 
-        const embeddingSet = new Set(embeddingIds);
-        const result = exemplars.map(e => ({
-            ...e,
-            hasEmbedding: embeddingSet.has(e.id),
-        }));
-
-        return NextResponse.json({ exemplars: result });
+        return NextResponse.json({ exemplars });
     } catch (err) {
         console.error('[ExemplarTasks] Error fetching exemplar tasks:', err);
         return NextResponse.json({ error: 'Failed to fetch exemplar tasks' }, { status: 500 });
