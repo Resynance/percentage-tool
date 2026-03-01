@@ -267,11 +267,19 @@ async function processVectorizationJobs(environment) {
         });
         // Run vectorization
         await vectorizeJob(nextJob.id, environment);
-        // Mark as complete and clear payload
-        await prisma.ingestJob.update({
+        // Only mark as complete if the job wasn't cancelled during vectorization.
+        // vectorizeJob exits early on cancellation but doesn't write the final status itself,
+        // so we check here to avoid overwriting a CANCELLED status with COMPLETED.
+        const finalJob = await prisma.ingestJob.findUnique({
             where: { id: nextJob.id },
-            data: { status: 'COMPLETED', payload: null }
+            select: { status: true }
         });
+        if (finalJob?.status !== 'CANCELLED') {
+            await prisma.ingestJob.update({
+                where: { id: nextJob.id },
+                data: { status: 'COMPLETED', payload: null }
+            });
+        }
         // Process next job in queue
         processVectorizationJobs(environment);
     }
@@ -406,6 +414,12 @@ async function vectorizeJob(jobId, environment) {
             }
         }
         console.log(`[Vectorize] Batch result: ${batchSuccess}/${recordsToProcess.length} successful (total: ${totalEmbedded}, skipped: ${totalSkipped})`);
+        // Heartbeat: touch the job's updatedAt so the status endpoint can distinguish
+        // an actively-processing job from one that is stuck/zombie (function timed out).
+        await prisma.ingestJob.update({
+            where: { id: jobId },
+            data: { updatedAt: new Date() }
+        });
         // Wait briefly to avoid hammering API if experiencing issues
         if (batchSuccess === 0 && recordsToProcess.length > 0) {
             console.warn(`[Vectorize] Batch failed, waiting before retry...`);
