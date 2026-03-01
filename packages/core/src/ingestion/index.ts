@@ -453,6 +453,13 @@ async function vectorizeJob(jobId: string, environment: string) {
 
         console.log(`[Vectorize] Batch result: ${batchSuccess}/${recordsToProcess.length} successful (total: ${totalEmbedded}, skipped: ${totalSkipped})`);
 
+        // Heartbeat: touch the job's updatedAt so the status endpoint can distinguish
+        // an actively-processing job from one that is stuck/zombie (function timed out).
+        await prisma.ingestJob.update({
+            where: { id: jobId },
+            data: { updatedAt: new Date() }
+        });
+
         // Wait briefly to avoid hammering API if experiencing issues
         if (batchSuccess === 0 && recordsToProcess.length > 0) {
             console.warn(`[Vectorize] Batch failed, waiting before retry...`);

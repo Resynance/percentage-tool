@@ -36,6 +36,27 @@ export async function GET(req: NextRequest) {
             return NextResponse.json(updatedJob || job);
         }
 
+        // ZOMBIE DETECTION: If the job has been VECTORIZING for more than 3 minutes without
+        // a heartbeat update, the serverless function that was running it has timed out.
+        // Reset the job so the next status poll can re-trigger vectorization and pick up
+        // where the embedding loop left off (only records with NULL embedding are processed).
+        const ZOMBIE_THRESHOLD_MS = 3 * 60 * 1000; // 3 minutes
+        if (job.status === 'VECTORIZING') {
+            const staleSinceMs = Date.now() - new Date(job.updatedAt).getTime();
+            if (staleSinceMs > ZOMBIE_THRESHOLD_MS) {
+                console.warn(`[Status] Job ${jobId} has been VECTORIZING for ${Math.round(staleSinceMs / 1000)}s without a heartbeat — resetting to QUEUED_FOR_VEC`);
+                await prisma.ingestJob.update({
+                    where: { id: jobId },
+                    data: { status: 'QUEUED_FOR_VEC' }
+                });
+                await processQueuedJobs(job.environment).catch(err =>
+                    console.error('Queue Processor Error (zombie recovery):', err)
+                );
+                const recoveredJob = await prisma.ingestJob.findUnique({ where: { id: jobId } });
+                return NextResponse.json(recoveredJob || job);
+            }
+        }
+
         return NextResponse.json(job);
     } catch (error: any) {
         console.error('Job Status Error:', error);
