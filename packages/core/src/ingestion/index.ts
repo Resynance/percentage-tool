@@ -302,11 +302,19 @@ async function processVectorizationJobs(environment: string) {
         // Run vectorization
         await vectorizeJob(nextJob.id, environment);
 
-        // Mark as complete and clear payload
-        await prisma.ingestJob.update({
+        // Only mark as complete if the job wasn't cancelled during vectorization.
+        // vectorizeJob exits early on cancellation but doesn't write the final status itself,
+        // so we check here to avoid overwriting a CANCELLED status with COMPLETED.
+        const finalJob = await prisma.ingestJob.findUnique({
             where: { id: nextJob.id },
-            data: { status: 'COMPLETED', payload: null }
+            select: { status: true }
         });
+        if (finalJob?.status !== 'CANCELLED') {
+            await prisma.ingestJob.update({
+                where: { id: nextJob.id },
+                data: { status: 'COMPLETED', payload: null }
+            });
+        }
 
         // Process next job in queue
         processVectorizationJobs(environment);
