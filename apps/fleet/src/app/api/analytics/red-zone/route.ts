@@ -42,6 +42,11 @@ function parseVector(vectorStr: string): number[] {
 
 // Cap the number of tasks fed into the O(n²) comparison to prevent timeouts.
 // At 500 records: ~125K comparisons (fast). At 1000: ~500K (slow). At 2000: ~2M (likely timeout).
+//
+// Trade-off: only the most recent RECORD_LIMIT tasks are analysed. High-similarity pairs
+// that span across this boundary (one record inside the window, one outside) will not be
+// detected. The UI surfaces "Analyzing X of Y" so users are aware when the cap is active.
+// If wider coverage is needed, consider paginating the analysis or using a pgvector ANN index.
 const RECORD_LIMIT = 500;
 
 export async function GET(request: NextRequest) {

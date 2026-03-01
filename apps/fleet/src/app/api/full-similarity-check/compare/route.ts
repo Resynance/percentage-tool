@@ -94,7 +94,8 @@ export async function POST(req: NextRequest) {
             // Build query to fetch comparison tasks
             let comparisonQuery;
             if (scope === 'environment') {
-                // Compare within same environment (case-insensitive)
+                // Compare within same environment (case-insensitive).
+                // ORDER BY ensures the 2000-record window is deterministic (most recent first).
                 comparisonQuery = Prisma.sql`
                     SELECT id, content, metadata, environment, embedding, "createdByName", "createdByEmail", "createdAt"
                     FROM data_records
@@ -102,16 +103,19 @@ export async function POST(req: NextRequest) {
                     AND type = 'TASK'
                     AND id != ${sourceTask.id}
                     AND embedding IS NOT NULL
+                    ORDER BY "createdAt" DESC
                     LIMIT 2000
                 `;
             } else {
-                // Compare with all tasks (across all environments)
+                // Compare with all tasks (across all environments).
+                // ORDER BY ensures the 2000-record window is deterministic (most recent first).
                 comparisonQuery = Prisma.sql`
                     SELECT id, content, metadata, environment, embedding, "createdByName", "createdByEmail", "createdAt"
                     FROM data_records
                     WHERE type = 'TASK'
                     AND id != ${sourceTask.id}
                     AND embedding IS NOT NULL
+                    ORDER BY "createdAt" DESC
                     LIMIT 2000
                 `;
             }

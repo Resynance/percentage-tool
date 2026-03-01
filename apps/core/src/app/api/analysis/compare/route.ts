@@ -17,8 +17,17 @@ import { extractTextFromPDF } from '@repo/core/utils';
 import { createClient } from '@repo/auth/server';
 
 // Module-level cache — persists across requests in the same server process.
-// Key: guideline.id, Value: extracted PDF text.
-const guidelineTextCache = new Map<string, string>();
+// Key: guideline.id, Value: { text, expiresAt }.
+// TTL: 30 minutes. Without a TTL, re-uploading a PDF (same guideline ID, new content)
+// would serve stale extracted text until the server process restarted.
+const GUIDELINE_CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
+
+interface CachedGuideline {
+    text: string;
+    expiresAt: number;
+}
+
+const guidelineTextCache = new Map<string, CachedGuideline>();
 
 export async function POST(req: NextRequest) {
     const supabase = await createClient();
@@ -114,7 +123,9 @@ export async function POST(req: NextRequest) {
         }
 
         // Parse PDF guidelines (with in-process cache to avoid re-parsing on every request)
-        let guidelinesText = guidelineTextCache.get(guideline.id) ?? '';
+        const now = Date.now();
+        const cachedGuideline = guidelineTextCache.get(guideline.id);
+        let guidelinesText = (cachedGuideline && cachedGuideline.expiresAt > now) ? cachedGuideline.text : '';
 
         if (!guidelinesText) {
             const base64Data = guideline.content.split(';base64,').pop() || guideline.content;
@@ -144,7 +155,7 @@ export async function POST(req: NextRequest) {
                     }, { status: 400 });
                 }
 
-                guidelineTextCache.set(guideline.id, guidelinesText);
+                guidelineTextCache.set(guideline.id, { text: guidelinesText, expiresAt: now + GUIDELINE_CACHE_TTL_MS });
             } catch (pdfError: any) {
                 console.error('Compare API Error: PDF parsing failed', {
                     environment: record.environment,
