@@ -1,5 +1,6 @@
 
 import { createClient, createAdminClient } from '@repo/auth/server'
+import { getUserRole, invalidateRoleCache } from '@repo/auth/utils'
 import { prisma } from '@repo/database'
 import { NextResponse } from 'next/server'
 import { logAudit, checkAuditResult } from '@repo/core/audit'
@@ -13,15 +14,8 @@ export async function GET() {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Check if the requesting user is an ADMIN
-    const { data: adminProfile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single()
-
-    const role = (adminProfile as any)?.role;
     // Allow ADMIN and MANAGER to view users list (needed for assignments)
+    const role = await getUserRole(user.id);
     if (!['ADMIN', 'MANAGER'].includes(role)) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
@@ -48,13 +42,7 @@ export async function PATCH(req: Request) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { data: adminProfile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single()
-
-    if ((adminProfile as any)?.role !== 'ADMIN') {
+    if (await getUserRole(user.id) !== 'ADMIN') {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
@@ -99,6 +87,11 @@ export async function PATCH(req: Request) {
             userId: user.id
         })
 
+        // Clear cached role for the affected user so the next request reflects the change
+        if (role !== undefined) {
+            invalidateRoleCache(userId);
+        }
+
         return NextResponse.json(updatedProfile)
     } catch (error: any) {
         return NextResponse.json({ error: error.message }, { status: 500 })
@@ -113,13 +106,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { data: adminProfile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', adminUser.id)
-        .single()
-
-    if ((adminProfile as any)?.role !== 'ADMIN') {
+    if (await getUserRole(adminUser.id) !== 'ADMIN') {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 

@@ -102,6 +102,7 @@ export async function POST(req: NextRequest) {
                     AND type = 'TASK'
                     AND id != ${sourceTask.id}
                     AND embedding IS NOT NULL
+                    LIMIT 2000
                 `;
             } else {
                 // Compare with all tasks (across all environments)
@@ -111,6 +112,7 @@ export async function POST(req: NextRequest) {
                     WHERE type = 'TASK'
                     AND id != ${sourceTask.id}
                     AND embedding IS NOT NULL
+                    LIMIT 2000
                 `;
             }
 

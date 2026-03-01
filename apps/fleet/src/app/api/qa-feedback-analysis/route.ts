@@ -74,11 +74,12 @@ export async function GET(req: Request) {
         const environment = searchParams.get('environment')
         const minNegativePercent = searchParams.get('minNegativePercent')
 
-        // Build date range filter
-        const dateFilter: Prisma.QAFeedbackRatingWhereInput = {}
+        // Parse date range (shared by both paths below)
+        let startDate: Date | undefined
+        let endDate: Date | undefined
         if (startParam && endParam) {
-            const startDate = new Date(startParam)
-            const endDate = new Date(endParam)
+            startDate = new Date(startParam)
+            endDate = new Date(endParam)
 
             if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
                 return NextResponse.json({
@@ -89,57 +90,49 @@ export async function GET(req: Request) {
 
             startDate.setHours(0, 0, 0, 0)
             endDate.setHours(23, 59, 59, 999)
-
-            dateFilter.ratedAt = {
-                gte: startDate,
-                lte: endDate
-            }
         }
 
-        // Get all ratings grouped by QA worker
-        const ratings = await prisma.qAFeedbackRating.findMany({
-            where: dateFilter,
-            select: {
-                qaEmail: true,
-                qaName: true,
-                isHelpful: true,
-                isDispute: true,
-                evalTaskId: true,
-            }
-        })
+        // Get ratings — when an environment filter is present, use a single JOIN query to
+        // avoid loading all ratings and then doing a second round-trip to filter by task metadata.
+        type RatingRow = { qaEmail: string; qaName: string | null; isHelpful: boolean; isDispute: boolean; evalTaskId: string | null }
+        let filteredRatings: RatingRow[]
 
-        // If environment filter is provided, we need to join with data_records
-        let filteredRatings = ratings
         if (environment) {
-            const ratingIds = ratings
-                .filter(r => r.evalTaskId)
-                .map(r => r.evalTaskId!)
+            const dateClause = startDate && endDate
+                ? Prisma.sql`AND qr.rated_at >= ${startDate} AND qr.rated_at <= ${endDate}`
+                : Prisma.empty
 
-            // Get tasks matching the environment
-            const tasks = await prisma.dataRecord.findMany({
-                where: {
-                    id: { in: ratingIds },
-                },
-                select: {
-                    id: true,
-                    metadata: true,
-                }
+            const rows = await prisma.$queryRaw<Array<{
+                qa_email: string; qa_name: string | null; is_helpful: boolean; is_dispute: boolean; eval_task_id: string | null;
+            }>>`
+                SELECT qr.qa_email, qr.qa_name, qr.is_helpful, qr.is_dispute, qr.eval_task_id
+                FROM qa_feedback_ratings qr
+                JOIN data_records dr ON dr.id = qr.eval_task_id
+                WHERE (
+                    dr.metadata->>'scenario_title' = ${environment}
+                    OR dr.metadata->>'env_key' = ${environment}
+                    OR dr.metadata->>'environment_name' = ${environment}
+                )
+                ${dateClause}
+            `
+
+            filteredRatings = rows.map(r => ({
+                qaEmail: r.qa_email,
+                qaName: r.qa_name,
+                isHelpful: r.is_helpful,
+                isDispute: r.is_dispute,
+                evalTaskId: r.eval_task_id,
+            }))
+        } else {
+            const dateFilter: Prisma.QAFeedbackRatingWhereInput = {}
+            if (startDate && endDate) {
+                dateFilter.ratedAt = { gte: startDate, lte: endDate }
+            }
+
+            filteredRatings = await prisma.qAFeedbackRating.findMany({
+                where: dateFilter,
+                select: { qaEmail: true, qaName: true, isHelpful: true, isDispute: true, evalTaskId: true }
             })
-
-            const taskIdsInEnvironment = new Set(
-                tasks
-                    .filter(task => {
-                        const metadata = task.metadata as any
-                        const taskEnv = metadata?.scenario_title || metadata?.env_key || metadata?.environment_name
-                        return taskEnv === environment
-                    })
-                    .map(task => task.id)
-            )
-
-            // Filter ratings to only those linked to tasks in the target environment
-            filteredRatings = ratings.filter(r =>
-                r.evalTaskId && taskIdsInEnvironment.has(r.evalTaskId)
-            )
         }
 
         // Group by QA worker
